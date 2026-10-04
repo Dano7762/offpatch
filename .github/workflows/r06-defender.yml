@@ -1,27 +1,22 @@
-# R-06 : application de mpam-fe.exe sur une plateforme Defender remise à celle de l'image (définitions conservées),
-# sur runners Windows 11 ARM64 jetables, une variante de lancement par runner.
+# R-06 : Defender sur runner Windows 11 ARM64 jetable. Plateforme remise à celle de l'image (définitions conservées),
+# puis, si un lien est donné, mise à jour de plateforme (KB4052623), puis mpam-fe.exe -q.
 # Déclenchement manuel uniquement. Modifie le système du runner (Defender), sans redémarrage.
 name: r06-defender
 
 on:
   workflow_dispatch:
+    inputs:
+      platform_url_arm64:
+        description: 'Lien de la mise à jour de plateforme ARM64 (updateplatform.arm64fre_*.exe), vide pour ne pas la tester'
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
   defender:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: windows-11-arm
-            arch: arm64
-            variant: Quiet
-          - runner: windows-11-arm
-            arch: arm64
-            variant: Plain
-    runs-on: ${{ matrix.runner }}
+    runs-on: windows-11-arm
     timeout-minutes: 60
     defaults:
       run:
@@ -31,15 +26,14 @@ jobs:
 
       - name: Essai R-06
         env:
-          DEFENDER_ARCH: ${{ matrix.arch }}
-          DEFENDER_VARIANT: ${{ matrix.variant }}
-        run: ./tests/runner/Invoke-R06DefenderTest.ps1 -Arch $env:DEFENDER_ARCH -Variant $env:DEFENDER_VARIANT -OutputDirectory "$env:RUNNER_TEMP\r06-out"
+          PLATFORM_URL: ${{ inputs.platform_url_arm64 }}
+        run: ./tests/runner/Invoke-R06DefenderTest.ps1 -Arch arm64 -Variant Quiet -PlatformUrl $env:PLATFORM_URL -OutputDirectory "$env:RUNNER_TEMP\r06-out"
 
       - name: Relevés
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: r06-defender-${{ matrix.arch }}-${{ matrix.variant }}
+          name: r06-defender-arm64
           path: ${{ runner.temp }}/r06-out
           retention-days: 30
           if-no-files-found: warn
