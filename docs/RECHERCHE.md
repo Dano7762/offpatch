@@ -55,10 +55,31 @@ Question : sur une installation récente de Windows 11 24H2, 25H2 ou 26H2, quell
 
 Impact : catégorie `windows-checkpoint`, ordre du plan, champ `prerequisites` du manifeste.
 
-- Statut : À vérifier
-- Sources :
+- Statut : En cours (documentation dépouillée, attente du test VM : `docs/procedures-vm/R-02-checkpoint.md`)
+- Sources (consultées le 2026-10-04) :
+  - https://learn.microsoft.com/en-us/windows/deployment/update/catalog-checkpoint-cumulative-updates (« Checkpoint cumulative updates and Microsoft Update Catalog usage », mise à jour du 2025-01-31).
+  - https://support.microsoft.com/help/5129195 (KB5129195), section « Microsoft Update Catalog » : tableau « Required checkpoint cumulative update » / « Target cumulative update », méthodes 1 et 2.
+  - https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-operating-system-package-servicing-command-line-options : `/Add-Package` et paragraphe « Checkpoint cumulative updates ».
+  - Microsoft Update Catalog : recherche `KB5043080`, `DownloadDialog.aspx` des entrées de KB5129195, requêtes HEAD sur les fichiers (`scratch/r02-download-pair.ps1 -ListOnly`).
+  - https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information : 24H2 disponible le 2024-10-01 en 26100.1742, 26H2 disponible le 2026-09-29 en 26300.9457.
+  - Machine de développement (lecture seule, sans élévation) : 26200.9550, `Get-HotFix`.
 - Conclusion :
-- Décision : déjà fixée par David le 2026-10-04 à la relecture de R-01 : KB5043080 étant joint à chaque entrée de cumulative Windows 11 (R-01), le stockage des fichiers est dédoublonné par hash et la purge se fait par comptage de références (un fichier n'est supprimé que si plus aucun élément du manifeste ne le référence). Le reste de la question reste à étudier.
+  - Une cumulative postérieure à une checkpoint ne s'applique qu'à un système qui a déjà cette checkpoint, ou une cumulative ultérieure. Microsoft annonce que d'autres checkpoints pourront suivre. Aujourd'hui, la seule pour 24H2/25H2/26H2 est KB5043080 (2024-09, 26100.1742). Son titre au catalogue a l'ancienne forme, sans virgule ni build : `2024-09 Cumulative Update for Windows 11 Version 24H2 for x64-based Systems (KB5043080)`.
+  - Le catalogue livre la checkpoint avec la cumulative : la fenêtre de téléchargement d'une entrée montre « all prior checkpoints » (Learn), et la page du KB distingue la checkpoint requise de la cible. Tailles relevées en HEAD : KB5043080 x64 533 761 740 octets, ARM64 610 638 429 ; KB5129195 x64 4 639 422 594, ARM64 4 391 570 921.
+  - Deux méthodes documentées :
+    - Méthode 1 : chaque .msu un par un, dans l'ordre (checkpoint puis cible), avec DISM ou wusa. Si la checkpoint est déjà présente, wusa indique qu'elle est déjà installée. Le code retour de DISM dans ce cas n'est pas documenté.
+    - Méthode 2 : tous les .msu dans un même dossier, DISM appelé avec la cible comme seul `/PackagePath`. DISM explore le dossier, installe les checkpoints nécessaires, puis la cible. Contraintes : « Ensure no other files are present in the folder » (KB) ; « Only the target cumulative update and any prerequisite checkpoint cumulative updates should be in the -PackagePath folder » et « Cumulative update packages with a revision less than or equal to the target cumulative update will be processed » (DISM). Les sous-dossiers sont aussi explorés.
+  - Conséquence pour le dépôt : DISM cherche les checkpoints dans le dossier du fichier passé en `/PackagePath`, même quand on lui donne un fichier. Avec la structure actuelle du cahier des charges (`win11-x64/lcu/` avec deux mois de rétention), une installation depuis le dépôt ferait aussi traiter la cumulative du mois précédent, dont la révision est inférieure à la cible. Un stockage par hash avec un fichier par dossier écarte ce risque.
+  - Aucun document ne dit s'il faut redémarrer entre la checkpoint et la cible avec la méthode 1. Le nombre de redémarrages reste à mesurer.
+  - Supports d'installation : une ISO 24H2 publique (26100.1742) contient déjà KB5043080, une ISO 26H2 actuelle (26300.9457) contient déjà KB5129195. Le cas « checkpoint manquante » ne concerne que des supports 24H2 antérieurs à la sortie publique (anciennes images constructeur, préversions). Sur une ISO récente, le cas courant est « checkpoint déjà présente ».
+  - Détection : la machine de développement, en 26200.9550 (elle a donc forcément la checkpoint), n'affiche pas KB5043080 dans `Get-HotFix`, qui ne permet donc pas de détecter la checkpoint. La liste des paquets DISM demande l'élévation et n'a pas pu être lue ici. La forme du nom du paquet est à relever en VM.
+- Décision (provisoire, à confirmer en VM) :
+  - Prérequis : tout fichier d'une entrée du catalogue autre que celui du KB principal (repéré par `kb<numéro>` dans le nom du fichier) est un prérequis. Aucun numéro de checkpoint en dur. Ordre d'installation : prérequis d'abord, par numéro de KB croissant (à revoir si plusieurs checkpoints coexistent un jour), puis la cible.
+  - Méthode recommandée : **installation séquentielle depuis le dépôt (méthode 1, DISM)**, un `/Add-Package` par fichier, en sautant les prérequis déjà détectés. Raisons : pas de copie de 5,2 Go sur `C:` (temps de copie depuis la clé, espace libre) ; compatible avec le dépôt dédoublonné et la rétention ; chaque étape est journalisée et reprise séparément ; méthode documentée par Microsoft. Condition : chaque fichier seul dans son dossier du dépôt, sinon DISM explore les autres .msu. Repli si la VM montre un problème : méthode 2 avec un dossier de travail sous `C:\ProgramData\OffPatch\temp\` contenant uniquement la cible et ses prérequis (copie, et contrôle d'espace libre augmenté de la taille des fichiers).
+  - Détection de la checkpoint : liste des paquets DISM, comme demandé par David. Complément proposé, à valider : la checkpoint est forcément présente si la build courante figure dans `baseBuilds` et que l'UBR courant est supérieur ou égal à celui de la checkpoint (1742 pour KB5043080), puisque les cumulatives sont cumulatives. Cet UBR n'est pas dans le titre de la checkpoint au catalogue (ancienne forme) : il viendrait de la page release-information, comme pour Windows 10 (R-01).
+  - Code retour de DISM quand la checkpoint est déjà installée : à relever en VM (essais A3 et A4), puis à reporter en R-14.
+  - Stockage (décision de David du 2026-10-04, relecture de R-01) : KB5043080 étant joint à chaque entrée de cumulative Windows 11 (R-01), le stockage des fichiers est dédoublonné par hash et la purge se fait par comptage de références (un fichier n'est supprimé que si plus aucun élément du manifeste ne le référence).
+  - Proposition de structure qui en découle, à valider avant de toucher au cahier des charges (section 5) : un dossier par fichier, nommé d'après son SHA-256, par exemple `depot/files/<sha256>/windows11.0-kb5129195-x64_….msu`, les éléments du manifeste pointant vers ces chemins.
 
 ## R-03 Enablement package 26H2
 
@@ -67,6 +88,7 @@ Question : numéro de KB, présence au catalogue pour x64 et ARM64, build minima
 Impact : catégorie `windows-ekb`, regroupement des redémarrages.
 
 - Statut : À vérifier
+- Piste (notée le 2026-10-04 à la demande de David) : KB5121794 serait l'enablement package 26H2. Sa présence au catalogue est contradictoire selon les sources. Le 2026-10-04, aucun résultat au catalogue pour `KB5121794`, `Enablement Package 26H2`, `Enablement Package Windows 11` ni `Feature Update to Windows 11, version 26H2 via Enablement Package`. À vérifier : la page du KB sur support.microsoft.com et d'autres formulations de recherche. Autre indice : `Get-HotFix` sur la machine de développement (25H2) liste KB5054156, à identifier.
 - Sources :
 - Conclusion :
 - Décision :
@@ -172,6 +194,7 @@ Question : taille réelle des fichiers par cible et par source Office. Un fichie
 Impact : refus du FAT32, README.
 
 - Statut : À vérifier
+- Piste (2026-10-04, R-02) : KB5129195 x64 fait 4 639 422 594 octets (plus de 4 Gio), ARM64 4 391 570 921 octets. Un seul fichier dépasse donc la limite du FAT32.
 - Sources :
 - Conclusion :
 - Décision :
@@ -194,6 +217,7 @@ Question : `dism.exe /Online /Add-Package` ou `Add-WindowsPackage -Online` ? Cod
 Impact : exécuteur des étapes Windows.
 
 - Statut : À vérifier
+- Piste (2026-10-04, R-02) : codes retour de DISM pour un .msu déjà installé (checkpoint ou cumulative) et pour une cumulative dont la checkpoint manque, à mesurer avec `docs/procedures-vm/R-02-checkpoint.md` (essais A3, A4, A5). DISM cherche les checkpoints dans le dossier du `/PackagePath` et explore les sous-dossiers.
 - Sources :
 - Conclusion :
 - Décision :
