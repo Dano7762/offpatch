@@ -6,7 +6,7 @@
     Script réservé aux runners GitHub hébergés (jetables). Il modifie le système : ne jamais l'exécuter ailleurs.
       1. état de Defender (Get-MpComputerStatus) et antivirus enregistrés (SecurityCenter2, poste client) ;
       2. téléchargement de mpam-fe.exe par le lien officiel, version du fichier et signature ;
-      3. simulation d'une installation récente : MpCmdRun -ResetPlatform puis -RemoveDefinitions -All ;
+      3. simulation d'une installation récente : MpCmdRun -ResetPlatform (plateforme de l'image), et -RemoveDefinitions -All si demandé ;
       4. application de mpam-fe.exe selon -Variant : avec -q, sans argument, ou -q puis sans argument si -q échoue ; code retour et durée ;
       5. état final : la version des définitions doit être celle du fichier.
     Les résultats sont relevés, pas jugés : le script n'échoue que sur une erreur imprévue.
@@ -19,7 +19,8 @@ param(
     [ValidateSet('x64', 'arm64')][string]$Arch = 'x64',
     [Parameter(Mandatory)][string]$OutputDirectory,
     [string]$DownloadUrl = 'https://go.microsoft.com/fwlink/?LinkID=121721&arch={0}',
-    [ValidateSet('QuietThenPlain', 'Quiet', 'Plain')][string]$Variant = 'QuietThenPlain'
+    [ValidateSet('QuietThenPlain', 'Quiet', 'Plain')][string]$Variant = 'QuietThenPlain',
+    [switch]$RemoveDefinitions
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -88,7 +89,7 @@ $fileVersion = $info.FileVersion
 
 if ($PSCmdlet.ShouldProcess('Defender', 'Retour à la plateforme et aux définitions d''origine, puis mpam-fe.exe')) {
     Invoke-MpCmdRun -Arguments @('-ResetPlatform')
-    Invoke-MpCmdRun -Arguments @('-RemoveDefinitions', '-All')
+    if ($RemoveDefinitions) { Invoke-MpCmdRun -Arguments @('-RemoveDefinitions', '-All') }
     Get-DefenderState -Label 'Après retour à l''origine' | Out-Null
 
     $attempts = New-Object System.Collections.Generic.List[string]

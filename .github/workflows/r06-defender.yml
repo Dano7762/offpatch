@@ -1,4 +1,5 @@
-# R-06 : application de mpam-fe.exe sur une plateforme Defender remise à l'origine, sur runners jetables.
+# R-06 : application de mpam-fe.exe sur une plateforme Defender remise à celle de l'image (définitions conservées),
+# sur runners Windows 11 ARM64 jetables, une variante de lancement par runner.
 # Déclenchement manuel uniquement. Modifie le système du runner (Defender), sans redémarrage.
 name: r06-defender
 
@@ -14,9 +15,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: windows-2025
-            arch: x64
-            variant: QuietThenPlain
           - runner: windows-11-arm
             arch: arm64
             variant: Quiet
