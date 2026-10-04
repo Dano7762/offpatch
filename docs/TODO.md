@@ -12,7 +12,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [ ] R-04 Windows 10 22H2 et ESU
 - [x] R-05 Cumulatives .NET Framework
 - [x] R-06 Définitions Defender
-- [ ] R-07 ODT et sources Office
+- [x] R-07 ODT et sources Office
 - [ ] R-08 Office déjà présent
 - [ ] R-09 Détection des cumulatives installées
 - [ ] R-10 Contrôle d'intégrité
@@ -132,3 +132,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-04 | 0 | Cahier des charges 1.7 : plateforme Defender (KB4052623, Current Channel (Broad) seul) avant les définitions, deux types de dépendance (`prerequisites` bloquant, `runsAfter` d'ordre) dans le manifeste et `pinned-items.json`, attente bornée à 120 s ; essai complet sur runner ARM64 (définitions supprimées puis 1.459.384.0 → 1.459.553.0 après plateforme et mpam-fe.exe) | R-07 |
 | 2026-10-04 | 0 | R-07 en cours : product IDs confirmés, canal `Current` pour les versions en boîte (même build que le Current Channel), Office 64 bits sur Arm confirmé (Windows 11 minimum), Office LTSC 2024 non pris en charge sur Windows 10 22H2, ODT récupérable par la page officielle (lien versionné) ; essai `r07-office.yml` préparé, non lancé | Accord de David pour télécharger une source Office sur runner (structure, `v64.cab`, anciennes versions) ; avertissement LTSC 2024 sur Windows 10 à trancher |
 | 2026-10-04 | 0 | `graphify-out/` exclu du dépôt ; matrice de traçabilité par catégorie ajoutée au bilan de phase 0 (accord de David) | R-07 |
+| 2026-10-04 | 0 | R-07 tranché : structure de la source et rôle de `v64.cab` mesurés (`r07-office`), règle de purge validée et installation hors ligne de Home2024Retail réussie sur ARM64 avec le CDN bloqué (`r07-install`, exécutables Office x64 émulés) ; cahier des charges 1.8 (3.3 sans « à vérifier », source Current unique, aucun profil pris en charge sur Windows 10 22H2 : avertissement en 8.2, 8.6, 8.8) | R-08 |
