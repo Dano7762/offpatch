@@ -119,7 +119,21 @@ foreach ($pass in 1, 2) {
 $after = Get-OsState
 Save-PackageInventory -Suffix 'apres'
 $cbs = 'C:\Windows\Logs\CBS\CBS.log'
-if (Test-Path $cbs) { Compress-Archive -Path $cbs -DestinationPath (Join-Path $OutputDirectory 'CBS.zip') -Force }
+if (Test-Path $cbs) {
+    # CBS.log reste ouvert par le service : copie en lecture partagée, puis compression de la copie.
+    try {
+        $copy = Join-Path $OutputDirectory 'CBS.log'
+        $source = [System.IO.File]::Open($cbs, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        try {
+            $target = [System.IO.File]::Create($copy)
+            try { $source.CopyTo($target) } finally { $target.Dispose() }
+        } finally { $source.Dispose() }
+        Compress-Archive -Path $copy -DestinationPath (Join-Path $OutputDirectory 'CBS.zip') -Force
+        Remove-Item -Path $copy
+    } catch {
+        Write-Host "CBS.log non récupéré : $($_.Exception.Message)"
+    }
+}
 
 $alreadyUpToDate = ($before.Ubr -ge [int]([regex]::Match($download.EntryTitle, '\.(\d+)\)$').Groups[1].Value))
 $result = [pscustomobject]@{

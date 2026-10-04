@@ -73,6 +73,13 @@ Impact : catégorie `windows-checkpoint`, ordre du plan, champ `prerequisites` d
   - Microsoft Update Catalog : recherche `KB5043080`, `DownloadDialog.aspx` des entrées de KB5129195, requêtes HEAD sur les fichiers (`scratch/r02-download-pair.ps1 -ListOnly`).
   - https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information : 24H2 disponible le 2024-10-01 en 26100.1742, 26H2 disponible le 2026-09-29 en 26300.9457.
   - Machine de développement (lecture seule, sans élévation) : 26200.9550, `Get-HotFix`.
+  - Runner GitHub `windows-11-arm`, workflow `r02-arm64` (2026-10-04) : https://github.com/Dano7762/offpatch/actions/runs/37199152736 (relevés initiaux, recherche au catalogue en échec) et https://github.com/Dano7762/offpatch/actions/runs/37199356179 (essai complet ; seule la copie finale de `CBS.log` a échoué, fichier verrouillé, corrigé depuis).
+- Résultats sur runner (Windows 11 Entreprise 25H2 ARM64, 26200.9457 au départ, 120 Go libres) :
+  - Le runner avait déjà KB5129195 : l'essai mesure le cas « déjà installé », pas une installation. Relancer `r02-arm64.yml` après le Patch Tuesday du 13 octobre 2026 avec la nouvelle cumulative pour mesurer une vraie installation (prévu, décision de David).
+  - `DISM /Online /Add-Package /NoRestart` sur la checkpoint déjà présente : code 0, « The operation completed successfully », 18 s puis 13 s. Sur la cumulative déjà présente : code 0, même message, 53 s. Aucun redémarrage mis en attente. **DISM ne distingue pas « installé » de « déjà présent »** : l'état doit être établi avant et après par la détection, pas par le code retour.
+  - Liste DISM : la checkpoint apparaît comme `Package_for_RollupFix~31bf3856ad364e35~arm64~~26100.1742.1.10`, état **Staged** ; la cumulative comme `Package_for_RollupFix~31bf3856ad364e35~arm64~~26100.9457.1.0`, état **Installed**. Le numéro de version du paquet porte la build 26100 même sur une 25H2 (build courante 26200), puis l'UBR. Aucun numéro de KB dans le nom.
+  - `Get-HotFix` liste KB5129195 mais pas KB5043080 (comme sur la machine de développement).
+  - Téléchargement ARM64 : 4 391 570 921 et 610 638 429 octets, SHA-1 conformes, Authenticode `Valid`, un seul domaine (`catalog.sf.dl.delivery.mp.microsoft.com`).
 - Conclusion :
   - Une cumulative postérieure à une checkpoint ne s'applique qu'à un système qui a déjà cette checkpoint, ou une cumulative ultérieure. Microsoft annonce que d'autres checkpoints pourront suivre. Aujourd'hui, la seule pour 24H2/25H2/26H2 est KB5043080 (2024-09, 26100.1742). Son titre au catalogue a l'ancienne forme, sans virgule ni build : `2024-09 Cumulative Update for Windows 11 Version 24H2 for x64-based Systems (KB5043080)`.
   - Le catalogue livre la checkpoint avec la cumulative : la fenêtre de téléchargement d'une entrée montre « all prior checkpoints » (Learn), et la page du KB distingue la checkpoint requise de la cible. Tailles relevées en HEAD : KB5043080 x64 533 761 740 octets, ARM64 610 638 429 ; KB5129195 x64 4 639 422 594, ARM64 4 391 570 921.
@@ -86,8 +93,9 @@ Impact : catégorie `windows-checkpoint`, ordre du plan, champ `prerequisites` d
 - Décision (provisoire, à confirmer par `r02-arm64.yml` puis sur intervention réelle) :
   - Prérequis : tout fichier d'une entrée du catalogue autre que celui du KB principal (repéré par `kb<numéro>` dans le nom du fichier) est un prérequis. Aucun numéro de checkpoint en dur. Ordre d'installation : prérequis d'abord, par numéro de KB croissant (à revoir si plusieurs checkpoints coexistent un jour), puis la cible.
   - Méthode recommandée : **installation séquentielle depuis le dépôt (méthode 1, DISM)**, un `/Add-Package` par fichier, en sautant les prérequis déjà détectés. Raisons : pas de copie de 5,2 Go sur `C:` (temps de copie depuis la clé, espace libre) ; compatible avec le dépôt dédoublonné et la rétention ; chaque étape est journalisée et reprise séparément ; méthode documentée par Microsoft. Condition : chaque fichier seul dans son dossier du dépôt, sinon DISM explore les autres .msu. Repli si les essais montrent un problème : méthode 2 avec un dossier de travail sous `C:\ProgramData\OffPatch\temp\` contenant uniquement la cible et ses prérequis (copie, et contrôle d'espace libre augmenté de la taille des fichiers).
-  - Détection de la checkpoint : liste des paquets DISM, comme demandé par David. Complément proposé, à valider : la checkpoint est forcément présente si la build courante figure dans `baseBuilds` et que l'UBR courant est supérieur ou égal à celui de la checkpoint (1742 pour KB5043080), puisque les cumulatives sont cumulatives. Cet UBR n'est pas dans le titre de la checkpoint au catalogue (ancienne forme) : il viendrait de la page release-information, comme pour Windows 10 (R-01).
-  - Code retour de DISM quand la checkpoint est déjà installée : relevé par la seconde passe de `r02-arm64.yml`, puis à reporter en R-14.
+  - Détection de la checkpoint : liste des paquets DISM, comme demandé par David. D'après le runner, la checkpoint est présente s'il existe un paquet `Package_for_RollupFix~…~<arch>~~26100.<UBR de la checkpoint>.*` à l'état `Installed`, `Staged` ou `Superseded` (à confirmer sur intervention réelle pour `Superseded`), la build du nom de paquet étant toujours 26100. Complément proposé, à valider : la checkpoint est forcément présente si la build courante figure dans `baseBuilds` et que l'UBR courant est supérieur ou égal à celui de la checkpoint (1742 pour KB5043080), puisque les cumulatives sont cumulatives. Cet UBR n'est pas dans le titre de la checkpoint au catalogue (ancienne forme) : il viendrait de la page release-information, comme pour Windows 10 (R-01).
+  - Code retour de DISM quand la checkpoint est déjà installée : 0 (mesuré, voir ci-dessus). Reporté en R-14.
+  - Reste à mesurer : une installation réelle (runner après le 13 octobre 2026), puis la build après redémarrage et le nombre de redémarrages (intervention réelle).
   - Stockage (décision de David du 2026-10-04, relecture de R-01) : KB5043080 étant joint à chaque entrée de cumulative Windows 11 (R-01), le stockage des fichiers est dédoublonné par hash et la purge se fait par comptage de références (un fichier n'est supprimé que si plus aucun élément du manifeste ne le référence).
   - Proposition de structure qui en découle, à valider avant de toucher au cahier des charges (section 5) : un dossier par fichier, nommé d'après son SHA-256, par exemple `depot/files/<sha256>/windows11.0-kb5129195-x64_….msu`, les éléments du manifeste pointant vers ces chemins.
 
@@ -97,11 +105,24 @@ Question : numéro de KB, présence au catalogue pour x64 et ARM64, build minima
 
 Impact : catégorie `windows-ekb`, regroupement des redémarrages.
 
-- Statut : À vérifier
-- Piste (notée le 2026-10-04 à la demande de David) : KB5121794 serait l'enablement package 26H2. Sa présence au catalogue est contradictoire selon les sources. Le 2026-10-04, aucun résultat au catalogue pour `KB5121794`, `Enablement Package 26H2`, `Enablement Package Windows 11` ni `Feature Update to Windows 11, version 26H2 via Enablement Package`. À vérifier : la page du KB sur support.microsoft.com et d'autres formulations de recherche. Autre indice : `Get-HotFix` sur la machine de développement (25H2) liste KB5054156, à identifier.
-- Sources :
+- Statut : Bloqué (le paquet n'est pas au catalogue ; décision de périmètre attendue de David)
+- Sources (consultées le 2026-10-04) :
+  - https://support.microsoft.com/help/5121794 : « KB5121794: Feature update to Windows 11, version 26H2 by using an enablement package ».
+  - https://support.microsoft.com/help/5054156 : « KB5054156: Feature update to Windows 11, version 25H2 by using an enablement package » (précédent).
+  - Microsoft Update Catalog, recherches sans résultat : `KB5121794`, `KB5054156`, `Enablement Package 26H2`, `Enablement Package Windows 11`, `Feature Update to Windows 11, version 26H2 via Enablement Package`, `Feature update to Windows 11, version 26H2`, `Windows 11, version 26H2 enablement`, `Windows 11 26H2 Upgrades`, `Feature Update to Windows 11, version 25H2 via Enablement Package`.
+  - https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information : KB5124010 = 26100.9550 / 26200.9550.
+  - Machine de développement : `Get-HotFix` liste KB5054156 (installée le 2026-04-15).
 - Conclusion :
-- Décision :
+  - Le numéro est KB5121794. Il s'applique à 24H2 et 25H2 (Famille, Professionnel, Entreprise, Éducation, IoT Entreprise). Un seul redémarrage est nécessaire.
+  - **Il n'est pas au Microsoft Update Catalog.** La page du KB, colonne « Microsoft Update Catalog », indique « This update is only available through the other release channels ». Seuls Windows Update et WSUS le distribuent ; dans WSUS, il figure sous le produit « Windows 11 », classification « Upgrades », nom « Windows 11, version 26H2 ». Les recherches au catalogue le confirment. Le cas de la 25H2 était identique : KB5054156 n'est pas au catalogue, avec la même mention. La « contradiction selon les sources » vient probablement de là : le KB existe bien, mais pas au catalogue.
+  - Prérequis : 24H2 ou 25H2 avec « September 22, 2026—KB5124010 (OS Builds 26100.9546) Preview or a later cumulative update ». La page du KB écrit 26100.9546, la page release-information donne 26100.9550 pour KB5124010 : écart à noter, à trancher sur intervention réelle. Conséquence : la cumulative de sécurité retenue pour septembre (KB5129195, UBR 9457) **ne suffit pas**. Seule la préversion de septembre (exclue par R-01) ou la cumulative du 13 octobre 2026 remplit la condition.
+  - Installation juste après la cumulative, avant le redémarrage : sans objet tant que le paquet n'est pas récupérable hors ligne. Aucun document consulté ne traite ce cas.
+  - Enjeu : les éditions Famille et Professionnel de la 24H2 ne reçoivent plus de mises à jour après le 13 octobre 2026 (cahier des charges, section 1). Un PC 24H2 Famille/Pro devra passer en 25H2 ou 26H2, ce que l'enablement package faisait en un redémarrage.
+- Décision : à prendre par David (le cahier des charges prévoit `windows-ekb` depuis le catalogue en 3.2, ce qui n'est pas possible). Options :
+  1. **Recommandée** : retirer `windows-ekb` du périmètre de la v1. Le passage en 25H2/26H2 se fait par Windows Update (PC connecté) ou par ISO (mise à niveau, déjà hors périmètre en 3.4). L'outil détecte une 24H2 Famille/Pro et l'affiche en avertissement dans les contrôles préalables et dans le rapport (« version en fin de support »). Simple, aucune source non documentée.
+  2. Récupérer le paquet par l'API Windows Update Agent (recherche `Microsoft.Update.Session`, liens de `DownloadContents`) sur une machine 24H2/25H2 connectée. Fragile : la machine qui prépare le dépôt doit elle-même être éligible, ce qui cesse dès qu'elle passe en 26H2. À n'envisager qu'après un essai sur runner.
+  3. Attendre une éventuelle publication au catalogue : rien ne l'annonce, et la 25H2 n'y a jamais été publiée.
+  - Suite si l'option 1 est retenue : modifier les sections 3.2, 3.4, 5, 8.2, 8.3 et le test T2 du cahier des charges, et retirer `windows-ekb` des catégories.
 
 ## R-04 Windows 10 22H2 et ESU
 
@@ -171,6 +192,10 @@ Question : quelle méthode est la plus fiable entre la comparaison build et UBR,
 Impact : champ `resultingBuild`, états `UpToDate` et `Pending`.
 
 - Statut : À vérifier
+- Pistes (2026-10-04, runner `windows-11-arm`, https://github.com/Dano7762/offpatch/actions/runs/37199152736) :
+  - Sur Windows 11 25H2, la valeur de registre `ProductName` (`HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion`) vaut « Windows 10 Enterprise ». Ne pas s'en servir pour distinguer Windows 10 de Windows 11 : utiliser `CurrentBuild` (22000 et plus = Windows 11).
+  - La liste DISM nomme les cumulatives `Package_for_RollupFix~…~26100.<UBR>.*`, sans numéro de KB, avec la build 26100 même sur 25H2 (voir R-02).
+  - `Get-HotFix` voit la cumulative courante mais pas la checkpoint.
 - Sources :
 - Conclusion :
 - Décision :
@@ -182,6 +207,8 @@ Question : `Get-AuthenticodeSignature` sous PowerShell 5.1 donne-t-il un résult
 Impact : étape de vérification après téléchargement.
 
 - Statut : À vérifier
+- Piste ARM64 (2026-10-04, workflow `r02-arm64`, https://github.com/Dano7762/offpatch/actions/runs/37199356179) : mêmes résultats pour les deux .msu ARM64 (`Valid`, SHA-1 conforme au nom).
+- Piste (2026-10-04, workflow `depot-x64`, https://github.com/Dano7762/offpatch/actions/runs/37199155132, runner `windows-2025`, Windows PowerShell 5.1.26100) : pour les deux .msu de KB5129195 x64, `Get-AuthenticodeSignature` renvoie `Valid`, type `Authenticode`, signataire `CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US`. Le SHA-1 calculé est égal à l'empreinte de 40 caractères en fin de nom de fichier (`windows11.0-kb5129195-x64_<sha1>.msu`). Reste à voir : .cab, mpam-fe.exe, machine sans accès réseau (vérification de révocation), ARM64.
 - Sources :
 - Conclusion :
 - Décision :
@@ -204,7 +231,7 @@ Question : taille réelle des fichiers par cible et par source Office. Un fichie
 Impact : refus du FAT32, README.
 
 - Statut : À vérifier
-- Piste (2026-10-04, R-02) : KB5129195 x64 fait 4 639 422 594 octets (plus de 4 Gio), ARM64 4 391 570 921 octets. Un seul fichier dépasse donc la limite du FAT32.
+- Piste (2026-10-04, R-02) : KB5129195 x64 fait 4 639 422 594 octets (plus de 4 Gio), ARM64 4 391 570 921 octets. Un seul fichier dépasse donc la limite du FAT32. Confirmé par le téléchargement réel du workflow `depot-x64` (https://github.com/Dano7762/offpatch/actions/runs/37199155132) : 4 639 422 594 octets pour la cible, 533 761 740 pour KB5043080, 5,2 Go par cible Windows 11 au total.
 - Sources :
 - Conclusion :
 - Décision :
@@ -216,6 +243,10 @@ Question : domaines réellement atteints après redirection pour le catalogue, m
 Impact : `allowedDomains`.
 
 - Statut : À vérifier
+- Pistes (2026-10-04) :
+  - Recherche et résolution des liens : `www.catalog.update.microsoft.com` (avec `www.`), pages `Search.aspx` et `DownloadDialog.aspx`. La liste du cahier des charges (6.1) porte `catalog.update.microsoft.com` sans `www.` : à compléter.
+  - Fichiers des cumulatives : `catalog.sf.dl.delivery.mp.microsoft.com`, sans aucune redirection (requête HEAD avec suivi des redirections, workflow `depot-x64`, https://github.com/Dano7762/offpatch/actions/runs/37199155132). Absent de la liste actuelle.
+  - Correspondance KB → build (R-01) : `learn.microsoft.com`. Absent de la liste actuelle.
 - Sources :
 - Conclusion :
 - Décision :
@@ -227,6 +258,7 @@ Question : `dism.exe /Online /Add-Package` ou `Add-WindowsPackage -Online` ? Cod
 Impact : exécuteur des étapes Windows.
 
 - Statut : À vérifier
+- Mesuré (2026-10-04, runner `windows-11-arm`, https://github.com/Dano7762/offpatch/actions/runs/37199356179) : `dism.exe /English /Online /Add-Package /PackagePath:<fichier .msu> /NoRestart /LogPath:<fichier>` renvoie 0 et « The operation completed successfully » pour une checkpoint ou une cumulative déjà installée. Le journal DISM contient des lignes `Error … CMitigationManager::CheckApplicability … 0x80070032` sans conséquence sur le résultat : l'exécuteur ne doit pas juger un succès sur la présence du mot « Error » dans le journal.
 - Piste (2026-10-04, R-02) : codes retour de DISM pour un .msu déjà installé (checkpoint ou cumulative) et pour une cumulative dont la checkpoint manque, à mesurer avec `r02-arm64.yml` (`docs/essais/R-02-checkpoint.md`). Le cas « checkpoint manquante » n'est pas reproductible sur un runner (image récente) : à valider sur intervention réelle. DISM cherche les checkpoints dans le dossier du `/PackagePath` et explore les sous-dossiers.
 - Sources :
 - Conclusion :
