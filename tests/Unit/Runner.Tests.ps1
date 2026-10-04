@@ -61,3 +61,19 @@ Describe 'Invoke-R06DefenderTest.ps1' {
             Should -Throw -ExpectedMessage '*runner GitHub*'
     }
 }
+
+Describe 'Invoke-R07OfficeSourceTest.ps1' {
+    BeforeEach { $savedFlag = $env:GITHUB_ACTIONS }
+    AfterEach { $env:GITHUB_ACTIONS = $savedFlag }
+
+    It 'refuse de s''exécuter hors d''un runner GitHub' {
+        $env:GITHUB_ACTIONS = 'false'
+        { & (Join-Path $runner 'Invoke-R07OfficeSourceTest.ps1') -Channel 'PerpetualVL2024' -ProductId 'ProPlus2024Volume' -OutputDirectory $TestDrive } |
+            Should -Throw -ExpectedMessage '*runner GitHub*'
+    }
+
+    It 'rejette un canal contenant des caractères non attendus' {
+        { & (Join-Path $runner 'Invoke-R07OfficeSourceTest.ps1') -Channel 'Current" /x' -ProductId 'ProPlus2024Volume' -OutputDirectory $TestDrive } |
+            Should -Throw
+    }
+}

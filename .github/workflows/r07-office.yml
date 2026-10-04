@@ -1,0 +1,56 @@
+# R-07 : récupération de l'ODT et téléchargement d'une source Office (version ancienne puis dernière version
+# dans le même dossier) sur un runner jetable. Déclenchement manuel uniquement. N'installe rien.
+name: r07-office
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Canal (ex. PerpetualVL2024, Current)'
+        required: true
+        default: 'PerpetualVL2024'
+      product_id:
+        description: 'Product ID (ex. ProPlus2024Volume)'
+        required: true
+        default: 'ProPlus2024Volume'
+      language:
+        description: 'Langue'
+        required: true
+        default: 'fr-fr'
+      older_version:
+        description: 'Version ancienne à télécharger d''abord (vide pour la sauter)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  office:
+    runs-on: windows-2025
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai R-07
+        env:
+          OFFICE_CHANNEL: ${{ inputs.channel }}
+          OFFICE_PRODUCT: ${{ inputs.product_id }}
+          OFFICE_LANGUAGE: ${{ inputs.language }}
+          OFFICE_OLDER: ${{ inputs.older_version }}
+        run: |
+          $params = @{ Channel = $env:OFFICE_CHANNEL; ProductId = $env:OFFICE_PRODUCT; Language = $env:OFFICE_LANGUAGE; OutputDirectory = "$env:RUNNER_TEMP\r07-out" }
+          if ($env:OFFICE_OLDER) { $params.OlderVersion = $env:OFFICE_OLDER }
+          ./tests/runner/Invoke-R07OfficeSourceTest.ps1 @params
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: r07-office-${{ inputs.channel }}
+          path: ${{ runner.temp }}/r07-out
+          retention-days: 30
+          if-no-files-found: warn
