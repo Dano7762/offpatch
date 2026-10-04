@@ -1,0 +1,498 @@
+# OffPatch : cahier des charges
+
+Version 1.0 du 4 octobre 2026.
+
+## 1. Contexte
+
+J'utilisais WSUS Offline Update pour télécharger une seule fois les mises à jour Windows et Office, puis les installer sur des PC fraîchement installés sans tout retélécharger à chaque fois. L'outil n'est plus en état de servir. La dernière version stable de la Community Edition (12.6.1) date de décembre 2021. Un fork a sorti des bêtas 12.7 en février 2025 pour Windows 11 24H2, mais elles reposent sur des listes de liens statiques à maintenir à la main. Le volet Office ne gère que les versions MSI, qui ne sont plus supportées.
+
+La maintenance de Windows a changé et rend un outil plus simple possible :
+
+- Windows 11 24H2, 25H2 et 26H2 partagent la même branche de maintenance et reçoivent les mêmes cumulatives mensuelles. La 26H2 est sortie le 29 septembre 2026 sous forme d'enablement package. Les éditions Famille et Professionnel de la 24H2 ne reçoivent plus de mises à jour après le 13 octobre 2026.
+- Windows 10 22H2 est sorti du support le 14 octobre 2025. Le 25 juin 2026, Microsoft a prolongé l'ESU grand public jusqu'au 12 octobre 2027. L'ESU commercial peut aller jusqu'au 10 octobre 2028.
+- Office 2016 et 2019 ne sont plus supportés depuis octobre 2025. Office 2021 et 2024, en boîte comme en LTSC, sont en Click-to-Run et se déploient avec l'Office Deployment Tool (ODT).
+
+Pour chaque cible, il y a donc chaque mois une poignée de fichiers : la cumulative Windows et ses éventuels prérequis, la cumulative .NET, les définitions Defender et, pour Office, une source par canal.
+
+Usage visé : je prépare les PC un par un, à l'atelier ou chez le client. Il n'y a ni parc à gérer, ni serveur, ni réseau à exploiter.
+
+## 2. Objectifs
+
+1. Télécharger une fois par mois et installer sur autant de PC que nécessaire sans retélécharger.
+2. Un PC fraîchement installé ressort à jour : Windows, .NET, Defender, et Office installé dans sa dernière build.
+3. Le même outil sert dans deux situations :
+   - le dépôt est mis à jour sur mon poste, puis copié sur un support (clé ou SSD) ;
+   - le support est autonome : on y lance aussi le téléchargement, depuis n'importe quel PC connecté.
+4. Deux modes d'installation au choix : automatique, avec redémarrages et reprise gérés, ou manuel, étape par étape.
+5. Chaque intervention laisse un rapport par PC.
+
+## 3. Périmètre
+
+### 3.1 Systèmes cibles
+
+| Code cible | Système | Versions | Architecture | Remarque |
+|---|---|---|---|---|
+| `win11-x64` | Windows 11 | 24H2, 25H2, 26H2 | x64 | Branche de maintenance commune |
+| `win11-arm64` | Windows 11 | 24H2, 25H2, 26H2 | ARM64 | Tests sur matériel réel uniquement |
+| `win10-x64` | Windows 10 | 22H2 (build 19045) | x64 | Seulement si l'ESU est actif sur le PC |
+
+Tout le reste est détecté puis refusé avec un message clair, sans rien installer : Windows 11 23H2 et antérieurs, Windows 10 avant 22H2, x86, Windows Server, Windows 11 26H1 (plateforme différente, réservée à certains PC ARM).
+
+### 3.2 Contenus gérés
+
+| Code catégorie | Contenu | Cibles | Source |
+|---|---|---|---|
+| `windows-checkpoint` | Cumulatives « checkpoint » prérequises | Windows 11 | Microsoft Update Catalog |
+| `windows-lcu` | Dernière cumulative Windows | Toutes | Microsoft Update Catalog |
+| `windows-ekb` | Enablement package 26H2 | Windows 11 | Microsoft Update Catalog |
+| `dotnet` | Cumulative .NET Framework | Toutes | Microsoft Update Catalog |
+| `defender` | Définitions Microsoft Defender (mpam-fe.exe) | Toutes | Lien de téléchargement Microsoft |
+| `office-source` | Source d'installation Office par canal | Toutes | ODT `/download` |
+
+Les points encore incertains (titres exacts du catalogue, prérequis checkpoint, enablement package, ESU) sont listés dans `RECHERCHE.md` et tranchés en phase 0.
+
+### 3.3 Éditions Office
+
+| Profil | Libellé | Product ID | Canal | Licence |
+|---|---|---|---|---|
+| `home2024` | Office Famille 2024 | `Home2024Retail` | Current | Compte Microsoft du client |
+| `homebusiness2024` | Office Famille et Petite Entreprise 2024 | `HomeBusiness2024Retail` | Current | Compte Microsoft du client |
+| `homestudent2021` | Office Famille et Étudiant 2021 | `HomeStudent2021Retail` (à vérifier) | Current | Compte Microsoft du client |
+| `homebusiness2021` | Office Famille et Petite Entreprise 2021 | `HomeBusiness2021Retail` (à vérifier) | Current | Compte Microsoft du client |
+| `ltsc2024-proplus` | Office LTSC Professionnel Plus 2024 | `ProPlus2024Volume` | PerpetualVL2024 | Clé MAK |
+| `ltsc2024-std` | Office LTSC Standard 2024 | `Standard2024Volume` (à vérifier) | PerpetualVL2024 | Clé MAK |
+| `ltsc2021-proplus` | Office LTSC Professionnel Plus 2021 | `ProPlus2021Volume` (à vérifier) | PerpetualVL2021 | Clé MAK |
+| `ltsc2021-std` | Office LTSC Standard 2021 | `Standard2021Volume` (à vérifier) | PerpetualVL2021 | Clé MAK |
+
+`Home2024Retail`, `HomeBusiness2024Retail` et `ProPlus2024Volume` figurent dans la liste officielle des product IDs de l'ODT. Les autres sont à confirmer (R-07).
+
+Une source Office correspond à un canal et à une liste de langues. Il en faut donc trois au maximum : `current`, `perpetualvl2024`, `perpetualvl2021`. Office est installé en 64 bits, y compris sur les PC ARM64 (à confirmer en R-07). Langue par défaut : `fr-fr`. La liste des langues est réglable, mais l'installation ne peut utiliser que des langues présentes dans la source, puisque le repli sur le CDN est désactivé.
+
+### 3.4 Hors périmètre de la v1
+
+- Gestion de parc, déploiement réseau, serveur WSUS.
+- Pilotes, runtimes Visual C++, logiciels tiers.
+- Activation, en dehors de la saisie facultative d'une clé MAK pour les profils LTSC.
+- Microsoft 365 Apps (abonnement). Le mécanisme serait le même, voir la section 14.
+- Création ou modification d'ISO.
+- Mises à niveau de version majeure (Windows 11 23H2 vers 24H2, Windows 10 vers 11). Elles passent par une ISO récente.
+- Windows Server, Windows x86, Office 32 bits.
+- Ouverture de session automatique après redémarrage.
+
+## 4. Principes d'architecture
+
+1. Un seul outil avec deux faces. La face Dépôt télécharge et a besoin d'Internet. La face Installation applique les mises à jour et ne contacte jamais Internet.
+2. Le manifeste `depot/manifest.json` est le contrat entre les deux faces. L'installation ne lit que lui et les fichiers qu'il référence.
+3. Toute la logique vit dans un module PowerShell. L'interface WPF et le script en ligne de commande ne sont que deux façades sur ce module.
+4. L'outil est portable. Sa racine est retrouvée grâce au fichier marqueur `offpatch.root` et le dépôt ne stocke aucun chemin absolu.
+5. Les données qui changent avec Microsoft (titres du catalogue, product IDs, URL, domaines) sont dans `config/`. Le code n'en contient aucune.
+6. Windows PowerShell 5.1, x64 et ARM64, aucune installation sur le PC client.
+
+## 5. Arborescence
+
+```text
+OffPatch/
+├── Lancer-OffPatch.cmd            Point d'entrée : élévation UAC, stratégie d'exécution contournée
+├── offpatch.root                  Fichier marqueur de la racine (contient un identifiant d'installation)
+├── CLAUDE.md
+├── README.md
+├── PSScriptAnalyzerSettings.psd1
+├── app/
+│   ├── OffPatch.ps1               Lance l'interface WPF (paramètre -Resume pour la reprise)
+│   ├── OffPatch-Cli.ps1           Mêmes opérations sans interface
+│   ├── resume.ps1                 Amorce de reprise, copiée dans ProgramData avant un redémarrage
+│   ├── module/OffPatch/
+│   │   ├── OffPatch.psd1
+│   │   ├── OffPatch.psm1
+│   │   ├── Public/                Une fonction exportée par fichier
+│   │   └── Private/
+│   └── gui/
+│       ├── MainWindow.xaml
+│       ├── Dialogs/               Récapitulatif du mode auto, préparation de support, attente du support
+│       └── *.ps1                  Câblage des événements
+├── config/
+│   ├── settings.json
+│   ├── catalog-queries.json
+│   └── office/
+│       ├── profiles.json
+│       ├── download.xml.template
+│       └── install.xml.template
+├── lib/
+│   └── MSCatalogLTS/<version>/    Module figé et sa licence
+├── tools/
+│   └── odt/                       setup.exe de l'ODT, récupéré par l'outil (hors git)
+├── depot/                         Données téléchargées (hors git)
+│   ├── manifest.json
+│   ├── win11-x64/                 checkpoint/ lcu/ ekb/ dotnet/ defender/
+│   ├── win11-arm64/               idem
+│   ├── win10-x64/                 lcu/ dotnet/ defender/
+│   └── office/                    current/ perpetualvl2024/ perpetualvl2021/
+├── rapports/                      Rapports d'intervention, un par PC (hors git)
+├── logs/                          Journaux de la face Dépôt (hors git)
+├── scratch/                       Scripts jetables de la phase de recherche (hors git)
+├── tests/
+│   ├── Unit/
+│   └── Fixtures/                  Manifestes, sorties DISM et registres simulés
+└── docs/
+    ├── CAHIER-DES-CHARGES.md
+    ├── RECHERCHE.md
+    └── TODO.md
+```
+
+Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `state.json`, `resume.ps1`, `temp\` (XML Office générés) et `logs\`. Tout est nettoyé en fin de session, sauf les journaux.
+
+## 6. Configuration
+
+### 6.1 `config/settings.json`
+
+```json
+{
+  "schemaVersion": 1,
+  "targets": ["win11-x64", "win11-arm64", "win10-x64"],
+  "windows": {
+    "includeEnablementPackage": true
+  },
+  "office": {
+    "sources": ["current", "perpetualvl2024", "perpetualvl2021"],
+    "languages": ["fr-fr"],
+    "clientEdition": "64"
+  },
+  "retention": {
+    "windowsMonths": 2,
+    "officeVersions": 1
+  },
+  "client": {
+    "minFreeSpaceGB": 20,
+    "maxAutoReboots": 5,
+    "rebootCountdownSeconds": 30,
+    "staleDepotWarningDays": 35,
+    "pauseWindowsUpdateDuringSession": true
+  },
+  "logging": {
+    "level": "INFO"
+  },
+  "allowedDomains": [
+    "catalog.update.microsoft.com",
+    "download.windowsupdate.com",
+    "download.microsoft.com",
+    "go.microsoft.com",
+    "officecdn.microsoft.com"
+  ]
+}
+```
+
+Les valeurs chiffrées sont des valeurs de départ. La liste `allowedDomains` sera complétée en phase 0 avec les domaines réellement atteints après redirection (R-13). L'interface modifie ce fichier quand je change les cibles ou les langues dans l'onglet Dépôt.
+
+### 6.2 `config/catalog-queries.json`
+
+Pour chaque cible et chaque catégorie : la recherche à envoyer au catalogue, un motif d'inclusion et un motif d'exclusion sur le titre, la règle de sélection. Le motif d'exclusion écarte au minimum les préversions, les mises à jour dynamiques, les hotpatchs, les éditions Server et les mauvaises architectures.
+
+Exemple de forme (les chaînes réelles sont établies en R-01) :
+
+```json
+{
+  "win11-x64": [
+    {
+      "category": "windows-lcu",
+      "search": "Cumulative Update Windows 11 x64",
+      "includeTitlePattern": "Cumulative Update for Windows 11.*x64-based",
+      "excludeTitlePattern": "Preview|Dynamic|Hotpatch|Server|\\.NET|arm64",
+      "pick": "latest"
+    }
+  ]
+}
+```
+
+Quand Microsoft change la formulation d'un titre, on corrige ce fichier sans toucher au code.
+
+### 6.3 Office
+
+`config/office/profiles.json` décrit les profils du tableau 3.3 :
+
+```json
+{
+  "id": "ltsc2024-proplus",
+  "label": "Office LTSC Professionnel Plus 2024",
+  "productId": "ProPlus2024Volume",
+  "channel": "PerpetualVL2024",
+  "source": "perpetualvl2024",
+  "license": "volume",
+  "acceptsProductKey": true,
+  "excludeApps": []
+}
+```
+
+`install.xml.template` sert à générer, au moment de l'installation, un XML avec le chemin absolu de la source sur le support :
+
+```xml
+<Configuration>
+  <Add OfficeClientEdition="64" Channel="{{Channel}}" SourcePath="{{SourcePath}}" AllowCdnFallback="FALSE">
+    <Product ID="{{ProductId}}"{{PidKeyAttribute}}>
+{{LanguageElements}}
+{{ExcludeAppElements}}
+    </Product>
+  </Add>
+{{RemoveElement}}
+  <RemoveMSI />
+  <Updates Enabled="TRUE" Channel="{{Channel}}" />
+  <Display Level="None" AcceptEULA="TRUE" />
+</Configuration>
+```
+
+`AllowCdnFallback="FALSE"` garantit que l'installation n'utilise que la source locale. Les mises à jour ultérieures du PC client restent activées sur le canal normal de Microsoft. La compatibilité de `<Remove>` combiné à `<Add>` dans un même fichier est à vérifier (R-08).
+
+## 7. Face Dépôt
+
+### 7.1 Mise à jour du dépôt
+
+Pour chaque cible cochée :
+
+1. Vérifier l'accès à Internet et aux domaines autorisés.
+2. Interroger le catalogue avec les requêtes de `catalog-queries.json`. MSCatalogLTS ne sert qu'à la recherche et à la résolution des liens. Le téléchargement est fait par l'outil, pour maîtriser la reprise, le dossier temporaire et le contrôle d'intégrité.
+3. Comparer avec le manifeste. Un élément déjà présent avec le même hash n'est pas retéléchargé.
+4. Télécharger dans `depot/.tmp/` avec BITS (`Start-BitsTransfer`, reprise possible), et un repli sur `HttpClient` en flux si BITS n'est pas disponible.
+5. Vérifier la signature Microsoft quand elle est exploitable et calculer le SHA-256 (R-10).
+6. Déplacer le fichier à sa place définitive et ajouter l'élément au manifeste.
+
+Ensuite :
+
+- Defender : télécharger mpam-fe.exe pour chaque architecture et lire sa version.
+- Office : vérifier ou récupérer l'ODT dans `tools/odt/`, générer le XML de téléchargement de chaque source (canal et langues), lancer `setup.exe /download`, relever la version obtenue.
+- Écrire le manifeste de façon atomique, appliquer la purge, afficher un résumé des nouveautés du mois.
+
+L'option `-ListOnly` fait tout sauf les téléchargements : elle affiche ce qui serait récupéré. Un téléchargement interrompu peut être relancé sans tout reprendre.
+
+### 7.2 Manifeste
+
+```json
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-14T09:12:00Z",
+  "toolVersion": "1.0.0",
+  "items": [
+    {
+      "id": "win11-x64-lcu-KB0000000",
+      "category": "windows-lcu",
+      "target": { "os": "win11", "arch": "x64", "minBuild": 26100, "maxBuild": 26399 },
+      "kb": "KB0000000",
+      "title": "Titre exact relevé dans le catalogue",
+      "releaseDate": "2026-10-13",
+      "resultingBuild": "26100.0000",
+      "order": 20,
+      "requiresReboot": true,
+      "prerequisites": ["win11-x64-checkpoint-KB0000001"],
+      "files": [
+        { "path": "win11-x64/lcu/nom-du-fichier.msu", "sha256": "…", "size": 0 }
+      ],
+      "sourceUrl": "https://catalog.update.microsoft.com/…"
+    }
+  ]
+}
+```
+
+Les valeurs ci-dessus illustrent le format. Les chemins dans `files` sont relatifs à `depot/`. Le champ `resultingBuild` sert à la détection : la méthode pour l'obtenir au téléchargement est à établir (R-09). Une source Office est un élément de catégorie `office-source` avec son canal, sa version, ses langues et le dossier concerné.
+
+### 7.3 Purge
+
+- Cumulatives Windows et .NET : on garde les `retention.windowsMonths` plus récentes par cible (2 par défaut, la courante et la précédente comme solution de repli).
+- Defender : seulement la dernière.
+- Office : seulement la dernière version par source, après avoir vérifié que l'index de la source (`v64.cab`) pointe bien sur elle (R-07).
+- La purge ne supprime que des éléments connus du manifeste. Les fichiers orphelins trouvés dans `depot/` sont listés et ne sont supprimés qu'après confirmation.
+
+### 7.4 Préparer un support
+
+Assistant accessible depuis l'onglet Dépôt :
+
+1. Choisir le lecteur de destination (clé ou disque externe).
+2. Choisir les cibles et les sources Office à embarquer, pour ne copier que l'utile.
+3. Contrôler le système de fichiers : NTFS ou exFAT. Le FAT32 est refusé, car certains fichiers peuvent dépasser 4 Go (R-12). Contrôler l'espace libre.
+4. Si le support contient déjà OffPatch, rapatrier d'abord ses rapports dans `rapports/` du poste.
+5. Copier `app/`, `config/`, `lib/`, `tools/`, `offpatch.root`, `README.md` et les dossiers du dépôt retenus, avec robocopy en miroir dossier par dossier. Le dossier `rapports/` du support n'est jamais mis en miroir, pour ne pas effacer de rapports.
+6. Écrire sur le support un manifeste filtré qui ne contient que les éléments copiés.
+7. Vérifier la copie (tailles, puis hash des fichiers du manifeste) et afficher un bilan.
+
+## 8. Face Installation
+
+### 8.1 Lancement
+
+`Lancer-OffPatch.cmd` demande l'élévation, puis lance `powershell.exe -NoProfile -ExecutionPolicy Bypass -File app\OffPatch.ps1`. Au premier lancement depuis un support, l'outil retire la marque « fichier téléchargé » de ses propres fichiers (`Unblock-File`). Tout fonctionne quelle que soit la lettre du lecteur.
+
+### 8.2 Contrôles préalables
+
+| Contrôle | Comportement |
+|---|---|
+| Droits administrateur | Bloquant |
+| Cible reconnue (système, version, build, architecture, édition) | Hors périmètre : bloquant, avec le motif |
+| Windows 10 : ESU actif | Absent ou indétectable : avertissement. En mode auto, l'étape Windows est ignorée sauf si je la force dans le récapitulatif (R-04) |
+| Redémarrage en attente (CBS, Windows Update, renommages de fichiers en attente) | Proposer de redémarrer avant de commencer |
+| Espace libre sur C: | Sous `minFreeSpaceGB` : bloquant |
+| Portable sur batterie | Avertissement, confirmation demandée avant le mode auto |
+| Âge du dépôt | Au-delà de `staleDepotWarningDays` : avertissement |
+| PC connecté à Internet | Avertissement : Windows Update peut travailler en parallèle. Si `pauseWindowsUpdateDuringSession` est actif, Windows Update est suspendu pendant la session et rétabli à la fin (méthode en R-15) |
+| Intégrité des fichiers nécessaires | Hash différent du manifeste : l'étape passe en erreur, les autres continuent |
+
+### 8.3 Détection et plan
+
+Pour chaque élément du manifeste applicable au PC, l'outil calcule un état :
+
+| État (code) | Libellé affiché |
+|---|---|
+| `UpToDate` | À jour |
+| `Pending` | À installer |
+| `NotApplicable` | Non applicable |
+| `MissingFromDepot` | Absent du dépôt |
+| `Error` | Erreur |
+
+Méthodes de détection, à confirmer en R-09 :
+
+- Cumulative Windows : build et UBR courants comparés à `resultingBuild`, avec la liste des paquets DISM en complément.
+- Checkpoint : présence du paquet dans la liste DISM.
+- Enablement package : `DisplayVersion` dans le registre.
+- .NET : présence du KB.
+- Defender : version des signatures (`Get-MpComputerStatus`) comparée à la version de mpam-fe.exe. Si Defender n'est pas l'antivirus actif, l'étape est non applicable.
+- Office : registre ClickToRun (produits installés, version, canal).
+
+Le plan est la liste ordonnée des étapes, avec les points de redémarrage. Ordre par défaut :
+
+1. Définitions Defender (pas de redémarrage).
+2. Checkpoints puis cumulative Windows, puis redémarrage.
+3. Enablement package 26H2 si l'option est active, puis redémarrage.
+4. Cumulative .NET, redémarrage si demandé.
+5. Office : installation ou mise à jour.
+6. Contrôle final : nouvelle détection et rapport.
+
+Si la phase 0 montre que certaines étapes peuvent s'enchaîner avant un seul redémarrage (R-02, R-03), le planificateur regroupe les redémarrages.
+
+### 8.4 Exécution des étapes Windows
+
+- Installation des paquets par DISM en ligne, sans redémarrage automatique, avec un journal DISM par étape. Le choix entre `dism.exe` et `Add-WindowsPackage` est fait en R-14.
+- Codes retour : 0 réussite, 3010 redémarrage nécessaire, « non applicable » (0x800f081e) traité comme `NotApplicable` et non comme une erreur, le reste en erreur avec le code dans le journal et le rapport.
+- Defender : exécution de mpam-fe.exe, puis lecture de la nouvelle version pour confirmer.
+
+### 8.5 Office
+
+| Situation détectée | Action |
+|---|---|
+| Aucun Office Click-to-Run | Installation du profil choisi depuis la source locale |
+| Office préinstallé par le fabricant ou autre produit | Je choisis avant le démarrage : le conserver, ou le retirer puis installer le profil choisi |
+| Même produit déjà installé, version plus ancienne que la source | Mise à jour depuis la source locale (mécanisme en R-08) |
+| Même produit, version égale ou plus récente | À jour |
+| Office MSI ancien | Retiré par `<RemoveMSI />` lors de l'installation |
+
+Le XML d'installation est généré dans `C:\ProgramData\OffPatch\temp\` avec le chemin absolu de la source, puis supprimé dès la fin de l'étape. Pour un profil LTSC, une clé MAK peut être saisie dans un champ masqué. Elle reste en mémoire, est injectée dans le XML temporaire, et le journal indique seulement « clé fournie : oui ». Pour un profil en boîte, le rapport rappelle que l'activation se fait avec le compte Microsoft du client.
+
+### 8.6 Mode automatique
+
+Toutes les décisions sont prises avant le démarrage, sur un écran récapitulatif : étapes prévues, profil Office, retrait d'un Office existant, clé éventuelle, forçage éventuel pour Windows 10. Je valide une seule fois, puis plus aucune question n'est posée.
+
+Pendant la session :
+
+- `C:\ProgramData\OffPatch\state.json` contient l'identifiant de session, l'état de chaque étape, le nombre de redémarrages, le numéro de série du volume du support et le chemin relatif de la racine.
+- Avant un redémarrage : copie de `resume.ps1` dans ProgramData, création de la tâche planifiée `OffPatch-Reprise` (à l'ouverture de session de l'utilisateur courant, privilèges les plus élevés), compte à rebours de `rebootCountdownSeconds` avec bouton Annuler, puis redémarrage.
+- À l'ouverture de session suivante, `resume.ps1` cherche le support sur tous les lecteurs (fichier `offpatch.root` et numéro de série du volume) et relance l'interface avec `-Resume`. Si le support est absent, une petite fenêtre demande de le rebrancher et vérifie toutes les 5 secondes.
+- Garde-fous : au plus `maxAutoReboots` redémarrages. Une étape qui échoue deux fois est abandonnée et signalée, la session continue avec les suivantes.
+- En fin de session : suppression de la tâche, de `resume.ps1` et de `temp\`, archivage de `state.json` dans les journaux, rétablissement de Windows Update, bilan à l'écran, rapport écrit.
+- Pas d'ouverture de session automatique : je rouvre la session moi-même après chaque redémarrage.
+- Si je ferme la fenêtre en cours de route, l'outil demande confirmation et conserve l'état. Un bouton « Reprendre la session interrompue » apparaît au lancement suivant.
+
+### 8.7 Mode manuel
+
+Le même plan est affiché avec une case à cocher par étape. « Installer la sélection » lance les étapes cochées dans l'ordre du plan. Quand une étape demande un redémarrage, un bandeau l'indique avec un bouton « Redémarrer maintenant ». Aucune tâche planifiée n'est créée : au lancement suivant, l'outil refait simplement la détection.
+
+### 8.8 Rapport d'intervention
+
+En fin de session, ou en cas d'abandon, un rapport HTML autonome et imprimable est écrit dans `rapports/AAAA-MM-JJ_NomPC_NumeroDeSerie.html` sur le support, avec une copie dans `C:\ProgramData\OffPatch\logs\`. Il contient :
+
+- date et heures de début et de fin ;
+- nom du PC, fabricant, modèle, numéro de série BIOS ;
+- Windows avant et après (édition, version, build et UBR), statut ESU pour Windows 10 ;
+- chaque étape avec son résultat, son code retour éventuel et sa durée ;
+- Office installé (produit, version, canal, langues) et le mode d'activation attendu ;
+- erreurs et avertissements ;
+- version de l'outil et date du dépôt utilisé.
+
+Aucune clé de produit n'y figure.
+
+## 9. Interface graphique
+
+Fenêtre WPF unique. En-tête : nom et version de l'outil, date du dépôt, alerte si le dépôt est ancien. Trois onglets.
+
+**Onglet « Ce PC »**
+
+- Bandeau système : édition, version, build et UBR, architecture, statut ESU (Windows 10), Office détecté, espace libre, alimentation, fabricant, modèle, numéro de série.
+- Tableau des étapes : étape, détail (KB ou version), état, case à cocher en mode manuel.
+- Bloc Office : liste des profils dont la source est présente dans le dépôt, langues disponibles dans cette source, case « Retirer l'Office déjà présent », champ de clé masqué pour les profils LTSC.
+- Boutons : « Installation automatique », « Installer la sélection », « Redémarrer maintenant » (visible si nécessaire), « Reprendre la session interrompue » (si un état existe).
+- Barre de progression globale, étape en cours, dernières lignes du journal.
+
+**Onglet « Dépôt »**
+
+- Résumé : date de la dernière mise à jour, taille totale, alerte de fraîcheur.
+- Cibles, sources Office et langues à cocher (enregistrées dans `settings.json`).
+- Tableau du manifeste : cible, catégorie, KB ou version, date, taille, état de l'intégrité.
+- Boutons : « Vérifier les nouveautés » (`-ListOnly`), « Mettre à jour le dépôt », « Purger », « Préparer un support… », « Annuler ».
+
+**Onglet « Journal »**
+
+- Journal en direct, filtre par niveau, boutons d'ouverture du dossier des journaux et du dossier des rapports.
+
+Règles de comportement :
+
+- Pendant un traitement, les boutons qui entreraient en conflit sont désactivés.
+- Un téléchargement peut être annulé. Une étape DISM en cours ne peut pas l'être : le bouton est grisé, avec une infobulle qui l'explique.
+- Contrôles WPF standard, présentation sobre, libellés en français, fenêtre redimensionnable et lisible en haute résolution.
+
+## 10. Journalisation
+
+- Face Dépôt : `logs/depot_AAAA-MM-JJ_HHMMSS.log` dans la racine de l'outil.
+- Face Installation : `C:\ProgramData\OffPatch\logs\session_AAAA-MM-JJ_HHMMSS.log`, avec une copie à côté du rapport.
+- Format d'une ligne : `2026-10-14 09:12:03 [INFO] message`. Niveaux : DEBUG, INFO, WARN, ERROR. Le niveau minimal est réglé dans `settings.json`.
+- Les journaux propres à DISM et à l'ODT sont rangés dans un sous-dossier de la session.
+
+## 11. Sécurité et intégrité
+
+- Téléchargements limités aux domaines Microsoft autorisés.
+- SHA-256 calculé au téléchargement, stocké dans le manifeste et revérifié avant chaque installation. Signature Authenticode Microsoft contrôlée sur les fichiers où elle est exploitable (R-10).
+- Clé de produit : mémoire et XML temporaire uniquement.
+- Aucune élévation persistante : la tâche planifiée disparaît en fin de session.
+- Écriture atomique du manifeste et de `state.json`.
+
+## 12. Tests
+
+Tests unitaires Pester, avec des mocks pour DISM, `Start-Process`, le registre, `Get-CimInstance`, BITS et le réseau. Les jeux de données de test (manifestes, sorties DISM, clés de registre simulées) sont dans `tests/Fixtures/`.
+
+Tests d'intégration en VM Hyper-V, avec un point de contrôle restauré avant chaque test :
+
+| Test | Situation de départ | Attendu |
+|---|---|---|
+| T1 | Windows 11 26H2 x64 installé depuis une ISO, sans Office | Mode auto complet, Office Famille 2024 installé, rapport sans erreur |
+| T2 | Windows 11 24H2 x64 avec un Office préinstallé | Enablement package appliqué, ancien Office retiré, profil LTSC 2024 installé avec une clé |
+| T3 | Windows 11 25H2 x64 déjà à jour | Rien à installer, rapport cohérent |
+| T4 | Windows 10 22H2 x64 avec ESU actif | Cumulative ESU installée |
+| T5 | Windows 10 22H2 x64 sans ESU | Avertissement, aucune étape Windows en mode auto |
+| T6 | Windows 11 ARM64 sur matériel réel | Mode manuel complet, Office 64 bits fonctionnel |
+| T7 | Support débranché pendant un redémarrage | Fenêtre d'attente, reprise dès le rebranchement, même sur une autre lettre de lecteur |
+| T8 | Préparation d'un support en FAT32 | Refus avec message explicite |
+
+Les résultats sont notés dans le journal de `TODO.md`.
+
+## 13. Critères d'acceptation de la v1
+
+- Mise à jour du dépôt en un clic, avec le résumé des nouveautés.
+- Préparation d'un support filtré, sans perte des rapports déjà présents.
+- Tests T1 à T8 réussis.
+- Aucun gel de l'interface pendant les traitements longs.
+- Journal et rapport produits pour chaque session, y compris en cas d'échec.
+- PSScriptAnalyzer sans erreur, tests Pester au vert.
+- README couvrant la mise en place, l'usage mensuel et le dépannage courant.
+
+## 14. Évolutions envisagées après la v1
+
+- Profil Microsoft 365 Apps (même mécanisme ODT, canal Current).
+- Génération d'une ISO Windows à jour en intégrant la cumulative hors ligne.
+- Outil de suppression de logiciels malveillants (MSRT) et mise à jour de la plateforme Defender.
+- Signature des scripts avec un certificat de code.
+
+## 15. Historique
+
+- 1.0 (4 octobre 2026) : version initiale.
