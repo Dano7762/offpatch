@@ -202,10 +202,26 @@ Question : liens de téléchargement officiels de mpam-fe.exe pour x64 et ARM64,
 
 Impact : catégorie `defender`, détection, éventuelle évolution vers la plateforme.
 
-- Statut : À vérifier
-- Sources :
+- Statut : Tranché (un point à confirmer sur intervention réelle : plateformes très anciennes)
+- Sources (consultées le 2026-10-04) :
+  - https://www.microsoft.com/en-us/wdsi/defenderupdates (« Latest security intelligence updates for Microsoft Defender Antivirus and other Microsoft antimalware »), lue dans le navigateur intégré : la page refuse les requêtes automatiques (HTTP 403 avec curl).
+  - https://learn.microsoft.com/en-us/defender-endpoint/microsoft-defender-antivirus-updates (mise à jour du 2026-05-14) : définitions (KB2267602), plateforme mensuelle (KB4052623), support N-2 de la plateforme et du moteur.
+  - https://learn.microsoft.com/en-us/defender-endpoint/microsoft-defender-antivirus-compatibility (mise à jour du 2026-08-21) : modes actif, passif, désactivé.
+  - Machine de développement : en-têtes des liens (suivi des redirections), téléchargement de mpam-fe.exe x64 (autorisé par CLAUDE.md, cible la plus légère), lecture de la version et de la signature, sans exécution.
+  - Workflow `r06-defender` sur runners jetables : https://github.com/Dano7762/offpatch/actions/runs/37229995374, https://github.com/Dano7762/offpatch/actions/runs/37230374976, https://github.com/Dano7762/offpatch/actions/runs/37230720333, https://github.com/Dano7762/offpatch/actions/runs/37231034932.
 - Conclusion :
-- Décision :
+  - **Liens officiels** (ligne « Microsoft Defender Antivirus for Windows 11, Windows 10, Windows 8.1, and Windows Server ») : `https://go.microsoft.com/fwlink/?LinkID=121721&arch=x64` et `https://go.microsoft.com/fwlink/?LinkID=121721&arch=arm64`. Ils redirigent vers `definitionupdates.microsoft.com/packages?arch=…`, puis vers `/packages/content/mpam-fe.exe?packageType=Signatures&packageVersion=1.459.553.0&arch=amd64&engineVersion=1.1.26080.3`. **La version figure dans l'URL de redirection avant tout téléchargement**, ce qui permet de savoir si le dépôt est à jour sans retélécharger 212 Mo. Tailles relevées le 2026-10-04 : 222 853 576 octets (x64), 222 341 064 octets (ARM64).
+  - **Version du fichier** : `(Get-Item mpam-fe.exe).VersionInfo.FileVersion` = `1.459.553.0`, identique à la version des définitions publiée sur la page Microsoft et à la valeur `AntivirusSignatureVersion` de `Get-MpComputerStatus` après application. Description `AntiMalware Definition Update`. Signature Authenticode `Valid`, Microsoft Corporation, sous PowerShell 5.1.
+  - **Antivirus tiers** : sur un poste non inscrit à Defender for Endpoint, Defender passe automatiquement en « Disabled mode » quand un antivirus tiers est installé ; il ne reçoit alors pas les définitions. En mode passif (poste inscrit à Defender for Endpoint), les définitions s'appliquent. `Get-MpComputerStatus`, valeur `AMRunningMode` : `Normal`, `Passive Mode` ou `EDR Block Mode` quand Defender est en service ; « Not running » relevé sur runner quand le service est arrêté. Sur un poste client, `root/SecurityCenter2`, classe `AntiVirusProduct`, liste les antivirus enregistrés (relevé : « Windows Defender » seul sur le runner client ; classe vide sur Windows Server).
+  - **Plateforme** : sur Windows 11 25H2 ARM64, après `MpCmdRun -ResetPlatform` (retour à la plateforme de l'image, 4.18.25080.5, au lieu de 4.18.26080.4), les définitions du jour (1.459.553.0, moteur 1.1.26080.3) s'appliquent sans mise à jour de plateforme. Le moteur est fourni par mpam-fe.exe. Microsoft ne supporte que les plateformes N-2 ; une plateforme beaucoup plus ancienne (image Windows 10 22H2 ou 24H2 jamais mise à jour) n'a pas été testée.
+  - **Lancement** : la page Microsoft dit seulement « Simply launch the file » ; aucune option n'est documentée. Mesuré sur runner : `mpam-fe.exe -q` renvoie 0 en 19 s et applique les définitions ; sans argument, il renvoie 0 en 3 s quand les définitions sont déjà à jour. Dans les deux cas, aucune fenêtre ne bloque le runner.
+  - **Pièges mesurés** : juste après un changement de plateforme, Defender est arrêté une quinzaine de secondes, et un lancement à ce moment-là échoue avec `0x800705B4` (délai dépassé) au bout d'environ 185 s, définitions inchangées. Sur Windows Server, avec le service arrêté, mpam-fe.exe renvoie 0 sans rien appliquer. **Le code retour ne prouve pas le succès.**
+- Décision (compatible avec le cahier des charges 8.3, sans modification) :
+  - Dépôt : un mpam-fe.exe par architecture, téléchargé par le lien officiel, version relevée dans l'URL de redirection pour éviter un téléchargement inutile, puis contrôlée par `FileVersion` et la signature Authenticode après téléchargement. Les liens restent dans la configuration.
+  - Détection : non applicable si `Get-MpComputerStatus` échoue, si `AMRunningMode` n'est pas `Normal`, `Passive Mode` ou `EDR Block Mode`, ou si un antivirus tiers est enregistré dans `SecurityCenter2` (motif dans le rapport) ; à jour si `AntivirusSignatureVersion` ≥ version du fichier ; à installer sinon.
+  - Exécution : `mpam-fe.exe -q`, après avoir vérifié que Defender est en service. L'étape n'est réussie que si `AntivirusSignatureVersion` atteint la version du fichier ; sinon, une seconde tentative après 30 s, puis « Erreur » avec le code retour.
+  - Plateforme : pas de mise à jour de plateforme en v1 (déjà en évolution, section 14), mais la version de la plateforme figure dans le rapport.
+  - À valider sur intervention réelle : application des définitions sur une plateforme très ancienne (Windows 10 22H2 ou 24H2 installé depuis une ISO ancienne).
 
 ## R-07 ODT et sources Office
 
@@ -284,6 +300,7 @@ Question : taille réelle des fichiers par cible et par source Office. Un fichie
 Impact : refus du FAT32, README.
 
 - Statut : À vérifier
+- Piste (2026-10-04, R-06) : mpam-fe.exe x64 222 853 576 octets, ARM64 222 341 064 octets.
 - Piste (2026-10-04, R-02) : KB5129195 x64 fait 4 639 422 594 octets (plus de 4 Gio), ARM64 4 391 570 921 octets. Un seul fichier dépasse donc la limite du FAT32. Confirmé par le téléchargement réel du workflow `depot-x64` (https://github.com/Dano7762/offpatch/actions/runs/37199155132) : 4 639 422 594 octets pour la cible, 533 761 740 pour KB5043080, 5,2 Go par cible Windows 11 au total.
 - Sources :
 - Conclusion :
@@ -300,6 +317,7 @@ Impact : `allowedDomains`.
   - Recherche et résolution des liens : `www.catalog.update.microsoft.com` (avec `www.`), pages `Search.aspx` et `DownloadDialog.aspx`. La liste du cahier des charges (6.1) porte `catalog.update.microsoft.com` sans `www.` : à compléter.
   - Fichiers des cumulatives : `catalog.sf.dl.delivery.mp.microsoft.com`, sans aucune redirection (requête HEAD avec suivi des redirections, workflow `depot-x64`, https://github.com/Dano7762/offpatch/actions/runs/37199155132). Absent de la liste actuelle.
   - Correspondance KB → build (R-01) : `learn.microsoft.com`. Absent de la liste actuelle.
+  - Définitions Defender (R-06) : `go.microsoft.com` puis `definitionupdates.microsoft.com` (deux redirections 302). Le second est absent de la liste actuelle.
   - Fichiers anciens du catalogue (SSU Windows 10 de 2023, R-04) : `catalog.s.download.windowsupdate.com`, sans redirection (https://github.com/Dano7762/offpatch/actions/runs/37202749032). Absent de la liste actuelle.
 - Sources :
 - Conclusion :
