@@ -90,6 +90,17 @@ $fileVersion = $info.FileVersion
 if ($PSCmdlet.ShouldProcess('Defender', 'Retour à la plateforme et aux définitions d''origine, puis mpam-fe.exe')) {
     Invoke-MpCmdRun -Arguments @('-ResetPlatform')
     if ($RemoveDefinitions) { Invoke-MpCmdRun -Arguments @('-RemoveDefinitions', '-All') }
+    # Le changement de plateforme arrête Defender un moment : on attend son retour en mode Normal (10 min au plus).
+    $waitStart = Get-Date
+    $ready = $false
+    while (((Get-Date) - $waitStart).TotalMinutes -lt 10) {
+        Start-Sleep -Seconds 15
+        try {
+            $mode = (Get-MpComputerStatus -ErrorAction Stop).AMRunningMode
+            if ($mode -eq 'Normal') { $ready = $true; break }
+        } catch { $mode = 'Erreur' }
+    }
+    $lines.Add(('- Attente du retour de Defender : {0} s, prêt : {1}' -f [math]::Round(((Get-Date) - $waitStart).TotalSeconds), $ready))
     Get-DefenderState -Label 'Après retour à l''origine' | Out-Null
 
     $attempts = New-Object System.Collections.Generic.List[string]
