@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.6 du 4 octobre 2026.
+Version 1.7 du 4 octobre 2026.
 
 ## 1. Contexte
 
@@ -47,6 +47,7 @@ Tout le reste est détecté puis refusé avec un message clair, sans rien instal
 | `windows-lcu` | Dernière cumulative Windows | Toutes | Microsoft Update Catalog |
 | `windows-ekb` | Enablement package 26H2 | Windows 11 24H2 et 25H2 | Élément épinglé (`config/pinned-items.json`) : lien direct Microsoft, l'enablement package n'est pas indexé au catalogue (R-03) |
 | `dotnet` | Cumulative .NET Framework | Toutes | Microsoft Update Catalog |
+| `defender-platform` | Mise à jour de la plateforme Microsoft Defender (KB4052623) | Toutes | Microsoft Update Catalog, canal « Current Channel (Broad) » uniquement |
 | `defender` | Définitions Microsoft Defender (mpam-fe.exe) | Toutes | Lien de téléchargement Microsoft |
 | `office-source` | Source d'installation Office par canal | Toutes | ODT `/download` |
 
@@ -212,6 +213,8 @@ Exemple de forme (les chaînes réelles sont établies en R-01) :
 
 Quand Microsoft change la formulation d'un titre, on corrige ce fichier sans toucher au code.
 
+Une entrée peut porter les champs de dépendance `prerequisites` et `runsAfter` décrits en 8.3 ; l'outil les recopie dans les éléments du manifeste. Exemples : la cumulative Windows 11 a pour prérequis la catégorie `windows-checkpoint`, la cumulative Windows 10 la catégorie `windows-ssu` ; les définitions Defender (`defender`) s'exécutent après `defender-platform` (`runsAfter`). Pour `defender-platform`, le motif d'inclusion n'accepte que « Current Channel (Broad) » et le motif d'exclusion écarte `Preview|Staged|Beta` (R-06).
+
 ### 6.3 Office
 
 `config/office/profiles.json` décrit les profils du tableau 3.3 :
@@ -264,7 +267,9 @@ Quand Microsoft change la formulation d'un titre, on corrige ce fichier sans tou
       "sha1": "<empreinte de 40 caractères, identique à celle du nom de fichier>",
       "appliesToBaseBuilds": [26100, 26200],
       "minUbr": 0,
-      "resultingBuild": 26300
+      "resultingBuild": 26300,
+      "prerequisites": [],
+      "runsAfter": ["windows-lcu"]
     }
   ]
 }
@@ -273,7 +278,7 @@ Quand Microsoft change la formulation d'un titre, on corrige ce fichier sans tou
 - Un élément épinglé est téléchargé une fois, puis vérifié : domaine autorisé (`allowedDomains`), SHA-1 égal à la valeur de la configuration et à l'empreinte du nom de fichier, signature Authenticode valide au nom de Microsoft. Un échec de vérification écarte le fichier.
 - Il n'est jamais purgé (7.3).
 - Le lien est mis à jour à la main, une fois par an, à la sortie d'une nouvelle version de Windows.
-- `appliesToBaseBuilds` : builds de base sur lesquelles l'élément s'applique. Champs facultatifs selon la catégorie : `minUbr`, UBR minimal du PC exigé par Microsoft avant l'installation ; `applyBelowUbr`, l'élément n'est utile que si l'UBR du PC est inférieur à cette valeur (SSU autonome des images anciennes) ; `resultingBuild`, build de base obtenue après installation et redémarrage.
+- `appliesToBaseBuilds` : builds de base sur lesquelles l'élément s'applique. Champs facultatifs selon la catégorie : `minUbr`, UBR minimal du PC exigé par Microsoft avant l'installation ; `applyBelowUbr`, l'élément n'est utile que si l'UBR du PC est inférieur à cette valeur (SSU autonome des images anciennes) ; `resultingBuild`, build de base obtenue après installation et redémarrage ; `prerequisites` et `runsAfter`, dépendances bloquantes et dépendances d'ordre (8.3).
 
 ## 7. Face Dépôt
 
@@ -291,7 +296,7 @@ Pour chaque cible cochée :
 
 Ensuite :
 
-- Defender : télécharger mpam-fe.exe pour chaque architecture et lire sa version.
+- Defender : télécharger la mise à jour de plateforme (KB4052623, recherche au catalogue) et mpam-fe.exe pour chaque architecture, et lire leur version (`FileVersion`).
 - Office : vérifier ou récupérer l'ODT dans `tools/odt/`, générer le XML de téléchargement de chaque source (canal et langues), lancer `setup.exe /download`, relever la version obtenue.
 - Écrire le manifeste de façon atomique, appliquer la purge, afficher un résumé des nouveautés du mois.
 
@@ -317,6 +322,7 @@ L'option `-ListOnly` fait tout sauf les téléchargements : elle affiche ce qui 
       "order": 20,
       "requiresReboot": true,
       "prerequisites": ["win11-x64-checkpoint-KB0000001"],
+      "runsAfter": [],
       "files": [
         {
           "path": "files/<sha256>/nom-du-fichier.msu",
@@ -360,12 +366,14 @@ L'option `-ListOnly` fait tout sauf les téléchargements : elle affiche ce qui 
 
 Les valeurs ci-dessus illustrent le format. Les chemins dans `files` sont relatifs à `depot/`. Les champs `baseBuilds` et `resultingUbr` servent à la détection des cumulatives Windows. Un même paquet s'applique à plusieurs versions qui partagent une branche de maintenance : chacune a sa build de base (26100 pour 24H2, 26200 pour 25H2, 26300 pour 26H2) et toutes reçoivent le même UBR. `baseBuilds` liste ces builds de base, `resultingUbr` est l'UBR obtenu après installation. Pour Windows 11, l'UBR est relevé dans le titre du catalogue. Pour Windows 10, dont le titre ne porte pas de build, il vient de la correspondance KB → build publiée par Microsoft (page release-information), ce qui permet de sélectionner la cumulative avant tout téléchargement (R-01, R-09). Après téléchargement, la version du paquet lue dans le .msu sert de contre-vérification de `resultingUbr` : en cas de divergence, l'outil écrit un avertissement dans le journal et la valeur lue dans le .msu fait foi pour la détection.
 
+`prerequisites` et `runsAfter` : dépendances bloquantes et dépendances d'ordre (8.3). Chaque valeur est l'identifiant d'un élément ou un code de catégorie ; un code de catégorie désigne tous les éléments de cette catégorie applicables au PC.
+
 `package` (par fichier) : nom et version du paquet lus dans le .msu au téléchargement (7.1). Pour une cumulative .NET, c'est la référence de détection (8.3). `netRelease` (par fichier, cumulatives .NET Windows 10) : plage de la valeur `Release` de .NET Framework 4 pour laquelle le fichier s'applique ; 4.8 de 528040 à 533319, 4.8.1 à partir de 533320 (R-05). Un élément .NET Windows 10 porte les deux fichiers ; l'outil installe celui qui correspond au PC. Une source Office est un élément de catégorie `office-source` avec son canal, sa version, ses langues et le dossier concerné.
 
 ### 7.3 Purge
 
 - Cumulatives Windows et .NET : on garde les `retention.windowsMonths` plus récentes par cible (2 par défaut, la courante et la précédente comme solution de repli).
-- Defender : seulement la dernière.
+- Defender (définitions et plateforme) : seulement la dernière version de chacune.
 - Éléments épinglés (6.4) : jamais purgés.
 - Office : seulement la dernière version par source, après avoir vérifié que l'index de la source (`v64.cab`) pointe bien sur elle (R-07).
 - Les fichiers étant partagés entre éléments (section 5), un fichier n'est supprimé que lorsque plus aucun élément conservé du manifeste ne le référence (comptage de références).
@@ -423,12 +431,13 @@ Méthodes de détection, à confirmer en R-09. La famille (Windows 10 ou 11) se 
 - SSU autonome Windows 10 (élément épinglé, 6.4) : à installer si la build est 19045 et que l'UBR courant est inférieur à `applyBelowUbr` (3271 pour KB5031539, prérequis des images sans KB5028244), non applicable sinon. Une réinstallation est sans effet : l'état se juge sur l'UBR, pas sur le code retour (R-02).
 - Enablement package (élément épinglé, 6.4) : non applicable si la build courante ne figure pas dans `appliesToBaseBuilds` (déjà en 26300, ou autre branche) ou si l'option est désactivée ; à installer sinon. Prérequis : UBR du PC supérieur ou égal à `minUbr` (voir les règles de prérequis ci-dessous).
 - .NET : à jour si la liste des paquets DISM contient un paquet de même nom que `package.name`, à l'état `Installed`, de version supérieure ou égale à `package.version` ; à installer sinon. Sous Windows 10, le fichier est choisi d'après la valeur `Release` de `HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full` (`netRelease`). `Get-HotFix` ne sert qu'au diagnostic : une cumulative plus récente fait disparaître le KB du dépôt de sa liste (R-05).
+- Plateforme Defender : mêmes règles d'applicabilité que les définitions ci-dessous ; à jour si `AMProductVersion` est supérieure ou égale à la version du fichier du dépôt (`FileVersion`), à installer sinon (R-06).
 - Defender : applicable si `Get-MpComputerStatus` répond et que `AMRunningMode` indique un Defender actif (`Normal`) ou passif (`Passive Mode`, `EDR Block Mode`). Si Defender est désactivé (antivirus tiers, service arrêté) ou si `Get-MpComputerStatus` échoue, l'étape est non applicable avec son motif dans le rapport, jamais en erreur. Sinon, à jour si `AntivirusSignatureVersion` est supérieure ou égale à la version de mpam-fe.exe (`FileVersion`), à installer dans le cas contraire (R-06).
 - Office : registre ClickToRun (produits installés, version, canal).
 
 Le plan est la liste ordonnée des étapes, avec les points de redémarrage. Ordre par défaut :
 
-1. Définitions Defender (pas de redémarrage).
+1. Plateforme Defender, puis définitions Defender (pas de redémarrage). La plateforme est une dépendance d'ordre des définitions : si elle échoue, les définitions sont tentées quand même.
 2. SSU autonome Windows 10 si nécessaire, checkpoints, puis cumulative Windows, puis redémarrage.
 3. Enablement package 26H2 si l'option est active et que l'UBR du PC, après le redémarrage de l'étape 2, est supérieur ou égal à `minUbr` ; puis redémarrage.
 4. Cumulative .NET, redémarrage si demandé. Le paquet .NET est le même fichier pour 24H2, 25H2 et 26H2 (R-05) : il ne dépend pas de l'enablement package.
@@ -437,16 +446,23 @@ Le plan est la liste ordonnée des étapes, avec les points de redémarrage. Ord
 
 Si la phase 0 montre que certaines étapes peuvent s'enchaîner avant un seul redémarrage (R-02, R-03), le planificateur regroupe les redémarrages.
 
+Règles de dépendance. Deux types, déclarés dans le manifeste (7.2) et dans `pinned-items.json` (6.4) :
+
+- **Prérequis bloquant** (`prerequisites`, ou condition comme `minUbr`) : l'étape n'est exécutée que si la condition est remplie. Exemples : l'enablement package exige `minUbr` ; une cumulative Windows 11 exige la checkpoint ; une cumulative Windows 10 sur image ancienne exige le SSU autonome.
+- **Dépendance d'ordre** (`runsAfter`) : l'étape est placée après celle dont elle dépend, sans condition sur le résultat de celle-ci. Exemples : les définitions Defender après la plateforme Defender ; l'enablement package après la cumulative Windows (et son redémarrage).
+- Un prérequis bloquant qui n'est pas applicable au PC (par exemple le SSU autonome sur un Windows 10 récent) ou déjà à jour est réputé rempli.
+
 Règles de prérequis :
 
 - Un prérequis peut être satisfait par une étape antérieure du même plan. L'UBR projeté après une cumulative prévue est son `resultingUbr` ; c'est lui qui sert à évaluer les étapes suivantes (par exemple l'enablement package et son `minUbr`).
 - Juste avant chaque étape, et donc après chaque redémarrage, l'outil revérifie l'état réel du PC (build, UBR, détection de la catégorie) au lieu de se fier au plan.
-- Si un prérequis n'est pas rempli, à la planification ou au moment de l'étape, l'étape passe à l'état `SkippedPrerequisite` (« Ignorée (prérequis) ») avec son motif dans le rapport. Les étapes qui en dépendent sont ignorées de la même façon. Le reste du plan continue.
+- Si un prérequis n'est pas rempli, à la planification ou au moment de l'étape, l'étape passe à l'état `SkippedPrerequisite` (« Ignorée (prérequis) ») avec son motif dans le rapport. Les étapes qui en dépendent par un prérequis bloquant sont ignorées de la même façon ; celles qui n'en dépendent que par l'ordre sont exécutées normalement. Le reste du plan continue.
 
 ### 8.4 Exécution des étapes Windows
 
 - Installation des paquets par DISM en ligne, sans redémarrage automatique, avec un journal DISM par étape. Le choix entre `dism.exe` et `Add-WindowsPackage` est fait en R-14.
 - Codes retour : 0 réussite, 3010 redémarrage nécessaire, « non applicable » (0x800f081e) traité comme `NotApplicable` et non comme une erreur, le reste en erreur avec le code dans le journal et le rapport.
+- Plateforme Defender : exécution de `updateplatform.<arch>fre_….exe`, puis attente du retour de Defender en mode `Normal`, bornée à 120 s. En cas de dépassement, avertissement dans le journal, et les définitions sont tentées quand même. Réussite constatée par `AMProductVersion`, pas par le code retour.
 - Defender : exécution de mpam-fe.exe, puis lecture de la nouvelle version pour confirmer. Le code retour ne suffit pas : mpam-fe.exe peut renvoyer 0 sans rien appliquer (R-06).
 
 ### 8.5 Office
@@ -584,7 +600,7 @@ Les résultats sont notés dans le journal de `TODO.md`.
 
 - Profil Microsoft 365 Apps (même mécanisme ODT, canal Current).
 - Génération d'une ISO Windows à jour en intégrant la cumulative hors ligne.
-- Outil de suppression de logiciels malveillants (MSRT) et mise à jour de la plateforme Defender.
+- Outil de suppression de logiciels malveillants (MSRT).
 - Signature des scripts avec un certificat de code.
 - Paquet de préparation ESU Windows 10 (KB5126256 à ce jour) dans le dépôt. Écarté de la v1 : l'inscription à l'ESU demande de toute façon une connexion, et le paquet redémarre le PC de lui-même (R-04).
 
@@ -597,3 +613,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.4 (4 octobre 2026) : règles de prérequis du planificateur (UBR projeté, revérification avant chaque étape, état `SkippedPrerequisite`, dépendances ignorées) (8.3) ; SSU autonome Windows 10 KB5031539 en élément épinglé, catégorie `windows-ssu`, champ `applyBelowUbr` (3.2, 6.4, 8.3) ; paquet .NET identique pour 24H2, 25H2 et 26H2 (8.3) ; tests de planification P1 à P5 (12) ; paquet de préparation ESU en évolution (14). Suite de R-04 et R-05.
 - 1.5 (4 octobre 2026) : détection .NET par comparaison de la version du paquet lue dans le .msu avec la liste DISM, choix 4.8 / 4.8.1 sous Windows 10 par la valeur `Release` (8.3) ; lecture du .msu au téléchargement (7.1) ; champs `package` et `netRelease` du manifeste, contre-vérification de `resultingUbr` par le .msu, la valeur du .msu faisant foi en cas de divergence (7.2) ; section 12 : tests réels sur runners GitHub hébergés ou sur intervention réelle, matrice T1 à T8 avec le lieu de chaque test, à la place des VM Hyper-V. Suite de R-05.
 - 1.6 (4 octobre 2026) : Defender, applicable si actif ou passif, non applicable avec motif (jamais en erreur) si désactivé ou si `Get-MpComputerStatus` échoue, contrôle de la version après exécution (8.3, 8.4) ; rapport d'intervention : version des définitions installées et rappel de la mise à jour automatique une fois le PC connecté (8.8). Suite de R-06.
+- 1.7 (4 octobre 2026) : plateforme Defender (KB4052623) dans le périmètre, catégorie `defender-platform`, canal « Current Channel (Broad) » seul (3.2, 6.2, 7.1, 7.3), retirée des évolutions (14) ; deux types de dépendance, prérequis bloquant (`prerequisites`, conditions) et dépendance d'ordre (`runsAfter`), dans le manifeste et `pinned-items.json` (6.4, 7.2, 8.3) ; plateforme exécutée avant les définitions, attente bornée à 120 s avec avertissement (8.3, 8.4). Suite de R-06.

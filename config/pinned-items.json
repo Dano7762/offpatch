@@ -13,7 +13,11 @@
         26200
       ],
       "minUbr": 9550,
-      "resultingBuild": 26300
+      "resultingBuild": 26300,
+      "prerequisites": [],
+      "runsAfter": [
+        "windows-lcu"
+      ]
     },
     {
       "id": "win11-arm64-ekb-26H2",
@@ -27,7 +31,11 @@
         26200
       ],
       "minUbr": 9550,
-      "resultingBuild": 26300
+      "resultingBuild": 26300,
+      "prerequisites": [],
+      "runsAfter": [
+        "windows-lcu"
+      ]
     },
     {
       "id": "win10-x64-ssu-KB5031539",
@@ -39,7 +47,9 @@
       "appliesToBaseBuilds": [
         19045
       ],
-      "applyBelowUbr": 3271
+      "applyBelowUbr": 3271,
+      "prerequisites": [],
+      "runsAfter": []
     }
   ]
 }

@@ -15,6 +15,17 @@ Describe 'Élément épinglé <Id>' -ForEach $items {
         }
     }
 
+    It 'déclare ses dépendances (prerequisites, runsAfter) comme des listes de chaînes non vides' {
+        foreach ($field in 'prerequisites', 'runsAfter') {
+            if ($Item.PSObject.Properties[$field]) {
+                foreach ($value in @($Item.$field)) {
+                    $value | Should -BeOfType [string]
+                    $value | Should -Not -BeNullOrEmpty
+                }
+            }
+        }
+    }
+
     It 'pointe en HTTPS vers un domaine de fichiers du catalogue' {
         $uri = [uri]$Item.url
         $uri.Scheme | Should -Be 'https'
