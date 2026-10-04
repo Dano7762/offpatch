@@ -1,0 +1,55 @@
+# Passage croisé : recherche arm64 depuis windows-2025 et x64 depuis windows-11-arm, pour séparer
+# une cause réseau d'une cause de filtre (échec de recherche du 2026-10-04 sur windows-11-arm).
+# Déclenchement manuel uniquement. Lecture seule : aucun téléchargement de fichier.
+name: catalog-cross
+
+on:
+  workflow_dispatch:
+    inputs:
+      kb:
+        description: 'KB à rechercher (ex. KB5129195)'
+        required: true
+        default: 'KB5129195'
+      attempts:
+        description: 'Nombre d''essais par runner'
+        required: true
+        default: '5'
+
+permissions:
+  contents: read
+
+jobs:
+  search:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            arch: arm64
+          - runner: windows-11-arm
+            arch: x64
+          - runner: windows-11-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Recherches répétées
+        env:
+          TARGET_KB: ${{ inputs.kb }}
+          ATTEMPTS: ${{ inputs.attempts }}
+          SEARCH_ARCH: ${{ matrix.arch }}
+        run: ./tests/runner/Test-CatalogSearch.ps1 -Kb $env:TARGET_KB -Arch $env:SEARCH_ARCH -Attempts ([int]$env:ATTEMPTS) -OutputDirectory "$env:RUNNER_TEMP\catalog-out"
+
+      - name: Résultats
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: catalog-cross-${{ matrix.runner }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/catalog-out
+          retention-days: 30
+          if-no-files-found: warn

@@ -1,5 +1,6 @@
 # R-10, R-12, R-13 : téléchargement d'une entrée x64 du catalogue, contrôle SHA-1 et Authenticode,
-# tailles et domaines atteints. Déclenchement manuel uniquement. Aucune installation.
+# tailles et domaines atteints. Si `urls` est renseigné, vérifie ces liens directs à la place
+# (éléments épinglés, R-03). Déclenchement manuel uniquement. Aucune installation.
 name: depot-x64
 
 on:
@@ -9,6 +10,10 @@ on:
         description: 'KB de la cumulative cible (ex. KB5129195)'
         required: true
         default: 'KB5129195'
+      urls:
+        description: 'Liens directs à vérifier, séparés par des espaces (laisse vide pour la recherche par KB)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -23,7 +28,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Téléchargement et contrôles
+      - name: Téléchargement et contrôles (catalogue)
+        if: inputs.urls == ''
         env:
           TARGET_KB: ${{ inputs.kb }}
         run: |
@@ -31,11 +37,21 @@ jobs:
           ./tests/runner/Save-CatalogEntryFile.ps1 -Kb $env:TARGET_KB -Arch x64 -Destination (Join-Path $env:RUNNER_TEMP 'depot') -ReportPath (Join-Path $out 'download.json') | Out-Null
           ./tests/runner/Write-DownloadSummary.ps1 -ReportPath (Join-Path $out 'download.json') -OutputPath (Join-Path $out 'resume.md')
 
+      - name: Téléchargement et contrôles (liens directs)
+        if: inputs.urls != ''
+        env:
+          DIRECT_URLS: ${{ inputs.urls }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'depot-out'
+          $urls = @($env:DIRECT_URLS -split '\s+' | Where-Object { $_ })
+          ./tests/runner/Test-PinnedFile.ps1 -Url $urls -Destination (Join-Path $env:RUNNER_TEMP 'pinned') -ReportPath (Join-Path $out 'download.json')
+          ./tests/runner/Write-DownloadSummary.ps1 -ReportPath (Join-Path $out 'download.json') -OutputPath (Join-Path $out 'resume.md')
+
       - name: Rapport
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: depot-x64-${{ inputs.kb }}
+          name: depot-x64-${{ inputs.urls == '' && inputs.kb || 'liens-directs' }}
           path: ${{ runner.temp }}/depot-out
           retention-days: 30
           if-no-files-found: warn

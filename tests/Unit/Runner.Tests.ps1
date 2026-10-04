@@ -38,3 +38,15 @@ Describe 'Save-CatalogEntryFile.ps1' {
             Should -Throw
     }
 }
+
+Describe 'Test-PinnedFile.ps1' {
+    It 'refuse un domaine non autorisé avant tout téléchargement' {
+        { & (Join-Path $runner 'Test-PinnedFile.ps1') -Url 'https://example.com/Windows11.0-KB0000000-x64_0000000000000000000000000000000000000000.msu' -Destination $TestDrive -ReportPath (Join-Path $TestDrive 'r.json') } |
+            Should -Throw -ExpectedMessage '*non autorisé*'
+    }
+
+    It 'refuse un lien non HTTPS' {
+        { & (Join-Path $runner 'Test-PinnedFile.ps1') -Url 'http://catalog.sf.dl.delivery.mp.microsoft.com/x/Windows11.0-KB0000000-x64_0000000000000000000000000000000000000000.msu' -Destination $TestDrive -ReportPath (Join-Path $TestDrive 'r.json') } |
+            Should -Throw -ExpectedMessage '*non autorisé*'
+    }
+}
