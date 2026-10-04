@@ -291,10 +291,26 @@ Question : comment mettre à jour un Office Click-to-Run déjà installé à par
 
 Impact : tableau 8.5 du cahier des charges.
 
-- Statut : À vérifier
-- Sources :
-- Conclusion :
-- Décision :
+- Statut : Tranché sur le mécanisme (deux points restent ouverts, voir plus bas)
+- Sources (consultées le 2026-10-04) :
+  - https://learn.microsoft.com/en-us/microsoft-365-apps/deploy/office-deployment-tool-configuration-options (mise à jour du 2026-09-28) : élément `Remove` (« If set to TRUE, all Microsoft 365 Apps products and languages are removed, including Project and Visio » ; sans attribut de langue, toutes les langues installées du produit sont retirées), élément `Updates` (`UpdatePath` local, réseau ou HTTP ; `TargetVersion`).
+  - https://support.microsoft.com/en-us/topic/how-to-revert-to-an-earlier-version-of-office-2bd5c457-a917-d57e-35a1-f709e3dda841 : changement de version d'un Office Click-to-Run (Microsoft 365, Office 2024, Office 2021) par `setup.exe /configure` avec `<Updates Enabled="TRUE" TargetVersion="…" />`.
+  - Aucune page officielle trouvée pour les options de `OfficeC2RClient.exe /update` (`displaylevel`, `forceappshutdown`, `updatepromptuser`) : elles ont été mesurées, pas documentées.
+  - Workflow `r08-office` sur `windows-11-arm`, un runner neuf par scénario, source Current fr-fr (Home2024Retail) téléchargée par l'ODT 16.0.20326.20112, CDN Office bloqué dans le fichier hosts pour toute opération « hors ligne » : https://github.com/Dano7762/offpatch/actions/runs/37237307356.
+- Conclusion (mesures sur runner) :
+  - **Office « constructeur » retiré et remplacé en une passe** (scénario RemoveAdd) : O365HomePremRetail fr-fr + en-us installé depuis le CDN (16.0.20430.20140), puis, CDN bloqué, un seul XML avec `<Remove All="TRUE" />` et `<Add>` Home2024Retail depuis la source locale (`AllowCdnFallback="FALSE"`) : code 0, 120 s ; `ProductReleaseIds` passe de `O365HomePremRetail` à `Home2024Retail`. **`<Remove All="TRUE" />` se combine avec `<Add>` dans le même fichier.** Le passage en deux temps n'a pas été nécessaire.
+  - **Mise à jour hors ligne par `setup.exe /configure` relancé** (UpdateConfigure) : Home2024Retail installé en 16.0.20430.20092 depuis la source locale, puis, CDN bloqué, `/configure` avec la même `<Add SourcePath=… AllowCdnFallback="FALSE">` sur une source qui contient la version récente : code 0, 192 s, version 16.0.20430.20140.
+  - **Mise à jour hors ligne par `OfficeC2RClient.exe`** (UpdateC2RClient) : même départ ; valeur `UpdateUrl` de `HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration` mise temporairement sur la source locale, puis `OfficeC2RClient.exe /update user displaylevel=false forceappshutdown=true updatepromptuser=false` : rend la main en 4 s (code 0), la mise à jour se termine en arrière-plan, version 16.0.20430.20140 atteinte au bout de 105 s ; `UpdateUrl` restauré (absent au départ, supprimé à la fin).
+  - **La source Current met à jour un O365HomePremRetail existant** (hypothèse de David vérifiée) : O365HomePremRetail 16.0.20430.20092 installé depuis le CDN, puis, CDN bloqué, mise à jour vers 16.0.20430.20140 depuis la source Current fr-fr **téléchargée pour Home2024Retail**, aussi bien par `/configure` (`<Add>` avec le produit O365HomePremRetail, 193 s) que par `OfficeC2RClient` (106 s). La source d'un canal et d'une langue n'est donc pas propre à un produit.
+  - **Applications du Store** : Microsoft.MicrosoftOfficeHub (19.2506.56051.0) inchangée dans les cinq scénarios, retrait compris. Click-to-Run installe lui-même deux paquets MSIX qui lui sont liés (`Microsoft.OfficePushNotificationUtility`, `Microsoft.Office.ActionsServer`, à la version d'Office) ; après une mise à jour, les deux versions restent listées par `Get-AppxPackage -AllUsers`. L'outil ne les touche pas.
+  - Durées : installation depuis le CDN 280 à 305 s ; installation ou mise à jour depuis la source locale 120 à 280 s.
+- Points restés ouverts :
+  - **Retrait des langues** : le scénario RemoveAdd prouve le changement de produit, pas le retrait de la langue en-us. Les dossiers de langue de `root\Office16` (1025, 1031, 1033, 1036, 1043, 3082) sont présents dans tous les scénarios, y compris avec une seule langue installée ; ce sont des outils linguistiques communs, l'indicateur n'est pas discriminant. À relever : les langues déclarées par Click-to-Run dans le registre.
+  - **Office existant en plusieurs langues** : la mise à jour d'un Office installé en fr-fr + en-us depuis une source fr-fr seule n'a pas été testée. Avec `AllowCdnFallback="FALSE"`, la langue absente de la source risque de faire échouer l'opération. L'ODT documente `Language ID="MatchInstalled"`, à essayer.
+- Décision (provisoire, cahier des charges 8.5 inchangé tant que David n'a pas tranché) :
+  - **Mécanisme de mise à jour recommandé : `setup.exe /configure` relancé** avec `<Add SourcePath=<source> AllowCdnFallback="FALSE">` et les produits déjà installés. Il est documenté, ne touche pas au registre et laisse le PC dans son état normal ; il prend environ 190 s, contre 105 s pour `OfficeC2RClient`. `OfficeC2RClient` avec `UpdateUrl` temporaire fonctionne aussi, mais ses options ne sont pas documentées, il modifie une valeur de registre qu'il faut restaurer, et la fin de la mise à jour doit être guettée dans `VersionToReport` : repli seulement.
+  - Office préinstallé à retirer : un seul XML `<Remove All="TRUE" />` + `<Add>`, validé.
+  - Office existant d'un autre produit sur le même canal (par exemple Microsoft 365 Famille, Current) : la source Current du dépôt suffit pour le mettre à jour hors ligne, si ses langues y figurent. Proposition à soumettre à David : ajouter au tableau 8.5 la ligne « Autre produit Click-to-Run sur un canal présent dans le dépôt : mise à jour proposée depuis la source locale », distincte du choix « conserver / retirer ».
 
 ## R-09 Détection des cumulatives installées
 
