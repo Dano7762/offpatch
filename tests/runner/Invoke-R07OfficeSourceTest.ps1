@@ -79,10 +79,12 @@ function Add-SourceSnapshot {
     $lines.Add('')
     foreach ($dir in @(Get-ChildItem -Path $source -Recurse -Directory | Sort-Object FullName)) {
         $files = @(Get-ChildItem -Path $dir.FullName -File)
-        $size = ($files | Measure-Object -Property Length -Sum).Sum
+        $size = [int64]0
+        foreach ($file in $files) { $size += $file.Length }
         $lines.Add(('    {0} : {1} fichier(s), {2} Mo' -f $dir.FullName.Substring($source.Length), $files.Count, [math]::Round($size / 1MB, 1)))
     }
-    $total = (Get-ChildItem -Path $source -Recurse -File | Measure-Object -Property Length -Sum).Sum
+    $total = [int64]0
+    foreach ($file in @(Get-ChildItem -Path $source -Recurse -File)) { $total += $file.Length }
     $lines.Add(('    Total : {0} Mo' -f [math]::Round($total / 1MB, 1)))
     foreach ($cab in @(Get-ChildItem -Path $source -Recurse -File -Filter 'v*.cab' | Where-Object { $_.DirectoryName -match '\\Data$' })) {
         $cabOut = Join-Path $OutputDirectory ("{0}-{1}" -f $Label, $cab.BaseName)
@@ -95,8 +97,15 @@ function Add-SourceSnapshot {
     }
 }
 
-if ($OlderVersion) { Invoke-OfficeDownload -Version $OlderVersion -Label 'version-ancienne' }
-Invoke-OfficeDownload -Version '' -Label 'derniere-version'
+try {
+    if ($OlderVersion) { Invoke-OfficeDownload -Version $OlderVersion -Label 'version-ancienne' }
+    Invoke-OfficeDownload -Version '' -Label 'derniere-version'
+} catch {
+    $lines.Add("- ERREUR : $($_.Exception.Message)")
+    throw
+} finally {
+    ($lines -join "`n") | Set-Content -Path (Join-Path $OutputDirectory 'resume-partiel.md') -Encoding UTF8
+}
 
 # Domaines cités dans les journaux de l'ODT (dossier temporaire de l'utilisateur)
 $logs = @(Get-ChildItem -Path $env:TEMP -Filter '*.log' -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt (Get-Date).AddHours(-3) })

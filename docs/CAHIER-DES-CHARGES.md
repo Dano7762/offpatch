@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.7 du 4 octobre 2026.
+Version 1.8 du 4 octobre 2026.
 
 ## 1. Contexte
 
@@ -55,18 +55,20 @@ Les points encore incertains (titres exacts du catalogue, prérequis checkpoint,
 
 ### 3.3 Éditions Office
 
-| Profil | Libellé | Product ID | Canal | Licence |
-|---|---|---|---|---|
-| `home2024` | Office Famille 2024 | `Home2024Retail` | Current | Compte Microsoft du client |
-| `homebusiness2024` | Office Famille et Petite Entreprise 2024 | `HomeBusiness2024Retail` | Current | Compte Microsoft du client |
-| `homestudent2021` | Office Famille et Étudiant 2021 | `HomeStudent2021Retail` (à vérifier) | Current | Compte Microsoft du client |
-| `homebusiness2021` | Office Famille et Petite Entreprise 2021 | `HomeBusiness2021Retail` (à vérifier) | Current | Compte Microsoft du client |
-| `ltsc2024-proplus` | Office LTSC Professionnel Plus 2024 | `ProPlus2024Volume` | PerpetualVL2024 | Clé MAK |
-| `ltsc2024-std` | Office LTSC Standard 2024 | `Standard2024Volume` (à vérifier) | PerpetualVL2024 | Clé MAK |
-| `ltsc2021-proplus` | Office LTSC Professionnel Plus 2021 | `ProPlus2021Volume` (à vérifier) | PerpetualVL2021 | Clé MAK |
-| `ltsc2021-std` | Office LTSC Standard 2021 | `Standard2021Volume` (à vérifier) | PerpetualVL2021 | Clé MAK |
+| Profil | Libellé | Product ID | Canal | Licence | Windows 10 22H2 |
+|---|---|---|---|---|---|
+| `home2024` | Office Famille 2024 | `Home2024Retail` | Current | Compte Microsoft du client | Non pris en charge |
+| `homebusiness2024` | Office Famille et Petite Entreprise 2024 | `HomeBusiness2024Retail` | Current | Compte Microsoft du client | Non pris en charge |
+| `homestudent2021` | Office Famille et Étudiant 2021 | `HomeStudent2021Retail` | Current | Compte Microsoft du client | Non pris en charge |
+| `homebusiness2021` | Office Famille et Petite Entreprise 2021 | `HomeBusiness2021Retail` | Current | Compte Microsoft du client | Non pris en charge |
+| `ltsc2024-proplus` | Office LTSC Professionnel Plus 2024 | `ProPlus2024Volume` | PerpetualVL2024 | Clé MAK | Non pris en charge |
+| `ltsc2024-std` | Office LTSC Standard 2024 | `Standard2024Volume` | PerpetualVL2024 | Clé MAK | Non pris en charge |
+| `ltsc2021-proplus` | Office LTSC Professionnel Plus 2021 | `ProPlus2021Volume` | PerpetualVL2021 | Clé MAK | Non pris en charge |
+| `ltsc2021-std` | Office LTSC Standard 2021 | `Standard2021Volume` | PerpetualVL2021 | Clé MAK | Non pris en charge |
 
-`Home2024Retail`, `HomeBusiness2024Retail` et `ProPlus2024Volume` figurent dans la liste officielle des product IDs de l'ODT. Les autres sont à confirmer (R-07).
+Les huit product IDs figurent dans la liste officielle de l'ODT (R-07). Les quatre profils en boîte utilisent le canal Current et partagent une seule source `current` : leur build est celle du Current Channel (R-07).
+
+Prise en charge sous Windows 10 22H2, d'après les configurations requises de Microsoft (« Office suites for individuals and families » et « Office suites for enterprise, business, education, and government », support.microsoft.com, consultées le 4 octobre 2026) : Office 2024 et Office 2021 en boîte ne citent que Windows 11 ; Office LTSC 2024 et LTSC 2021 citent Windows 11, Windows 11 LTSC 2024, Windows 10 LTSC 2021 et 2019 et des versions de Windows Server, pas Windows 10 22H2. L'installation reste possible, mais elle se fait hors du support Microsoft : l'outil le signale sans la bloquer (8.2, 8.6, 8.8). La liste est tenue à jour dans `profiles.json` (champ `supportedOn`), avec la source.
 
 Une source Office correspond à un canal et à une liste de langues. Il en faut donc trois au maximum : `current`, `perpetualvl2024`, `perpetualvl2021`. Office est installé en 64 bits, y compris sur les PC ARM64 (à confirmer en R-07). Langue par défaut : `fr-fr`. La liste des langues est réglable, mais l'installation ne peut utiliser que des langues présentes dans la source, puisque le repli sur le CDN est désactivé.
 
@@ -228,7 +230,11 @@ Une entrée peut porter les champs de dépendance `prerequisites` et `runsAfter`
   "source": "perpetualvl2024",
   "license": "volume",
   "acceptsProductKey": true,
-  "excludeApps": []
+  "excludeApps": [],
+  "supportedOn": {
+    "windows": ["win11"],
+    "source": "https://support.microsoft.com/en-us/office/system-requirements/office-suites-for-enterprise-business-education-and-government"
+  }
 }
 ```
 
@@ -404,6 +410,7 @@ Assistant accessible depuis l'onglet Dépôt :
 | Droits administrateur | Bloquant |
 | Cible reconnue (système, version, build, architecture, édition) | Hors périmètre : bloquant, avec le motif. Windows 10 et Windows 11 se distinguent par `CurrentBuild` (22000 et plus = Windows 11), jamais par `ProductName`, qui vaut encore « Windows 10 … » sur Windows 11. Le libellé affiché vient de `Win32_OperatingSystem.Caption` (R-09) |
 | Windows 10 : ESU actif | Absent ou indétectable : avertissement. En mode auto, l'étape Windows est ignorée sauf si je la force dans le récapitulatif (R-04) |
+| Profil Office choisi pris en charge par Microsoft sur ce Windows (3.3, `supportedOn`) | Non pris en charge (par exemple tout profil sur Windows 10 22H2) : avertissement non bloquant, avec la source Microsoft ; rappel dans l'écran récapitulatif du mode auto (8.6) et dans le rapport (8.8) |
 | Redémarrage en attente (CBS, Windows Update, renommages de fichiers en attente) | Proposer de redémarrer avant de commencer |
 | Espace libre sur C: | Sous `minFreeSpaceGB` : bloquant |
 | Portable sur batterie | Avertissement, confirmation demandée avant le mode auto |
@@ -479,7 +486,7 @@ Le XML d'installation est généré dans `C:\ProgramData\OffPatch\temp\` avec le
 
 ### 8.6 Mode automatique
 
-Toutes les décisions sont prises avant le démarrage, sur un écran récapitulatif : étapes prévues, profil Office, retrait d'un Office existant, clé éventuelle, forçage éventuel pour Windows 10. Je valide une seule fois, puis plus aucune question n'est posée.
+Toutes les décisions sont prises avant le démarrage, sur un écran récapitulatif : étapes prévues, profil Office (avec le rappel, s'il y a lieu, que Microsoft ne prend pas ce profil en charge sur ce Windows, et la source), retrait d'un Office existant, clé éventuelle, forçage éventuel pour Windows 10. Je valide une seule fois, puis plus aucune question n'est posée.
 
 Pendant la session :
 
@@ -504,7 +511,7 @@ En fin de session, ou en cas d'abandon, un rapport HTML autonome et imprimable e
 - Windows avant et après (édition, version, build et UBR), statut ESU pour Windows 10 ;
 - Defender : version des définitions installées (et de la plateforme), ou motif de non-application, avec le rappel que Defender se met à jour seul dès que le PC est connecté à Internet ;
 - chaque étape avec son résultat, son code retour éventuel et sa durée ;
-- Office installé (produit, version, canal, langues) et le mode d'activation attendu ;
+- Office installé (produit, version, canal, langues) et le mode d'activation attendu, avec la mention, s'il y a lieu, que Microsoft ne prend pas ce profil en charge sur ce Windows (et la source) ;
 - erreurs et avertissements ;
 - version de l'outil et date du dépôt utilisé.
 
@@ -614,3 +621,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.5 (4 octobre 2026) : détection .NET par comparaison de la version du paquet lue dans le .msu avec la liste DISM, choix 4.8 / 4.8.1 sous Windows 10 par la valeur `Release` (8.3) ; lecture du .msu au téléchargement (7.1) ; champs `package` et `netRelease` du manifeste, contre-vérification de `resultingUbr` par le .msu, la valeur du .msu faisant foi en cas de divergence (7.2) ; section 12 : tests réels sur runners GitHub hébergés ou sur intervention réelle, matrice T1 à T8 avec le lieu de chaque test, à la place des VM Hyper-V. Suite de R-05.
 - 1.6 (4 octobre 2026) : Defender, applicable si actif ou passif, non applicable avec motif (jamais en erreur) si désactivé ou si `Get-MpComputerStatus` échoue, contrôle de la version après exécution (8.3, 8.4) ; rapport d'intervention : version des définitions installées et rappel de la mise à jour automatique une fois le PC connecté (8.8). Suite de R-06.
 - 1.7 (4 octobre 2026) : plateforme Defender (KB4052623) dans le périmètre, catégorie `defender-platform`, canal « Current Channel (Broad) » seul (3.2, 6.2, 7.1, 7.3), retirée des évolutions (14) ; deux types de dépendance, prérequis bloquant (`prerequisites`, conditions) et dépendance d'ordre (`runsAfter`), dans le manifeste et `pinned-items.json` (6.4, 7.2, 8.3) ; plateforme exécutée avant les définitions, attente bornée à 120 s avec avertissement (8.3, 8.4). Suite de R-06.
+- 1.8 (4 octobre 2026) : tableau 3.3 : product IDs confirmés (mentions « à vérifier » levées), une seule source Current pour les quatre profils en boîte, colonne de prise en charge sous Windows 10 22H2 (aucun profil pris en charge, d'après les configurations requises Microsoft) ; champ `supportedOn` des profils (6.3) ; avertissement non bloquant en contrôle préalable (8.2), rappel dans l'écran récapitulatif (8.6) et dans le rapport (8.8). Suite de R-07.
