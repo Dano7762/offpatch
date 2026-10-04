@@ -116,3 +116,4 @@ Une ligne par session, la plus récente en bas.
 |---|---|---|---|
 | 2026-10-04 | Préparation | Cahier des charges, CLAUDE.md, backlog et liste des points à vérifier | Démarrer la phase 0 |
 | 2026-10-04 | 0 | R-01 tranché : forme des titres Windows 11 et 10, même KB publié sous 24H2/25H2/26H2 avec les mêmes fichiers, sélection par UBR max (OOB possibles), exclusion de 26H1, une requête par version (plafond de 25 résultats) | R-02 (KB5043080 livré avec chaque entrée de cumulative) |
+| 2026-10-04 | 0 | Relecture R-01 : règles validées (UBR max, Windows 10 via release-information, mois courant + précédent), contrôle étendu dans scratch, cahier des charges 1.1 (`baseBuilds` + `resultingUbr`), décision de stockage par hash notée en R-02 | R-02 |

@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.0 du 4 octobre 2026.
+Version 1.1 du 4 octobre 2026.
 
 ## 1. Contexte
 
@@ -277,7 +277,8 @@ L'option `-ListOnly` fait tout sauf les téléchargements : elle affiche ce qui 
       "kb": "KB0000000",
       "title": "Titre exact relevé dans le catalogue",
       "releaseDate": "2026-10-13",
-      "resultingBuild": "26100.0000",
+      "baseBuilds": [26100, 26200, 26300],
+      "resultingUbr": 0,
       "order": 20,
       "requiresReboot": true,
       "prerequisites": ["win11-x64-checkpoint-KB0000001"],
@@ -290,7 +291,7 @@ L'option `-ListOnly` fait tout sauf les téléchargements : elle affiche ce qui 
 }
 ```
 
-Les valeurs ci-dessus illustrent le format. Les chemins dans `files` sont relatifs à `depot/`. Le champ `resultingBuild` sert à la détection : la méthode pour l'obtenir au téléchargement est à établir (R-09). Une source Office est un élément de catégorie `office-source` avec son canal, sa version, ses langues et le dossier concerné.
+Les valeurs ci-dessus illustrent le format. Les chemins dans `files` sont relatifs à `depot/`. Les champs `baseBuilds` et `resultingUbr` servent à la détection des cumulatives Windows. Un même paquet s'applique à plusieurs versions qui partagent une branche de maintenance : chacune a sa build de base (26100 pour 24H2, 26200 pour 25H2, 26300 pour 26H2) et toutes reçoivent le même UBR. `baseBuilds` liste ces builds de base, `resultingUbr` est l'UBR obtenu après installation. Pour Windows 11, l'UBR est relevé dans le titre du catalogue. Pour Windows 10, dont le titre ne porte pas de build, il vient de la correspondance KB → build publiée par Microsoft (R-01, R-09). Une source Office est un élément de catégorie `office-source` avec son canal, sa version, ses langues et le dossier concerné.
 
 ### 7.3 Purge
 
@@ -345,7 +346,7 @@ Pour chaque élément du manifeste applicable au PC, l'outil calcule un état :
 
 Méthodes de détection, à confirmer en R-09 :
 
-- Cumulative Windows : build et UBR courants comparés à `resultingBuild`, avec la liste des paquets DISM en complément.
+- Cumulative Windows : non applicable si la build courante ne figure pas dans `baseBuilds`. Sinon, à jour si l'UBR courant est supérieur ou égal à `resultingUbr`, à installer dans le cas contraire. La liste des paquets DISM sert de complément.
 - Checkpoint : présence du paquet dans la liste DISM.
 - Enablement package : `DisplayVersion` dans le registre.
 - .NET : présence du KB.
@@ -496,3 +497,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 ## 15. Historique
 
 - 1.0 (4 octobre 2026) : version initiale.
+- 1.1 (4 octobre 2026) : manifeste (7.2), `resultingBuild` remplacé par `baseBuilds` et `resultingUbr` ; détection de la cumulative Windows (8.3) adaptée en conséquence. Suite de R-01 : un même KB est publié pour 24H2, 25H2 et 26H2 avec la même UBR et des builds de base différentes.
