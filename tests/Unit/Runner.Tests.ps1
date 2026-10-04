@@ -88,3 +88,32 @@ Describe 'Invoke-R07OfficeInstallTest.ps1' {
             Should -Throw -ExpectedMessage '*runner GitHub*'
     }
 }
+
+Describe 'Invoke-R08OfficeExistingTest.ps1' {
+    BeforeEach { $savedFlag = $env:GITHUB_ACTIONS }
+    AfterEach { $env:GITHUB_ACTIONS = $savedFlag }
+
+    It 'refuse de s''exécuter hors d''un runner GitHub' {
+        $env:GITHUB_ACTIONS = 'false'
+        { & (Join-Path $runner 'Invoke-R08OfficeExistingTest.ps1') -Scenario 'RemoveAdd' -OutputDirectory $TestDrive -WhatIf } |
+            Should -Throw -ExpectedMessage '*runner GitHub*'
+    }
+}
+
+Describe 'Get-OdtConfigurationXml' {
+    BeforeAll { . (Join-Path $runner 'OfficeRunner.Common.ps1') }
+
+    It 'combine Remove All et Add dans un XML valide' {
+        [xml]$xml = Get-OdtConfigurationXml -SourcePath 'D:\source' -ProductId 'Home2024Retail' -Language 'fr-fr', 'en-us' -NoCdnFallback -RemoveAll -Display
+        $xml.Configuration.Add.AllowCdnFallback | Should -Be 'FALSE'
+        $xml.Configuration.Add.OfficeClientEdition | Should -Be '64'
+        @($xml.Configuration.Add.Product.Language).Count | Should -Be 2
+        $xml.Configuration.Remove.All | Should -Be 'TRUE'
+    }
+
+    It 'produit un XML de retrait seul sans élément Add' {
+        [xml]$xml = Get-OdtConfigurationXml -RemoveAll
+        $xml.Configuration.PSObject.Properties['Add'] | Should -BeNullOrEmpty
+        $xml.Configuration.Remove.All | Should -Be 'TRUE'
+    }
+}

@@ -1,0 +1,44 @@
+# R-08 : Office déjà présent (retrait combiné à l'installation, mise à jour hors ligne par ODT ou OfficeC2RClient,
+# mise à jour d'un O365HomePremRetail par la source Current), un scénario par runner Windows 11 ARM64 jetable.
+# Déclenchement manuel uniquement. Modifie le système du runner (installation et retrait d'Office).
+name: r08-office
+
+on:
+  workflow_dispatch:
+    inputs:
+      older_version:
+        description: 'Version ancienne du Current Channel'
+        required: true
+        default: '16.0.20430.20092'
+
+permissions:
+  contents: read
+
+jobs:
+  office:
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [RemoveAdd, UpdateConfigure, UpdateC2RClient, HomePremConfigure, HomePremC2RClient]
+    runs-on: windows-11-arm
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai R-08
+        env:
+          R08_SCENARIO: ${{ matrix.scenario }}
+          R08_OLDER: ${{ inputs.older_version }}
+        run: ./tests/runner/Invoke-R08OfficeExistingTest.ps1 -Scenario $env:R08_SCENARIO -OlderVersion $env:R08_OLDER -OutputDirectory "$env:RUNNER_TEMP\r08-out"
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: r08-office-${{ matrix.scenario }}
+          path: ${{ runner.temp }}/r08-out
+          retention-days: 30
+          if-no-files-found: warn
