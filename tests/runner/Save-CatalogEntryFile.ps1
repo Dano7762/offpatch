@@ -23,6 +23,7 @@ param(
     [ValidateSet('x64', 'arm64')][string]$Arch = 'x64',
     [Parameter(Mandatory)][string]$Destination,
     [string]$ReportPath,
+    [string]$DiagnosticDirectory,
     [switch]$ListOnly
 )
 Set-StrictMode -Version Latest
@@ -30,13 +31,26 @@ $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 function Get-CatalogEntryId {
-    param([string]$Kb, [string]$Arch)
-    $html = (Invoke-WebRequest -Uri ('https://www.catalog.update.microsoft.com/Search.aspx?q=' + $Kb) -UseBasicParsing -ErrorAction Stop).Content
-    foreach ($row in [regex]::Matches($html, '(?s)<tr id="([0-9a-f\-]+)_R\d+".*?</tr>')) {
-        $title = ([regex]::Match($row.Value, "(?s)_link'[^>]*>(.*?)</a>").Groups[1].Value -replace '\s+', ' ').Trim()
-        if ($title -match "Windows 11, version \d\dH\d for $Arch-based Systems" -and $title -notmatch 'Preview|Dynamic|Server|\.NET') {
-            return [pscustomobject]@{ Id = $row.Groups[1].Value; Title = $title }
+    param([string]$Kb, [string]$Arch, [string]$DiagnosticDirectory)
+    $html = ''
+    $titles = @()
+    foreach ($attempt in 1..3) {
+        $response = Invoke-WebRequest -Uri ('https://www.catalog.update.microsoft.com/Search.aspx?q=' + $Kb) -UseBasicParsing -ErrorAction Stop
+        $html = $response.Content
+        $rows = [regex]::Matches($html, '(?s)<tr id="([0-9a-f\-]+)_R\d+".*?</tr>')
+        $titles = @(foreach ($row in $rows) { ([regex]::Match($row.Value, "(?s)_link'[^>]*>(.*?)</a>").Groups[1].Value -replace '\s+', ' ').Trim() })
+        for ($i = 0; $i -lt $rows.Count; $i++) {
+            if ($titles[$i] -match "Windows 11, version \d\dH\d for $Arch-based Systems" -and $titles[$i] -notmatch 'Preview|Dynamic|Server|\.NET') {
+                return [pscustomobject]@{ Id = $rows[$i].Groups[1].Value; Title = $titles[$i] }
+            }
         }
+        Write-Host ("Tentative {0} : HTTP {1}, {2} octets, {3} ligne(s) de résultat" -f $attempt, $response.StatusCode, $html.Length, $rows.Count)
+        $titles | ForEach-Object { Write-Host "  $_" }
+        Start-Sleep -Seconds (10 * $attempt)
+    }
+    if ($DiagnosticDirectory) {
+        New-Item -ItemType Directory -Force -Path $DiagnosticDirectory | Out-Null
+        Set-Content -Path (Join-Path $DiagnosticDirectory "catalog-search-$Kb.html") -Value $html -Encoding UTF8
     }
     throw "Aucune entrée Windows 11 $Arch pour $Kb"
 }
@@ -66,7 +80,7 @@ function Get-RedirectHost {
     @($hosts | Select-Object -Unique)
 }
 
-$entry = Get-CatalogEntryId -Kb $Kb -Arch $Arch
+$entry = Get-CatalogEntryId -Kb $Kb -Arch $Arch -DiagnosticDirectory $DiagnosticDirectory
 Write-Host "Entrée : $($entry.Title)"
 $urls = Get-CatalogDownloadUrl -EntryId $entry.Id
 if ($ListOnly) {

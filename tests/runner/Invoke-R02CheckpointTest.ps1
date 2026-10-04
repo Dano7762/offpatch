@@ -95,7 +95,7 @@ $before | Format-List | Out-String | Write-Host
 Save-PackageInventory -Suffix 'avant'
 
 # 3. Téléchargement
-$download = & (Join-Path $PSScriptRoot 'Save-CatalogEntryFile.ps1') -Kb $Kb -Arch $Arch -Destination $WorkDirectory -ReportPath (Join-Path $OutputDirectory 'download.json')
+$download = & (Join-Path $PSScriptRoot 'Save-CatalogEntryFile.ps1') -Kb $Kb -Arch $Arch -Destination $WorkDirectory -ReportPath (Join-Path $OutputDirectory 'download.json') -DiagnosticDirectory $OutputDirectory
 $prerequisites = @($download.Files | Where-Object { $_.Role -eq 'prerequisite' } | Sort-Object { [int]($_.Kb -replace '\D', '') })
 $target = @($download.Files | Where-Object { $_.Role -eq 'target' })
 if ($target.Count -ne 1) { throw "Cible introuvable ou en double pour $Kb dans l'entrée du catalogue." }
