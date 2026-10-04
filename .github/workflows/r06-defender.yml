@@ -1,0 +1,41 @@
+# R-06 : application de mpam-fe.exe sur une plateforme Defender remise à l'origine, sur runners jetables.
+# Déclenchement manuel uniquement. Modifie le système du runner (Defender), sans redémarrage.
+name: r06-defender
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  defender:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            arch: x64
+          - runner: windows-11-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai R-06
+        env:
+          DEFENDER_ARCH: ${{ matrix.arch }}
+        run: ./tests/runner/Invoke-R06DefenderTest.ps1 -Arch $env:DEFENDER_ARCH -OutputDirectory "$env:RUNNER_TEMP\r06-out"
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: r06-defender-${{ matrix.arch }}
+          path: ${{ runner.temp }}/r06-out
+          retention-days: 30
+          if-no-files-found: warn

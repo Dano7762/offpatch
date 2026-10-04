@@ -50,3 +50,14 @@ Describe 'Test-PinnedFile.ps1' {
             Should -Throw -ExpectedMessage '*non autorisé*'
     }
 }
+
+Describe 'Invoke-R06DefenderTest.ps1' {
+    BeforeEach { $savedFlag = $env:GITHUB_ACTIONS }
+    AfterEach { $env:GITHUB_ACTIONS = $savedFlag }
+
+    It 'refuse de s''exécuter hors d''un runner GitHub' {
+        $env:GITHUB_ACTIONS = 'false'
+        { & (Join-Path $runner 'Invoke-R06DefenderTest.ps1') -OutputDirectory $TestDrive -WhatIf } |
+            Should -Throw -ExpectedMessage '*runner GitHub*'
+    }
+}
