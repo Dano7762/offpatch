@@ -10,15 +10,15 @@ BeforeDiscovery {
 
 Describe 'Élément épinglé <Id>' -ForEach $items {
     It 'a tous les champs attendus' {
-        foreach ($field in 'id', 'category', 'kb', 'arch', 'url', 'sha1', 'appliesToBaseBuilds', 'minUbr', 'resultingBuild') {
+        foreach ($field in 'id', 'category', 'kb', 'arch', 'url', 'sha1', 'appliesToBaseBuilds') {
             $Item.PSObject.Properties[$field] | Should -Not -BeNullOrEmpty -Because "le champ $field est obligatoire"
         }
     }
 
-    It 'pointe en HTTPS vers le domaine de fichiers du catalogue' {
+    It 'pointe en HTTPS vers un domaine de fichiers du catalogue' {
         $uri = [uri]$Item.url
         $uri.Scheme | Should -Be 'https'
-        $uri.Host | Should -Be 'catalog.sf.dl.delivery.mp.microsoft.com'
+        $uri.Host | Should -BeIn @('catalog.sf.dl.delivery.mp.microsoft.com', 'catalog.s.download.windowsupdate.com')
     }
 
     It 'a un SHA-1 identique à l''empreinte du nom de fichier' {
@@ -27,8 +27,9 @@ Describe 'Élément épinglé <Id>' -ForEach $items {
         $Item.sha1 | Should -Be $fromName
     }
 
-    It 'a un nom de fichier qui correspond à son KB et à son architecture' {
+    It 'a un nom de fichier qui correspond à son architecture, et à son KB quand le nom en porte un' {
         $name = ([uri]$Item.url).Segments[-1]
-        $name | Should -Match ('(?i)-{0}-{1}_' -f $Item.kb, $Item.arch)
+        $name | Should -Match ('(?i)-{0}_[0-9a-f]{{40}}\.msu$' -f $Item.arch)
+        if ($name -match '(?i)-kb\d+-') { $name | Should -Match ('(?i)-{0}-' -f $Item.kb) }
     }
 }

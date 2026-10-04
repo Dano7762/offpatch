@@ -17,7 +17,7 @@ param(
     [Parameter(Mandatory)][string[]]$Url,
     [Parameter(Mandatory)][string]$Destination,
     [Parameter(Mandatory)][string]$ReportPath,
-    [string[]]$AllowedHost = @('catalog.sf.dl.delivery.mp.microsoft.com')
+    [string[]]$AllowedHost = @('catalog.sf.dl.delivery.mp.microsoft.com', 'catalog.s.download.windowsupdate.com')
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -71,7 +71,7 @@ $files = foreach ($u in $Url) {
 
 $report = [pscustomobject]@{
     Kb         = (@($files | ForEach-Object { $_.Kb } | Select-Object -Unique) -join ', ')
-    Arch       = (@($files | ForEach-Object { [regex]::Match($_.Name, '(?i)-(x64|arm64)_').Groups[1].Value }) -join ', ')
+    Arch       = (@($files | ForEach-Object { [regex]::Match($_.Name, '(?i)-(x64|arm64)_').Groups[1].Value.ToLowerInvariant() }) -join ', ')
     EntryTitle = 'Liens directs (éléments épinglés)'
     EntryId    = $null
     Files      = @($files)
