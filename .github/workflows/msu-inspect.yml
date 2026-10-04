@@ -1,0 +1,53 @@
+# R-05 / R-09 : identité des paquets contenus dans des .msu, comparée aux paquets installés sur le runner.
+# Déclenchement manuel uniquement. N'installe rien (lecture du contenu des .msu et de la liste DISM).
+name: msu-inspect
+
+on:
+  workflow_dispatch:
+    inputs:
+      urls_x64:
+        description: 'Liens .msu à ouvrir sur windows-2025 (séparés par des espaces)'
+        required: false
+        default: ''
+      urls_arm64:
+        description: 'Liens .msu à ouvrir sur windows-11-arm (séparés par des espaces)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            set: x64
+          - runner: windows-11-arm
+            set: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Ouverture des .msu
+        env:
+          URLS: ${{ matrix.set == 'x64' && inputs.urls_x64 || inputs.urls_arm64 }}
+        run: |
+          $urls = @($env:URLS -split '\s+' | Where-Object { $_ })
+          if ($urls.Count -eq 0) { Write-Host 'Aucun lien pour ce runner.'; exit 0 }
+          ./tests/runner/Get-MsuPackageIdentity.ps1 -Url $urls -OutputDirectory "$env:RUNNER_TEMP\msu-out"
+
+      - name: Résultats
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: msu-inspect-${{ matrix.set }}
+          path: ${{ runner.temp }}/msu-out
+          retention-days: 30
+          if-no-files-found: warn
