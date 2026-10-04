@@ -57,17 +57,19 @@ function Get-DefenderState {
 }
 
 function Wait-DefenderNormal {
-    param([string]$Label)
-    # Un changement de plateforme arrête Defender un moment : on attend son retour en mode Normal (10 min au plus).
+    param([string]$Label, [int]$TimeoutSeconds = 120)
+    # Un changement de plateforme arrête Defender un moment : attente bornée de son retour en mode Normal
+    # (120 s, comme l'exécuteur prévu au cahier des charges), avertissement en cas de dépassement.
     $waitStart = Get-Date
     $ready = $false
-    while (((Get-Date) - $waitStart).TotalMinutes -lt 10) {
-        Start-Sleep -Seconds 15
+    while (((Get-Date) - $waitStart).TotalSeconds -lt $TimeoutSeconds) {
+        Start-Sleep -Seconds 5
         try {
             if ((Get-MpComputerStatus -ErrorAction Stop).AMRunningMode -eq 'Normal') { $ready = $true; break }
         } catch { Write-Host "Defender pas encore disponible : $($_.Exception.Message)" }
     }
     $lines.Add(('- Attente du retour de Defender ({0}) : {1} s, prêt : {2}' -f $Label, [math]::Round(((Get-Date) - $waitStart).TotalSeconds), $ready))
+    if (-not $ready) { $lines.Add("- AVERTISSEMENT : Defender pas revenu en mode Normal après $TimeoutSeconds s ($Label), on continue") }
 }
 
 function Invoke-MpCmdRun {
@@ -107,7 +109,10 @@ $fileVersion = $info.FileVersion
 
 if ($PSCmdlet.ShouldProcess('Defender', 'Retour à la plateforme et aux définitions d''origine, puis mpam-fe.exe')) {
     Invoke-MpCmdRun -Arguments @('-ResetPlatform')
-    if ($RemoveDefinitions) { Invoke-MpCmdRun -Arguments @('-RemoveDefinitions', '-All') }
+    if ($RemoveDefinitions) {
+        Invoke-MpCmdRun -Arguments @('-RemoveDefinitions', '-All')
+        Get-DefenderState -Label 'Après suppression des définitions' | Out-Null
+    }
     Wait-DefenderNormal -Label 'retour à l''origine'
     Get-DefenderState -Label 'Après retour à l''origine' | Out-Null
 

@@ -10,6 +10,10 @@ on:
         description: 'Lien de la mise à jour de plateforme ARM64 (updateplatform.arm64fre_*.exe), vide pour ne pas la tester'
         required: false
         default: ''
+      remove_definitions:
+        description: 'Supprimer aussi les définitions (MpCmdRun -RemoveDefinitions -All) avant la plateforme'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -27,7 +31,8 @@ jobs:
       - name: Essai R-06
         env:
           PLATFORM_URL: ${{ inputs.platform_url_arm64 }}
-        run: ./tests/runner/Invoke-R06DefenderTest.ps1 -Arch arm64 -Variant Quiet -PlatformUrl $env:PLATFORM_URL -OutputDirectory "$env:RUNNER_TEMP\r06-out"
+          REMOVE_DEFINITIONS: ${{ inputs.remove_definitions }}
+        run: ./tests/runner/Invoke-R06DefenderTest.ps1 -Arch arm64 -Variant Quiet -PlatformUrl $env:PLATFORM_URL -RemoveDefinitions:($env:REMOVE_DEFINITIONS -eq 'true') -OutputDirectory "$env:RUNNER_TEMP\r06-out"
 
       - name: Relevés
         if: always()
