@@ -134,10 +134,32 @@ Question : les cumulatives ESU téléchargées depuis le catalogue s'installent-
 
 Impact : contrôle préalable Windows 10, comportement du mode auto.
 
-- Statut : À vérifier
-- Sources :
+- Statut : Bloqué (documentation dépouillée ; deux points ne peuvent se trancher que sur un vrai PC Windows 10, aucun runner GitHub ne fournissant Windows 10 client. Relevé en lecture seule prêt : `docs/essais/R-04-esu.md`)
+- Sources (consultées le 2026-10-04) :
+  - https://learn.microsoft.com/en-us/windows/whats-new/extended-security-updates (mise à jour du 2025-11-17) : programme ESU, Windows 10 22H2 seulement.
+  - https://learn.microsoft.com/en-us/windows/whats-new/enable-extended-security-updates (mise à jour du 2026-04-22) : activation de l'ESU entreprise par MAK, identifiants d'activation, vérification par `slmgr.vbs /dlv`, activation par téléphone.
+  - https://support.microsoft.com/en-us/windows/windows-10-consumer-extended-security-updates-esu-program-33e17de9-36b3-43bb-874d-6c53d2e4bf42 : ESU grand public.
+  - https://support.microsoft.com/help/5122878 et https://support.microsoft.com/help/5129236 : cumulatives Windows 10 de septembre 2026.
+  - https://support.microsoft.com/help/5126256 et https://support.microsoft.com/help/5072653 : paquets de préparation ESU.
+  - Microsoft Update Catalog : recherches `KB5072653`, `KB5126256`.
+  - Machine de développement (lecture seule) : requête WMI sur `SoftwareLicensingProduct`.
 - Conclusion :
-- Décision :
+  - **ESU entreprise** : clé MAK installée par `slmgr.vbs /ipk`, puis activation par `slmgr.vbs /ato <identifiant>` (en ligne) ou par téléphone (`/dti` puis `/atp`). Identifiants d'activation documentés, « the same across all eligible Windows ESU editions and all devices » : année 1 `f520e45e-7413-4a34-a497-d2765967d094`, année 2 `1043add5-23b1-4afb-9a0f-64343c8f3f8d`, année 3 `83d49986-add3-41d7-ba33-87c7bfb5c0fb`. La vérification documentée est `slmgr.vbs /dlv`, qui affiche le nom du programme ESU et « License Status: Licensed ». `slmgr` lit la classe WMI `SoftwareLicensingProduct` : la requête équivalente, en lecture seule et hors ligne, filtre sur ces trois `ID` et lit `LicenseStatus` (1 = Licensed). Requête validée sur la machine de développement : 0,6 s, aucun résultat sur Windows 11, comme attendu. Les LTSB/LTSC ne sont pas couvertes par l'ESU Windows 10.
+  - **ESU grand public** : inscription par Paramètres > Windows Update avec un compte Microsoft administrateur, jusqu'au 12 octobre 2027. Exclus : PC joints à un domaine AD ou à Microsoft Entra, ou inscrits à une solution MDM (« Entra registered » reste admis), et PC qui ont déjà une licence ESU. La seule vérification documentée est l'écran Paramètres > Windows Update. **Aucune méthode hors ligne n'est documentée** (ni WMI, ni registre). La mention « Devices that already have an ESU license » suggère que l'inscription produit une licence, mais rien ne le confirme.
+  - **Paquet de préparation** : obligatoire pour l'inscription, après une cumulative du 14 octobre 2025 ou plus récente (KB5066791). Le plus récent est KB5126256 (2026-09), qui remplace les précédents dont KB5072653 (« Each ESU Licensing Preparation Package supersedes any previously released licensing package »). Il « does not enroll the device or install Windows 10 security updates » et redémarre le PC automatiquement. Il est au catalogue : `2026-09 Extended Security Updates (ESU) Licensing Preparation Package for Windows 10 Version 22H2 for x64-based Systems (KB5126256)`, 814 Ko. Le motif d'inclusion des cumulatives (R-01) ne le capture pas.
+  - **Installation depuis le catalogue** : les pages KB des cumulatives Windows 10 de septembre (« Applies to: Windows 10 ESU ») citent le Microsoft Update Catalog comme canal, avec le paquet autonome. Prérequis documentés pour une image ancienne : SSU autonome KB5005260 si le PC n'a pas la cumulative KB5003173 (mai 2021) ou plus récente ; SSU KB5031539 si l'image n'a pas KB5028244 (juillet 2023) ou plus récente. **Aucune page ne dit si l'installation par DISM vérifie la licence ESU**, ni ce qui se passe sur un PC non inscrit.
+- Décision (provisoire, compatible avec le cahier des charges 8.2, sans modification) :
+  - Statut ESU d'un PC Windows 10 (19045) calculé en lecture seule par WMI :
+    - « Actif (entreprise, année N) » si l'un des trois identifiants a `LicenseStatus = 1` ;
+    - « Indétectable » sinon, ce qui couvre l'ESU grand public tant que le relevé sur un vrai PC n'a pas montré de trace exploitable. Conformément au cahier des charges (8.2), cela donne un avertissement, et en mode auto l'étape Windows est ignorée sauf si David la force dans le récapitulatif.
+  - Les trois identifiants d'activation iront dans la configuration (`config/settings.json`, au bilan de phase), pas dans le code.
+  - Build 19044 (LTSC 2021) : hors cible, pas d'ESU Windows 10 ; seule la 19045 est acceptée.
+  - À proposer à David, sans l'appliquer : ajouter le paquet de préparation KB5126256 au dépôt Windows 10 (catégorie à créer), pour qu'un PC puisse s'inscrire plus tard sans téléchargement. Il redémarre le PC automatiquement, ce qui demande une place dans le plan.
+  - À proposer à David : un avertissement quand l'UBR d'un PC Windows 10 est antérieur à KB5028244 (prérequis SSU des images anciennes), plutôt que d'embarquer les SSU autonomes.
+- À valider sur intervention réelle (`docs/essais/R-04-esu.md`) :
+  1. Trace lisible hors ligne d'une inscription ESU grand public (produit de licence, identifiant, état).
+  2. Confirmation de la détection entreprise sur un PC avec MAK ESU.
+  3. Plus tard, avec l'accord de David : installation par DISM d'une cumulative ESU sur un PC inscrit et sur un PC non inscrit (tests T4 et T5).
 
 ## R-05 Cumulatives .NET Framework
 
