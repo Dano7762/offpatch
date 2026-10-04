@@ -7,7 +7,7 @@
       1. état de Defender (Get-MpComputerStatus) et antivirus enregistrés (SecurityCenter2, poste client) ;
       2. téléchargement de mpam-fe.exe par le lien officiel, version du fichier et signature ;
       3. simulation d'une installation récente : MpCmdRun -ResetPlatform puis -RemoveDefinitions -All ;
-      4. application de mpam-fe.exe, d'abord avec -q, puis sans argument si -q échoue ; code retour et durée ;
+      4. application de mpam-fe.exe selon -Variant : avec -q, sans argument, ou -q puis sans argument si -q échoue ; code retour et durée ;
       5. état final : la version des définitions doit être celle du fichier.
     Les résultats sont relevés, pas jugés : le script n'échoue que sur une erreur imprévue.
 
@@ -18,7 +18,8 @@
 param(
     [ValidateSet('x64', 'arm64')][string]$Arch = 'x64',
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [string]$DownloadUrl = 'https://go.microsoft.com/fwlink/?LinkID=121721&arch={0}'
+    [string]$DownloadUrl = 'https://go.microsoft.com/fwlink/?LinkID=121721&arch={0}',
+    [ValidateSet('QuietThenPlain', 'Quiet', 'Plain')][string]$Variant = 'QuietThenPlain'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -59,7 +60,7 @@ function Invoke-MpCmdRun {
     ($output | Out-String).Trim() | Out-File -FilePath (Join-Path $OutputDirectory ('mpcmdrun' + ($Arguments -join '') + '.txt')) -Encoding UTF8
 }
 
-$lines.Add("## R-06 : Defender ($Arch), $env:PROCESSOR_ARCHITECTURE")
+$lines.Add("## R-06 : Defender ($Arch, variante $Variant), $env:PROCESSOR_ARCHITECTURE")
 $lines.Add('')
 $v = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
 $lines.Add("Système : $($v.InstallationType) $($v.CurrentBuild).$($v.UBR)")
@@ -91,7 +92,8 @@ if ($PSCmdlet.ShouldProcess('Defender', 'Retour à la plateforme et aux définit
     Get-DefenderState -Label 'Après retour à l''origine' | Out-Null
 
     $attempts = New-Object System.Collections.Generic.List[string]
-    foreach ($arguments in @(@('-q'), @())) {
+    $variants = @{ QuietThenPlain = @(@('-q'), @()); Quiet = @(, @('-q')); Plain = @(, @()) }
+    foreach ($arguments in $variants[$Variant]) {
         $started = Get-Date
         if ($arguments.Count -gt 0) { $process = Start-Process -FilePath $file -ArgumentList $arguments -PassThru -WindowStyle Hidden }
         else { $process = Start-Process -FilePath $file -PassThru -WindowStyle Hidden }

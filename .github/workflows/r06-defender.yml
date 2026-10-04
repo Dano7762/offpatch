@@ -16,8 +16,13 @@ jobs:
         include:
           - runner: windows-2025
             arch: x64
+            variant: QuietThenPlain
           - runner: windows-11-arm
             arch: arm64
+            variant: Quiet
+          - runner: windows-11-arm
+            arch: arm64
+            variant: Plain
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     defaults:
@@ -29,13 +34,14 @@ jobs:
       - name: Essai R-06
         env:
           DEFENDER_ARCH: ${{ matrix.arch }}
-        run: ./tests/runner/Invoke-R06DefenderTest.ps1 -Arch $env:DEFENDER_ARCH -OutputDirectory "$env:RUNNER_TEMP\r06-out"
+          DEFENDER_VARIANT: ${{ matrix.variant }}
+        run: ./tests/runner/Invoke-R06DefenderTest.ps1 -Arch $env:DEFENDER_ARCH -Variant $env:DEFENDER_VARIANT -OutputDirectory "$env:RUNNER_TEMP\r06-out"
 
       - name: Relevés
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: r06-defender-${{ matrix.arch }}
+          name: r06-defender-${{ matrix.arch }}-${{ matrix.variant }}
           path: ${{ runner.temp }}/r06-out
           retention-days: 30
           if-no-files-found: warn
