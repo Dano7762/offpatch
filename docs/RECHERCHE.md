@@ -170,10 +170,31 @@ Question : titres exacts au catalogue pour chaque cible, versions de .NET Framew
 
 Impact : catégorie `dotnet`, détection.
 
-- Statut : À vérifier
-- Sources :
+- Statut : En cours (recherche terminée ; la méthode de détection proposée modifie le cahier des charges 8.3 et attend l'accord de David)
+- Sources (consultées le 2026-10-04) :
+  - https://support.microsoft.com/help/5126052 : « Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 24H2, Windows 11, version 25H2 and Microsoft server operating system 24H2 ». Prérequis : « you must have .NET Framework 3.5 or 4.8.1 installed ». Redémarrage : « if any affected files are being used ».
+  - https://support.microsoft.com/help/5126046 : article chapeau Windows 10 21H2/22H2 (3.5 et 4.8), qui renvoie aux articles par produit, dont KB5126146 « Cumulative Update for .NET Framework 3.5, 4.8 and 4.8.1 for Windows 10 Version 22H2 ». Les pages KB5126146 et KB5126421 renvoient une erreur.
+  - https://learn.microsoft.com/en-us/dotnet/framework/install/how-to-determine-which-versions-are-installed : valeur `Release` de `HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full` ; 4.8 = 528040 / 528372 / 528049 selon le système, 4.8.1 = 533320 / 533325 ; tester « greater than or equal ».
+  - Microsoft Update Catalog : recherches par mois et par version (`scratch/r05-patterns.ps1`), fenêtres de téléchargement de KB5126052, KB5126046, KB5126146, KB5126421.
+  - Workflow `msu-inspect` (https://github.com/Dano7762/offpatch/actions/runs/37203060768) : contenu des .msu et paquets installés sur `windows-2025` (Server 2025, 26100.33438) et `windows-11-arm` (25H2, 26200.9457).
 - Conclusion :
-- Décision :
+  - **Windows 11** (24H2, 25H2, 26H2) : une seule cumulative .NET par mois, pour 3.5 et 4.8.1. Titre : `2026-09 Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 25H2 for x64 (KB5126052)` (`for arm64` en ARM64). Les entrées 24H2, 25H2 et 26H2 du même KB renvoient **le même fichier** par architecture (`windows11.0-kb5126052-x64-ndp481_<sha1>.msu`, `…-arm64-ndp481_<sha1>.msu`) : la cumulative .NET ne dépend pas de l'enablement package (cahier des charges 1.4, 8.3). La page du KB ne cite pas 26H2, mais le catalogue publie l'entrée 26H2 avec le même fichier. Pas de build dans le titre.
+  - **Windows 10 22H2** : trois entrées par mois. `…for .NET Framework 3.5 and 4.8 for Windows 10 Version 22H2 for x64 (KB5126046)` (fichier `windows10.0-kb5126046-x64-ndp48_<sha1>.msu`, 81 842 924 octets), `…3.5 and 4.8.1… (KB5126421)` (`windows10.0-kb5126421-x64-ndp481_<sha1>.msu`, 81 247 370 octets) et `…3.5, 4.8 and 4.8.1… (KB5126146)`, qui renvoie **les deux fichiers précédents**. Le bon fichier dépend de la version de .NET 4.x installée : 4.8 (Release 528040 à 533319) ou 4.8.1 (Release ≥ 533320). Fichiers servis par `catalog.s.download.windowsupdate.com`. Les titres sans architecture sont les versions x86 ; une entrée ARM64 du catalogue porte un libellé incohérent (`3.5 and 4.8` pour KB5126146), sans effet sur la cible `win10-x64`.
+  - Motifs vérifiés sur août et septembre 2026 (une entrée retenue par mois et par cible) :
+    - `win11-x64` : include `^\d{4}-\d{2} Cumulative Update for \.NET Framework 3\.5 and 4\.8\.1 for Windows 11, version (24H2|25H2|26H2) for x64 \(KB\d+\)$`, exclude `Preview|Server|26H1` ;
+    - `win11-arm64` : idem avec `for arm64` ;
+    - `win10-x64` : include `^\d{4}-\d{2} Cumulative Update for \.NET Framework 3\.5, 4\.8 and 4\.8\.1 for Windows 10 Version 22H2 for x64 \(KB\d+\)$` (entrée qui apporte les deux fichiers), exclude `Preview|Server|21H2|ARM64`.
+  - **Identité du paquet** : chaque .msu .NET contient un .cab dont le fichier `update.mum` donne le nom et la version du paquet, lisibles avec `expand.exe`, présent sur tout Windows. KB5126052 : `Package_for_DotNetRollup_481` 10.0.9347.1 (x64 et ARM64) ; KB5126046 : `Package_for_DotNetRollup` 10.0.4806.2 ; KB5126421 : `Package_for_DotNetRollup_481` 10.0.9346.1. Sur les deux runners à jour, `dism /Get-Packages` liste exactement `Package_for_DotNetRollup_481~31bf3856ad364e35~<arch>~~10.0.9347.1`, état `Installed` : **la version lue dans le .msu se retrouve à l'identique dans la liste DISM**.
+  - `Get-HotFix` liste KB5126052 sur les deux runners. Mais une cumulative .NET plus récente installée par Windows Update ferait disparaître le KB du dépôt de cette liste : la présence du KB ne suffit pas pour dire « à jour ».
+  - Release .NET 4 relevée sur les runners : 533509, valeur absente du tableau Learn mais supérieure à 533320 (4.8.1) ; d'où la règle « supérieur ou égal ».
+  - .NET 3.5 est une fonctionnalité à la demande (`Microsoft-Windows-NetFx3-OnDemand-Package`) ; la cumulative la met à jour si elle est présente.
+- Décision proposée (le cahier des charges 8.3 dit aujourd'hui « .NET : présence du KB », d'où la demande d'accord) :
+  - Au téléchargement, l'outil lit dans chaque .msu .NET le nom et la version du paquet (`update.mum`, via `expand.exe`) et les inscrit dans le manifeste.
+  - Sur le PC : à jour si la liste DISM contient un paquet de même nom, état `Installed`, de version supérieure ou égale ; à installer sinon. `Get-HotFix` reste un complément de diagnostic.
+  - Windows 10 : choix du fichier selon la valeur `Release` (≥ 533320 → fichier `ndp481`, sinon `ndp48`).
+  - Sélection mensuelle : pas de build dans le titre ; on retient l'entrée la plus récente parmi les non-préversions du mois courant et du précédent. En cas d'égalité, la version de paquet la plus élevée.
+  - Piste pour R-09 : la même lecture de `update.mum` dans la cumulative Windows 10 pourrait donner sa build sans passer par la page release-information. À essayer.
+  - Reste à valider sur intervention réelle : Windows 10 (choix ndp48 ou ndp481, liste DISM après installation, nom du KB dans `Get-HotFix`) et code retour quand la cumulative .NET est déjà présente (R-14).
 
 ## R-06 Définitions Defender
 
