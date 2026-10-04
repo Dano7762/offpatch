@@ -8,7 +8,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 
 - [x] R-01 Titres des cumulatives Windows dans le catalogue
 - [ ] R-02 Cumulatives checkpoint
-- [ ] R-03 Enablement package 26H2
+- [x] R-03 Enablement package 26H2
 - [ ] R-04 Windows 10 22H2 et ESU
 - [ ] R-05 Cumulatives .NET Framework
 - [ ] R-06 Définitions Defender
@@ -120,3 +120,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-04 | 0 | R-02 en cours : documentation dépouillée (méthodes 1 et 2, exploration du dossier par DISM), recommandation séquentielle depuis le dépôt avec un fichier par dossier, procédure VM rédigée (`docs/procedures-vm/R-02-checkpoint.md`), pistes notées en R-03, R-12, R-14 | Attente du test VM R-02 ; valider la structure du dépôt par hash ; PSScriptAnalyzer absent de la machine de développement |
 | 2026-10-04 | 0 | Cahier des charges 1.2 (dépôt `files/<sha256>/`), CLAUDE.md : essais réels sur runners GitHub hébergés ; `.gitignore`, `PSScriptAnalyzerSettings.psd1`, `tests/runner/`, tests Pester de conventions, workflows `ci`, `r02-arm64`, `depot-x64` ; procédure R-02 réécrite (`docs/essais/`) | Pousser sur `Dano7762/offpatch`, lancer les workflows, puis R-03 |
 | 2026-10-04 | 0 | Dépôt `Dano7762/offpatch` (privé) créé, CI au vert sous PowerShell 5.1. `depot-x64` : SHA-1 et Authenticode valides, 4,64 Go, domaine `catalog.sf.dl.delivery.mp.microsoft.com`. `r02-arm64` : runner déjà en 26200.9457, DISM renvoie 0 pour un paquet déjà installé, checkpoint visible en `RollupFix 26100.1742` à l'état Staged. R-03 bloqué : KB5121794 absent du catalogue (comme la 25H2), prérequis 26100.9546 non couvert par la cumulative de septembre | Décision de David sur R-03 (retrait de `windows-ekb` recommandé) ; relancer `r02-arm64` après le 13/10 ; suite : R-04 |
+| 2026-10-04 | 0 | R-03 tranché : élément épinglé `config/pinned-items.json` (KB5121794 x64 et ARM64 vérifiés sur runner : SHA-1, Authenticode Microsoft, domaine), `minUbr` 9550 ; cahier des charges 1.3 (CurrentBuild, détection par UBR, éléments épinglés) ; `Get-OpWindowsIdentity` et tests ; passage croisé au catalogue : échec ARM64 non reproduit (15/15) | R-02 : relancer `r02-arm64` après le 13/10 ; suite : R-04 |

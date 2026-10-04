@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.2 du 4 octobre 2026.
+Version 1.3 du 4 octobre 2026.
 
 ## 1. Contexte
 
@@ -44,7 +44,7 @@ Tout le reste est détecté puis refusé avec un message clair, sans rien instal
 |---|---|---|---|
 | `windows-checkpoint` | Cumulatives « checkpoint » prérequises | Windows 11 | Microsoft Update Catalog |
 | `windows-lcu` | Dernière cumulative Windows | Toutes | Microsoft Update Catalog |
-| `windows-ekb` | Enablement package 26H2 | Windows 11 | Microsoft Update Catalog |
+| `windows-ekb` | Enablement package 26H2 | Windows 11 24H2 et 25H2 | Élément épinglé (`config/pinned-items.json`) : lien direct Microsoft, l'enablement package n'est pas indexé au catalogue (R-03) |
 | `dotnet` | Cumulative .NET Framework | Toutes | Microsoft Update Catalog |
 | `defender` | Définitions Microsoft Defender (mpam-fe.exe) | Toutes | Lien de téléchargement Microsoft |
 | `office-source` | Source d'installation Office par canal | Toutes | ODT `/download` |
@@ -113,6 +113,7 @@ OffPatch/
 ├── config/
 │   ├── settings.json
 │   ├── catalog-queries.json
+│   ├── pinned-items.json
 │   └── office/
 │       ├── profiles.json
 │       ├── download.xml.template
@@ -246,6 +247,33 @@ Quand Microsoft change la formulation d'un titre, on corrige ce fichier sans tou
 
 `AllowCdnFallback="FALSE"` garantit que l'installation n'utilise que la source locale. Les mises à jour ultérieures du PC client restent activées sur le canal normal de Microsoft. La compatibilité de `<Remove>` combiné à `<Add>` dans un même fichier est à vérifier (R-08).
 
+### 6.4 `config/pinned-items.json`
+
+Éléments épinglés : fichiers Microsoft qui ne sont pas indexés au Microsoft Update Catalog mais dont le lien direct est stable, comme l'enablement package 26H2 (R-03). Pour ces catégories, aucune recherche au catalogue.
+
+```json
+{
+  "items": [
+    {
+      "id": "win11-x64-ekb-26H2",
+      "category": "windows-ekb",
+      "kb": "KB0000000",
+      "arch": "x64",
+      "url": "https://catalog.sf.dl.delivery.mp.microsoft.com/…/windows11.0-kb0000000-x64_<sha1>.msu",
+      "sha1": "<empreinte de 40 caractères, identique à celle du nom de fichier>",
+      "appliesToBaseBuilds": [26100, 26200],
+      "minUbr": 0,
+      "resultingBuild": 26300
+    }
+  ]
+}
+```
+
+- Un élément épinglé est téléchargé une fois, puis vérifié : domaine autorisé (`allowedDomains`), SHA-1 égal à la valeur de la configuration et à l'empreinte du nom de fichier, signature Authenticode valide au nom de Microsoft. Un échec de vérification écarte le fichier.
+- Il n'est jamais purgé (7.3).
+- Le lien est mis à jour à la main, une fois par an, à la sortie d'une nouvelle version de Windows.
+- `appliesToBaseBuilds` : builds de base sur lesquelles l'élément s'applique. `minUbr` : UBR minimal du PC exigé par Microsoft avant l'installation. `resultingBuild` : build de base obtenue après installation et redémarrage.
+
 ## 7. Face Dépôt
 
 ### 7.1 Mise à jour du dépôt
@@ -302,6 +330,7 @@ Les valeurs ci-dessus illustrent le format. Les chemins dans `files` sont relati
 
 - Cumulatives Windows et .NET : on garde les `retention.windowsMonths` plus récentes par cible (2 par défaut, la courante et la précédente comme solution de repli).
 - Defender : seulement la dernière.
+- Éléments épinglés (6.4) : jamais purgés.
 - Office : seulement la dernière version par source, après avoir vérifié que l'index de la source (`v64.cab`) pointe bien sur elle (R-07).
 - Les fichiers étant partagés entre éléments (section 5), un fichier n'est supprimé que lorsque plus aucun élément conservé du manifeste ne le référence (comptage de références).
 - La purge ne supprime que des éléments connus du manifeste. Les fichiers orphelins trouvés dans `depot/` sont listés et ne sont supprimés qu'après confirmation.
@@ -329,7 +358,7 @@ Assistant accessible depuis l'onglet Dépôt :
 | Contrôle | Comportement |
 |---|---|
 | Droits administrateur | Bloquant |
-| Cible reconnue (système, version, build, architecture, édition) | Hors périmètre : bloquant, avec le motif |
+| Cible reconnue (système, version, build, architecture, édition) | Hors périmètre : bloquant, avec le motif. Windows 10 et Windows 11 se distinguent par `CurrentBuild` (22000 et plus = Windows 11), jamais par `ProductName`, qui vaut encore « Windows 10 … » sur Windows 11. Le libellé affiché vient de `Win32_OperatingSystem.Caption` (R-09) |
 | Windows 10 : ESU actif | Absent ou indétectable : avertissement. En mode auto, l'étape Windows est ignorée sauf si je la force dans le récapitulatif (R-04) |
 | Redémarrage en attente (CBS, Windows Update, renommages de fichiers en attente) | Proposer de redémarrer avant de commencer |
 | Espace libre sur C: | Sous `minFreeSpaceGB` : bloquant |
@@ -350,11 +379,11 @@ Pour chaque élément du manifeste applicable au PC, l'outil calcule un état :
 | `MissingFromDepot` | Absent du dépôt |
 | `Error` | Erreur |
 
-Méthodes de détection, à confirmer en R-09 :
+Méthodes de détection, à confirmer en R-09. La famille (Windows 10 ou 11) se lit sur `CurrentBuild`, jamais sur `ProductName` (8.2). Pour les cumulatives, la détection repose sur l'UBR ; la liste des paquets DISM ne sert qu'au diagnostic (son nom de paquet porte la build 26100 même sur une 25H2, et une checkpoint y figure à l'état « Staged », R-02) :
 
-- Cumulative Windows : non applicable si la build courante ne figure pas dans `baseBuilds`. Sinon, à jour si l'UBR courant est supérieur ou égal à `resultingUbr`, à installer dans le cas contraire. La liste des paquets DISM sert de complément.
-- Checkpoint : présence du paquet dans la liste DISM.
-- Enablement package : `DisplayVersion` dans le registre.
+- Cumulative Windows : non applicable si la build courante ne figure pas dans `baseBuilds`. Sinon, à jour si l'UBR courant est supérieur ou égal à `resultingUbr`, à installer dans le cas contraire.
+- Checkpoint : présente si la build courante est une build de base de la branche (26100, 26200 ou 26300) et que l'UBR courant est supérieur ou égal à l'UBR de la checkpoint (1742 pour KB5043080).
+- Enablement package (élément épinglé, 6.4) : non applicable si la build courante ne figure pas dans `appliesToBaseBuilds` (déjà en 26300, ou autre branche) ou si l'option est désactivée ; à installer sinon. Il n'est installé que si l'UBR du PC au moment de l'étape est supérieur ou égal à `minUbr`. Si la cumulative du dépôt n'atteint pas `minUbr`, l'étape est ignorée avec ce motif dans le rapport.
 - .NET : présence du KB.
 - Defender : version des signatures (`Get-MpComputerStatus`) comparée à la version de mpam-fe.exe. Si Defender n'est pas l'antivirus actif, l'étape est non applicable.
 - Office : registre ClickToRun (produits installés, version, canal).
@@ -363,7 +392,7 @@ Le plan est la liste ordonnée des étapes, avec les points de redémarrage. Ord
 
 1. Définitions Defender (pas de redémarrage).
 2. Checkpoints puis cumulative Windows, puis redémarrage.
-3. Enablement package 26H2 si l'option est active, puis redémarrage.
+3. Enablement package 26H2 si l'option est active et que l'UBR du PC, après le redémarrage de l'étape 2, est supérieur ou égal à `minUbr` ; puis redémarrage.
 4. Cumulative .NET, redémarrage si demandé.
 5. Office : installation ou mise à jour.
 6. Contrôle final : nouvelle détection et rapport.
@@ -505,3 +534,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.0 (4 octobre 2026) : version initiale.
 - 1.1 (4 octobre 2026) : manifeste (7.2), `resultingBuild` remplacé par `baseBuilds` et `resultingUbr` ; détection de la cumulative Windows (8.3) adaptée en conséquence. Suite de R-01 : un même KB est publié pour 24H2, 25H2 et 26H2 avec la même UBR et des builds de base différentes.
 - 1.2 (4 octobre 2026) : arborescence (5), dépôt `depot/files/<sha256>/<nom d'origine>`, un dossier par fichier, dédoublonné ; chemin d'exemple du manifeste (7.2) aligné ; purge par comptage de références (7.3) ; ajout de `tests/runner/` et `.github/workflows/`. Suite de R-02 : la checkpoint est jointe à chaque cumulative et DISM explore le dossier du paquet.
+- 1.3 (4 octobre 2026) : distinction Windows 10 / 11 par `CurrentBuild`, libellé par `Win32_OperatingSystem.Caption` (8.2, 8.3) ; détection des cumulatives et des checkpoints par l'UBR, liste DISM réservée au diagnostic (8.3) ; enablement package 26H2 en élément épinglé, nouveau fichier `config/pinned-items.json` (3.2, 5, 6.4, 7.3), installé après la cumulative et son redémarrage si l'UBR atteint `minUbr` (8.3). Suite des mesures sur runner (R-02, R-09) et de R-03.

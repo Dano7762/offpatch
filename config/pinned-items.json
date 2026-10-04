@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "id": "win11-x64-ekb-26H2",
+      "category": "windows-ekb",
+      "kb": "KB5121794",
+      "arch": "x64",
+      "url": "https://catalog.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/94520a88-858f-4832-a57d-7211f6d84a4e/public/Windows11.0-KB5121794-x64_5e20a3cce48d6611b16bdec42b07167f5456586a.msu",
+      "sha1": "5e20a3cce48d6611b16bdec42b07167f5456586a",
+      "appliesToBaseBuilds": [
+        26100,
+        26200
+      ],
+      "minUbr": 9550,
+      "resultingBuild": 26300
+    },
+    {
+      "id": "win11-arm64-ekb-26H2",
+      "category": "windows-ekb",
+      "kb": "KB5121794",
+      "arch": "arm64",
+      "url": "https://catalog.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/9d8dc3d0-9cbf-4eb1-9411-722e3e6a19b3/public/Windows11.0-KB5121794-arm64_77a76caf2d362bb293a4d18058388f2717365abe.msu",
+      "sha1": "77a76caf2d362bb293a4d18058388f2717365abe",
+      "appliesToBaseBuilds": [
+        26100,
+        26200
+      ],
+      "minUbr": 9550,
+      "resultingBuild": 26300
+    }
+  ]
+}
