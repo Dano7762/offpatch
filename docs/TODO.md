@@ -22,6 +22,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [ ] R-14 Moteur d'installation des paquets
 - [ ] R-15 Suspendre Windows Update pendant une session
 - [ ] Bilan de phase : reporter dans le cahier des charges ce qui change (avec mon accord) et compléter `config/` avec les valeurs établies
+  - [ ] Ajouter au cahier des charges une matrice de traçabilité (accord de David du 2026-10-04), une ligne par catégorie (`windows-lcu`, `windows-checkpoint`, `windows-ekb`, `windows-ssu`, `dotnet`, `defender-platform`, `defender`, `office-source`). Colonnes : cibles concernées, source (requête catalogue ou élément épinglé), règle de détection, dépendances (`prerequisites` / `runsAfter`), position dans le plan, scénarios de test qui la couvrent (P1 à P5, T1 à T8, workflows). Toute case vide est un point à traiter avant la phase 1.
 
 ## Phase 1 : socle
 
@@ -130,3 +131,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-04 | 0 | R-06 complété : temps réel actif sur le runner ARM64 (mesures valables), aucune garantie documentée pour une plateforme ancienne, KB4052623 testé sur runner (4.18.25080.5 → 4.18.26080.4 sans redémarrage) et proposé en prérequis des définitions ; cahier des charges 1.6 (détection Defender actif ou passif, non applicable jamais en erreur, rapport) | Décision de David sur KB4052623 ; suite : R-07 |
 | 2026-10-04 | 0 | Cahier des charges 1.7 : plateforme Defender (KB4052623, Current Channel (Broad) seul) avant les définitions, deux types de dépendance (`prerequisites` bloquant, `runsAfter` d'ordre) dans le manifeste et `pinned-items.json`, attente bornée à 120 s ; essai complet sur runner ARM64 (définitions supprimées puis 1.459.384.0 → 1.459.553.0 après plateforme et mpam-fe.exe) | R-07 |
 | 2026-10-04 | 0 | R-07 en cours : product IDs confirmés, canal `Current` pour les versions en boîte (même build que le Current Channel), Office 64 bits sur Arm confirmé (Windows 11 minimum), Office LTSC 2024 non pris en charge sur Windows 10 22H2, ODT récupérable par la page officielle (lien versionné) ; essai `r07-office.yml` préparé, non lancé | Accord de David pour télécharger une source Office sur runner (structure, `v64.cab`, anciennes versions) ; avertissement LTSC 2024 sur Windows 10 à trancher |
+| 2026-10-04 | 0 | `graphify-out/` exclu du dépôt ; matrice de traçabilité par catégorie ajoutée au bilan de phase 0 (accord de David) | R-07 |

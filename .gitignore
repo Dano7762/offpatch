@@ -6,6 +6,9 @@ logs/
 # Scripts jetables de la phase de recherche
 scratch/
 
+# Graphe de connaissances généré par graphify
+graphify-out/
+
 # Binaires de tools/ (ODT et autres outils récupérés par l'outil)
 tools/**/*.exe
 tools/**/*.dll
