@@ -1,0 +1,57 @@
+# R-07 : source Office (deux versions), purge selon v64.cab, puis installation hors ligne
+# (AllowCdnFallback="FALSE", CDN bloqué) sur un runner Windows 11 ARM64 jetable.
+# Déclenchement manuel uniquement. Modifie le système du runner (installation d'Office).
+name: r07-install
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Canal'
+        required: true
+        default: 'Current'
+      product_id:
+        description: 'Product ID'
+        required: true
+        default: 'Home2024Retail'
+      language:
+        description: 'Langue'
+        required: true
+        default: 'fr-fr'
+      older_version:
+        description: 'Version ancienne téléchargée d''abord (vide pour la sauter)'
+        required: false
+        default: '16.0.20430.20092'
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    runs-on: windows-11-arm
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai R-07 (installation)
+        env:
+          OFFICE_CHANNEL: ${{ inputs.channel }}
+          OFFICE_PRODUCT: ${{ inputs.product_id }}
+          OFFICE_LANGUAGE: ${{ inputs.language }}
+          OFFICE_OLDER: ${{ inputs.older_version }}
+        run: |
+          $params = @{ Channel = $env:OFFICE_CHANNEL; ProductId = $env:OFFICE_PRODUCT; Language = $env:OFFICE_LANGUAGE; OutputDirectory = "$env:RUNNER_TEMP\r07i-out" }
+          if ($env:OFFICE_OLDER) { $params.OlderVersion = $env:OFFICE_OLDER }
+          ./tests/runner/Invoke-R07OfficeInstallTest.ps1 @params
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: r07-install-${{ inputs.product_id }}
+          path: ${{ runner.temp }}/r07i-out
+          retention-days: 30
+          if-no-files-found: warn

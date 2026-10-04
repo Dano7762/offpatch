@@ -77,3 +77,14 @@ Describe 'Invoke-R07OfficeSourceTest.ps1' {
             Should -Throw
     }
 }
+
+Describe 'Invoke-R07OfficeInstallTest.ps1' {
+    BeforeEach { $savedFlag = $env:GITHUB_ACTIONS }
+    AfterEach { $env:GITHUB_ACTIONS = $savedFlag }
+
+    It 'refuse de s''exécuter hors d''un runner GitHub' {
+        $env:GITHUB_ACTIONS = 'false'
+        { & (Join-Path $runner 'Invoke-R07OfficeInstallTest.ps1') -Channel 'Current' -ProductId 'Home2024Retail' -OutputDirectory $TestDrive -WhatIf } |
+            Should -Throw -ExpectedMessage '*runner GitHub*'
+    }
+}
