@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.8 du 4 octobre 2026.
+Version 1.9 du 4 octobre 2026.
 
 ## 1. Contexte
 
@@ -191,7 +191,7 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
 }
 ```
 
-Les valeurs chiffrées sont des valeurs de départ. La liste `allowedDomains` sera complétée en phase 0 avec les domaines réellement atteints après redirection (R-13). L'interface modifie ce fichier quand je change les cibles ou les langues dans l'onglet Dépôt.
+Les valeurs chiffrées sont des valeurs de départ. La liste `allowedDomains` sera complétée en phase 0 avec les domaines réellement atteints après redirection (R-13). Elle s'applique aux téléchargements faits par OffPatch lui-même (catalogue, mpam-fe.exe, plateforme Defender, éléments épinglés, ODT). Elle ne s'applique pas au trafic propre de l'ODT pendant `setup.exe /download`, qui contacte ses propres domaines (CDN Office, mais aussi par exemple `ecs.office.com` ou `mrodevicemgr.officeapps.live.com`) : OffPatch ne le contrôle pas, il se contente de le journaliser. L'interface modifie ce fichier quand je change les cibles ou les langues dans l'onglet Dépôt.
 
 ### 6.2 `config/catalog-queries.json`
 
@@ -622,3 +622,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.6 (4 octobre 2026) : Defender, applicable si actif ou passif, non applicable avec motif (jamais en erreur) si désactivé ou si `Get-MpComputerStatus` échoue, contrôle de la version après exécution (8.3, 8.4) ; rapport d'intervention : version des définitions installées et rappel de la mise à jour automatique une fois le PC connecté (8.8). Suite de R-06.
 - 1.7 (4 octobre 2026) : plateforme Defender (KB4052623) dans le périmètre, catégorie `defender-platform`, canal « Current Channel (Broad) » seul (3.2, 6.2, 7.1, 7.3), retirée des évolutions (14) ; deux types de dépendance, prérequis bloquant (`prerequisites`, conditions) et dépendance d'ordre (`runsAfter`), dans le manifeste et `pinned-items.json` (6.4, 7.2, 8.3) ; plateforme exécutée avant les définitions, attente bornée à 120 s avec avertissement (8.3, 8.4). Suite de R-06.
 - 1.8 (4 octobre 2026) : tableau 3.3 : product IDs confirmés (mentions « à vérifier » levées), une seule source Current pour les quatre profils en boîte, colonne de prise en charge sous Windows 10 22H2 (aucun profil pris en charge, d'après les configurations requises Microsoft) ; champ `supportedOn` des profils (6.3) ; avertissement non bloquant en contrôle préalable (8.2), rappel dans l'écran récapitulatif (8.6) et dans le rapport (8.8). Suite de R-07.
+- 1.9 (4 octobre 2026) : portée de `allowedDomains` précisée (téléchargements faits par OffPatch, pas le trafic propre de l'ODT) (6.1). Suite de R-07 et R-13.
