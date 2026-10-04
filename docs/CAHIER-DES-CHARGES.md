@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.1 du 4 octobre 2026.
+Version 1.2 du 4 octobre 2026.
 
 ## 1. Contexte
 
@@ -123,21 +123,26 @@ OffPatch/
 │   └── odt/                       setup.exe de l'ODT, récupéré par l'outil (hors git)
 ├── depot/                         Données téléchargées (hors git)
 │   ├── manifest.json
-│   ├── win11-x64/                 checkpoint/ lcu/ ekb/ dotnet/ defender/
-│   ├── win11-arm64/               idem
-│   ├── win10-x64/                 lcu/ dotnet/ defender/
+│   ├── files/                     Fichiers Windows, .NET et Defender, dédoublonnés
+│   │   └── <sha256>/              Un dossier par fichier, nommé par son SHA-256
+│   │       └── <nom d'origine>    ex. windows11.0-kb5129195-x64_<sha1>.msu
 │   └── office/                    current/ perpetualvl2024/ perpetualvl2021/
 ├── rapports/                      Rapports d'intervention, un par PC (hors git)
 ├── logs/                          Journaux de la face Dépôt (hors git)
 ├── scratch/                       Scripts jetables de la phase de recherche (hors git)
 ├── tests/
 │   ├── Unit/
-│   └── Fixtures/                  Manifestes, sorties DISM et registres simulés
+│   ├── Fixtures/                  Manifestes, sorties DISM et registres simulés
+│   └── runner/                    Scripts exécutés sur les runners GitHub (jamais livrés)
+├── .github/
+│   └── workflows/                 ci.yml, essais sur runners hébergés
 └── docs/
     ├── CAHIER-DES-CHARGES.md
     ├── RECHERCHE.md
     └── TODO.md
 ```
+
+Chaque fichier Windows, .NET ou Defender est rangé seul dans un dossier nommé par son SHA-256, sous son nom d'origine. Un fichier partagé par plusieurs éléments du manifeste (par exemple une cumulative checkpoint jointe à chaque cumulative) n'est stocké qu'une fois. Le dossier ne contient jamais d'autre fichier : DISM cherche les checkpoints dans le dossier du paquet qu'on lui passe et traite toutes les cumulatives qu'il y trouve (R-02).
 
 Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `state.json`, `resume.ps1`, `temp\` (XML Office générés) et `logs\`. Tout est nettoyé en fin de session, sauf les journaux.
 
@@ -283,7 +288,7 @@ L'option `-ListOnly` fait tout sauf les téléchargements : elle affiche ce qui 
       "requiresReboot": true,
       "prerequisites": ["win11-x64-checkpoint-KB0000001"],
       "files": [
-        { "path": "win11-x64/lcu/nom-du-fichier.msu", "sha256": "…", "size": 0 }
+        { "path": "files/<sha256>/nom-du-fichier.msu", "sha256": "…", "size": 0 }
       ],
       "sourceUrl": "https://catalog.update.microsoft.com/…"
     }
@@ -298,6 +303,7 @@ Les valeurs ci-dessus illustrent le format. Les chemins dans `files` sont relati
 - Cumulatives Windows et .NET : on garde les `retention.windowsMonths` plus récentes par cible (2 par défaut, la courante et la précédente comme solution de repli).
 - Defender : seulement la dernière.
 - Office : seulement la dernière version par source, après avoir vérifié que l'index de la source (`v64.cab`) pointe bien sur elle (R-07).
+- Les fichiers étant partagés entre éléments (section 5), un fichier n'est supprimé que lorsque plus aucun élément conservé du manifeste ne le référence (comptage de références).
 - La purge ne supprime que des éléments connus du manifeste. Les fichiers orphelins trouvés dans `depot/` sont listés et ne sont supprimés qu'après confirmation.
 
 ### 7.4 Préparer un support
@@ -498,3 +504,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 
 - 1.0 (4 octobre 2026) : version initiale.
 - 1.1 (4 octobre 2026) : manifeste (7.2), `resultingBuild` remplacé par `baseBuilds` et `resultingUbr` ; détection de la cumulative Windows (8.3) adaptée en conséquence. Suite de R-01 : un même KB est publié pour 24H2, 25H2 et 26H2 avec la même UBR et des builds de base différentes.
+- 1.2 (4 octobre 2026) : arborescence (5), dépôt `depot/files/<sha256>/<nom d'origine>`, un dossier par fichier, dédoublonné ; chemin d'exemple du manifeste (7.2) aligné ; purge par comptage de références (7.3) ; ajout de `tests/runner/` et `.github/workflows/`. Suite de R-02 : la checkpoint est jointe à chaque cumulative et DISM explore le dossier du paquet.

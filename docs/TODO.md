@@ -1,6 +1,6 @@
 # Backlog OffPatch
 
-Une phase ne commence que lorsque la précédente est terminée, sauf indication contraire. Les tâches marquées [VM] sont des tests que David lance lui-même dans une machine virtuelle : Claude Code prépare la procédure et note le résultat qu'on lui communique.
+Une phase ne commence que lorsque la précédente est terminée, sauf indication contraire. Les tâches marquées [VM] sont des tests réels. Claude Code les lance sur des runners GitHub hébergés quand c'est possible (workflows en déclenchement manuel, lus avec `gh`). Ce que les runners ne permettent pas (redémarrage, Windows 11 x64 client, Windows 10 ESU) est validé par David sur intervention réelle, en commençant par l'action `Plan` en lecture seule.
 
 ## Phase 0 : recherche
 
@@ -118,3 +118,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-04 | 0 | R-01 tranché : forme des titres Windows 11 et 10, même KB publié sous 24H2/25H2/26H2 avec les mêmes fichiers, sélection par UBR max (OOB possibles), exclusion de 26H1, une requête par version (plafond de 25 résultats) | R-02 (KB5043080 livré avec chaque entrée de cumulative) |
 | 2026-10-04 | 0 | Relecture R-01 : règles validées (UBR max, Windows 10 via release-information, mois courant + précédent), contrôle étendu dans scratch, cahier des charges 1.1 (`baseBuilds` + `resultingUbr`), décision de stockage par hash notée en R-02 | R-02 |
 | 2026-10-04 | 0 | R-02 en cours : documentation dépouillée (méthodes 1 et 2, exploration du dossier par DISM), recommandation séquentielle depuis le dépôt avec un fichier par dossier, procédure VM rédigée (`docs/procedures-vm/R-02-checkpoint.md`), pistes notées en R-03, R-12, R-14 | Attente du test VM R-02 ; valider la structure du dépôt par hash ; PSScriptAnalyzer absent de la machine de développement |
+| 2026-10-04 | 0 | Cahier des charges 1.2 (dépôt `files/<sha256>/`), CLAUDE.md : essais réels sur runners GitHub hébergés ; `.gitignore`, `PSScriptAnalyzerSettings.psd1`, `tests/runner/`, tests Pester de conventions, workflows `ci`, `r02-arm64`, `depot-x64` ; procédure R-02 réécrite (`docs/essais/`) | Pousser sur `Dano7762/offpatch`, lancer les workflows, puis R-03 |

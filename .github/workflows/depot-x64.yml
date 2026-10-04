@@ -1,0 +1,41 @@
+# R-10, R-12, R-13 : téléchargement d'une entrée x64 du catalogue, contrôle SHA-1 et Authenticode,
+# tailles et domaines atteints. Déclenchement manuel uniquement. Aucune installation.
+name: depot-x64
+
+on:
+  workflow_dispatch:
+    inputs:
+      kb:
+        description: 'KB de la cumulative cible (ex. KB5129195)'
+        required: true
+        default: 'KB5129195'
+
+permissions:
+  contents: read
+
+jobs:
+  depot:
+    runs-on: windows-2025
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Téléchargement et contrôles
+        env:
+          TARGET_KB: ${{ inputs.kb }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'depot-out'
+          ./tests/runner/Save-CatalogEntryFile.ps1 -Kb $env:TARGET_KB -Arch x64 -Destination (Join-Path $env:RUNNER_TEMP 'depot') -ReportPath (Join-Path $out 'download.json') | Out-Null
+          ./tests/runner/Write-DownloadSummary.ps1 -ReportPath (Join-Path $out 'download.json') -OutputPath (Join-Path $out 'resume.md')
+
+      - name: Rapport
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: depot-x64-${{ inputs.kb }}
+          path: ${{ runner.temp }}/depot-out
+          retention-days: 30
+          if-no-files-found: warn

@@ -17,7 +17,13 @@ Réponds-moi en français.
 
 ## Règles de sécurité (non négociables)
 
-- Ne jamais exécuter sur la machine de développement une opération qui modifie le système : DISM en ligne, wusa, mpam-fe.exe, `setup.exe /configure`, création de tâche planifiée, écriture dans HKLM, redémarrage. Ces chemins de code se testent avec des mocks Pester. Les tests réels se font en VM et c'est moi qui les lance.
+- Ne jamais exécuter sur la machine de développement une opération qui modifie le système : DISM en ligne, wusa, mpam-fe.exe, `setup.exe /configure`, création de tâche planifiée, écriture dans HKLM, redémarrage. Ces chemins de code se testent avec des mocks Pester.
+- Les tests réels passent par GitHub Actions, sur le dépôt privé `Dano7762/offpatch`, dans ces limites strictes :
+  - les opérations qui modifient le système ne sont autorisées que dans des jobs sur runners hébergés par GitHub (jetables) ; jamais sur un runner auto-hébergé, jamais sur ma machine ;
+  - les workflows lourds (téléchargement de cumulatives, installation) se déclenchent uniquement à la main (`workflow_dispatch`) ; seul `ci.yml` (analyse statique et tests) tourne à chaque push ;
+  - aucun secret ni clé de produit dans les workflows, les scripts de `tests/runner/` ou les artefacts ;
+  - avec `gh`, tu peux pousser sur ce dépôt, lancer des workflows, lire leurs journaux et récupérer leurs artefacts. Rien d'autre sur mon compte GitHub.
+- Ce que les runners ne permettent pas (redémarrage, mode auto, Windows 11 x64 client, Windows 10 ESU, support sans checkpoint) est validé sur intervention réelle, en commençant par l'action `Plan` en lecture seule.
 - Les fonctions en lecture seule (détection, interrogation du catalogue) peuvent tourner sur la machine de développement.
 - Pour tester le téléchargement, utiliser `-ListOnly` (interroge le catalogue sans rien télécharger) ou la cible la plus légère (définitions Defender). Ne télécharger une cumulative complète ou une source Office que si je le demande.
 - Toute fonction qui modifie le système ou le dépôt déclare `[CmdletBinding(SupportsShouldProcess)]` et respecte `-WhatIf`.
@@ -68,6 +74,8 @@ Pester 5 et PSScriptAnalyzer sont des outils de développement. L'outil livré n
 ## Git
 
 - Exclus du dépôt git : `depot/`, `rapports/`, `logs/`, `scratch/`, les binaires de `tools/`.
+- Dépôt distant : `Dano7762/offpatch` (privé), branche `master`.
+- `tests/runner/` contient les scripts exécutés sur les runners GitHub. Mêmes conventions que `app/` (PowerShell 5.1, UTF-8 avec BOM, PSScriptAnalyzer). Jamais livrés avec l'outil.
 - Un commit par tâche terminée, message en français préfixé par la phase : `P2: sélection des cumulatives Windows 11 dans le catalogue`.
 
 ## Documents à tenir à jour

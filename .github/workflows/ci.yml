@@ -1,0 +1,45 @@
+# Analyse statique et tests unitaires sous Windows PowerShell 5.1, à chaque push.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verif:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Version de PowerShell
+        run: $PSVersionTable | Format-Table -AutoSize | Out-String
+
+      - name: Outils de développement (versions figées)
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -RequiredVersion 5.9.1 -Scope CurrentUser -Force -SkipPublisherCheck
+          Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
+
+      - name: PSScriptAnalyzer
+        run: |
+          Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0
+          $paths = @('app', 'tests') | Where-Object { Test-Path $_ }
+          $findings = @(foreach ($p in $paths) { Invoke-ScriptAnalyzer -Path $p -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 })
+          $findings | Format-Table -AutoSize -Property Severity, RuleName, ScriptName, Line, Message | Out-String -Width 300
+          if ($findings.Count -gt 0) { Write-Host "$($findings.Count) problème(s) relevé(s)"; exit 1 }
+
+      - name: Pester
+        run: |
+          Import-Module Pester -RequiredVersion 5.9.1
+          $config = New-PesterConfiguration
+          $config.Run.Path = './tests'
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config

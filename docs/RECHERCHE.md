@@ -2,7 +2,17 @@
 
 Chaque point est traité en phase 0, avant d'écrire le code qui en dépend. Sources prioritaires : learn.microsoft.com, support.microsoft.com, le Microsoft Update Catalog lui-même. Un forum peut donner une piste, jamais une conclusion.
 
-Pour chaque point, remplir les quatre champs en dessous de la question. Les scripts d'essai vont dans `scratch/`, jamais dans `app/`.
+Pour chaque point, remplir les quatre champs en dessous de la question. Les scripts d'essai vont dans `scratch/`, jamais dans `app/`. Les essais qui modifient le système passent par les workflows GitHub Actions (`tests/runner/`, `docs/essais/`).
+
+## À valider sur intervention réelle
+
+Ce que les runners GitHub ne permettent pas de vérifier (décision de David du 2026-10-04). On commence toujours par l'action `Plan`, en lecture seule, avant toute installation.
+
+- Application effective d'une cumulative après redémarrage, build obtenue et nombre de redémarrages (R-02, R-03, R-14) : un runner ne redémarre pas.
+- Mode automatique complet : reprise après redémarrage, tâche planifiée, `resume.ps1` (phase 5).
+- Windows 11 x64 client : aucun runner standard (`windows-2025` est un Windows Server 2025).
+- Windows 10 22H2 avec et sans ESU (R-04).
+- Support d'installation sans checkpoint (24H2 antérieure à 26100.1742, R-02).
 
 Statuts possibles : À vérifier, En cours, Tranché, Bloqué.
 
@@ -55,7 +65,7 @@ Question : sur une installation récente de Windows 11 24H2, 25H2 ou 26H2, quell
 
 Impact : catégorie `windows-checkpoint`, ordre du plan, champ `prerequisites` du manifeste.
 
-- Statut : En cours (documentation dépouillée, attente du test VM : `docs/procedures-vm/R-02-checkpoint.md`)
+- Statut : En cours (documentation dépouillée, essai sur runner GitHub : `docs/essais/R-02-checkpoint.md`, workflow `r02-arm64.yml`)
 - Sources (consultées le 2026-10-04) :
   - https://learn.microsoft.com/en-us/windows/deployment/update/catalog-checkpoint-cumulative-updates (« Checkpoint cumulative updates and Microsoft Update Catalog usage », mise à jour du 2025-01-31).
   - https://support.microsoft.com/help/5129195 (KB5129195), section « Microsoft Update Catalog » : tableau « Required checkpoint cumulative update » / « Target cumulative update », méthodes 1 et 2.
@@ -72,12 +82,12 @@ Impact : catégorie `windows-checkpoint`, ordre du plan, champ `prerequisites` d
   - Conséquence pour le dépôt : DISM cherche les checkpoints dans le dossier du fichier passé en `/PackagePath`, même quand on lui donne un fichier. Avec la structure actuelle du cahier des charges (`win11-x64/lcu/` avec deux mois de rétention), une installation depuis le dépôt ferait aussi traiter la cumulative du mois précédent, dont la révision est inférieure à la cible. Un stockage par hash avec un fichier par dossier écarte ce risque.
   - Aucun document ne dit s'il faut redémarrer entre la checkpoint et la cible avec la méthode 1. Le nombre de redémarrages reste à mesurer.
   - Supports d'installation : une ISO 24H2 publique (26100.1742) contient déjà KB5043080, une ISO 26H2 actuelle (26300.9457) contient déjà KB5129195. Le cas « checkpoint manquante » ne concerne que des supports 24H2 antérieurs à la sortie publique (anciennes images constructeur, préversions). Sur une ISO récente, le cas courant est « checkpoint déjà présente ».
-  - Détection : la machine de développement, en 26200.9550 (elle a donc forcément la checkpoint), n'affiche pas KB5043080 dans `Get-HotFix`, qui ne permet donc pas de détecter la checkpoint. La liste des paquets DISM demande l'élévation et n'a pas pu être lue ici. La forme du nom du paquet est à relever en VM.
-- Décision (provisoire, à confirmer en VM) :
+  - Détection : la machine de développement, en 26200.9550 (elle a donc forcément la checkpoint), n'affiche pas KB5043080 dans `Get-HotFix`, qui ne permet donc pas de détecter la checkpoint. La liste des paquets DISM demande l'élévation et n'a pas pu être lue ici. La forme du nom du paquet est relevée par `r02-arm64.yml`.
+- Décision (provisoire, à confirmer par `r02-arm64.yml` puis sur intervention réelle) :
   - Prérequis : tout fichier d'une entrée du catalogue autre que celui du KB principal (repéré par `kb<numéro>` dans le nom du fichier) est un prérequis. Aucun numéro de checkpoint en dur. Ordre d'installation : prérequis d'abord, par numéro de KB croissant (à revoir si plusieurs checkpoints coexistent un jour), puis la cible.
-  - Méthode recommandée : **installation séquentielle depuis le dépôt (méthode 1, DISM)**, un `/Add-Package` par fichier, en sautant les prérequis déjà détectés. Raisons : pas de copie de 5,2 Go sur `C:` (temps de copie depuis la clé, espace libre) ; compatible avec le dépôt dédoublonné et la rétention ; chaque étape est journalisée et reprise séparément ; méthode documentée par Microsoft. Condition : chaque fichier seul dans son dossier du dépôt, sinon DISM explore les autres .msu. Repli si la VM montre un problème : méthode 2 avec un dossier de travail sous `C:\ProgramData\OffPatch\temp\` contenant uniquement la cible et ses prérequis (copie, et contrôle d'espace libre augmenté de la taille des fichiers).
+  - Méthode recommandée : **installation séquentielle depuis le dépôt (méthode 1, DISM)**, un `/Add-Package` par fichier, en sautant les prérequis déjà détectés. Raisons : pas de copie de 5,2 Go sur `C:` (temps de copie depuis la clé, espace libre) ; compatible avec le dépôt dédoublonné et la rétention ; chaque étape est journalisée et reprise séparément ; méthode documentée par Microsoft. Condition : chaque fichier seul dans son dossier du dépôt, sinon DISM explore les autres .msu. Repli si les essais montrent un problème : méthode 2 avec un dossier de travail sous `C:\ProgramData\OffPatch\temp\` contenant uniquement la cible et ses prérequis (copie, et contrôle d'espace libre augmenté de la taille des fichiers).
   - Détection de la checkpoint : liste des paquets DISM, comme demandé par David. Complément proposé, à valider : la checkpoint est forcément présente si la build courante figure dans `baseBuilds` et que l'UBR courant est supérieur ou égal à celui de la checkpoint (1742 pour KB5043080), puisque les cumulatives sont cumulatives. Cet UBR n'est pas dans le titre de la checkpoint au catalogue (ancienne forme) : il viendrait de la page release-information, comme pour Windows 10 (R-01).
-  - Code retour de DISM quand la checkpoint est déjà installée : à relever en VM (essais A3 et A4), puis à reporter en R-14.
+  - Code retour de DISM quand la checkpoint est déjà installée : relevé par la seconde passe de `r02-arm64.yml`, puis à reporter en R-14.
   - Stockage (décision de David du 2026-10-04, relecture de R-01) : KB5043080 étant joint à chaque entrée de cumulative Windows 11 (R-01), le stockage des fichiers est dédoublonné par hash et la purge se fait par comptage de références (un fichier n'est supprimé que si plus aucun élément du manifeste ne le référence).
   - Proposition de structure qui en découle, à valider avant de toucher au cahier des charges (section 5) : un dossier par fichier, nommé d'après son SHA-256, par exemple `depot/files/<sha256>/windows11.0-kb5129195-x64_….msu`, les éléments du manifeste pointant vers ces chemins.
 
@@ -217,7 +227,7 @@ Question : `dism.exe /Online /Add-Package` ou `Add-WindowsPackage -Online` ? Cod
 Impact : exécuteur des étapes Windows.
 
 - Statut : À vérifier
-- Piste (2026-10-04, R-02) : codes retour de DISM pour un .msu déjà installé (checkpoint ou cumulative) et pour une cumulative dont la checkpoint manque, à mesurer avec `docs/procedures-vm/R-02-checkpoint.md` (essais A3, A4, A5). DISM cherche les checkpoints dans le dossier du `/PackagePath` et explore les sous-dossiers.
+- Piste (2026-10-04, R-02) : codes retour de DISM pour un .msu déjà installé (checkpoint ou cumulative) et pour une cumulative dont la checkpoint manque, à mesurer avec `r02-arm64.yml` (`docs/essais/R-02-checkpoint.md`). Le cas « checkpoint manquante » n'est pas reproductible sur un runner (image récente) : à valider sur intervention réelle. DISM cherche les checkpoints dans le dossier du `/PackagePath` et explore les sous-dossiers.
 - Sources :
 - Conclusion :
 - Décision :
