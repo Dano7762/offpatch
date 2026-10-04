@@ -59,8 +59,9 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 
 - [ ] `Get-OpSystemInfo` : système, version, build et UBR, architecture, édition, ESU, Office, espace libre, alimentation, fabricant, modèle, numéro de série
 - [ ] Contrôles préalables (tableau 8.2)
-- [ ] Détection par catégorie (états `UpToDate`, `Pending`, `NotApplicable`, `MissingFromDepot`, `Error`)
+- [ ] Détection par catégorie (états `UpToDate`, `Pending`, `NotApplicable`, `MissingFromDepot`, `SkippedPrerequisite`, `Error`)
 - [ ] Planificateur : ordre, prérequis, points de redémarrage
+- [ ] Tests de planification `tests/Unit/Planner/` (fixtures d'état PC + manifeste, plan attendu dans l'ordre) : P1 24H2 .1742, P2 25H2 .9457 avec cumulative d'octobre au dépôt, P3 25H2 .9550, P4 26H2 à jour, P5 Windows 10 sans SSU récents
 - [ ] Exécuteur Defender
 - [ ] Exécuteur DISM avec gestion des codes retour
 - [ ] Exécuteur Office : XML temporaire, clé en mémoire, suppression après usage
@@ -122,3 +123,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-04 | 0 | Dépôt `Dano7762/offpatch` (privé) créé, CI au vert sous PowerShell 5.1. `depot-x64` : SHA-1 et Authenticode valides, 4,64 Go, domaine `catalog.sf.dl.delivery.mp.microsoft.com`. `r02-arm64` : runner déjà en 26200.9457, DISM renvoie 0 pour un paquet déjà installé, checkpoint visible en `RollupFix 26100.1742` à l'état Staged. R-03 bloqué : KB5121794 absent du catalogue (comme la 25H2), prérequis 26100.9546 non couvert par la cumulative de septembre | Décision de David sur R-03 (retrait de `windows-ekb` recommandé) ; relancer `r02-arm64` après le 13/10 ; suite : R-04 |
 | 2026-10-04 | 0 | R-03 tranché : élément épinglé `config/pinned-items.json` (KB5121794 x64 et ARM64 vérifiés sur runner : SHA-1, Authenticode Microsoft, domaine), `minUbr` 9550 ; cahier des charges 1.3 (CurrentBuild, détection par UBR, éléments épinglés) ; `Get-OpWindowsIdentity` et tests ; passage croisé au catalogue : échec ARM64 non reproduit (15/15) | R-02 : relancer `r02-arm64` après le 13/10 ; suite : R-04 |
 | 2026-10-04 | 0 | R-04 dépouillé : ESU entreprise détectable hors ligne (WMI `SoftwareLicensingProduct`, 3 identifiants d'activation documentés), ESU grand public sans méthode hors ligne documentée, paquet de préparation KB5126256 au catalogue, aucune doc sur le contrôle de licence à l'installation ; relevé en lecture seule `docs/essais/R-04-esu.md` | R-04 bloqué : relevé sur un vrai PC Windows 10 ; propositions (KB5126256 au dépôt, avertissement SSU) à trancher ; suite : R-05 |
+| 2026-10-04 | 0 | Cahier des charges 1.4 (règles de prérequis du planificateur, `SkippedPrerequisite`, SSU Windows 10 en élément épinglé, tests P1 à P5, KB5126256 en évolution) ; KB5031539 vérifié sur runner et ajouté à `pinned-items.json` ; KB5005260 écarté (sans objet en 22H2) ; tâche de tests de planification ajoutée en phase 4 | R-05 en cours |

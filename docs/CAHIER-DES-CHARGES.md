@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.3 du 4 octobre 2026.
+Version 1.4 du 4 octobre 2026.
 
 ## 1. Contexte
 
@@ -43,6 +43,7 @@ Tout le reste est détecté puis refusé avec un message clair, sans rien instal
 | Code catégorie | Contenu | Cibles | Source |
 |---|---|---|---|
 | `windows-checkpoint` | Cumulatives « checkpoint » prérequises | Windows 11 | Microsoft Update Catalog |
+| `windows-ssu` | Mise à jour autonome de la pile de maintenance (SSU), prérequise sur les images anciennes | Windows 10 | Élément épinglé (`config/pinned-items.json`) |
 | `windows-lcu` | Dernière cumulative Windows | Toutes | Microsoft Update Catalog |
 | `windows-ekb` | Enablement package 26H2 | Windows 11 24H2 et 25H2 | Élément épinglé (`config/pinned-items.json`) : lien direct Microsoft, l'enablement package n'est pas indexé au catalogue (R-03) |
 | `dotnet` | Cumulative .NET Framework | Toutes | Microsoft Update Catalog |
@@ -272,7 +273,7 @@ Quand Microsoft change la formulation d'un titre, on corrige ce fichier sans tou
 - Un élément épinglé est téléchargé une fois, puis vérifié : domaine autorisé (`allowedDomains`), SHA-1 égal à la valeur de la configuration et à l'empreinte du nom de fichier, signature Authenticode valide au nom de Microsoft. Un échec de vérification écarte le fichier.
 - Il n'est jamais purgé (7.3).
 - Le lien est mis à jour à la main, une fois par an, à la sortie d'une nouvelle version de Windows.
-- `appliesToBaseBuilds` : builds de base sur lesquelles l'élément s'applique. `minUbr` : UBR minimal du PC exigé par Microsoft avant l'installation. `resultingBuild` : build de base obtenue après installation et redémarrage.
+- `appliesToBaseBuilds` : builds de base sur lesquelles l'élément s'applique. Champs facultatifs selon la catégorie : `minUbr`, UBR minimal du PC exigé par Microsoft avant l'installation ; `applyBelowUbr`, l'élément n'est utile que si l'UBR du PC est inférieur à cette valeur (SSU autonome des images anciennes) ; `resultingBuild`, build de base obtenue après installation et redémarrage.
 
 ## 7. Face Dépôt
 
@@ -377,13 +378,15 @@ Pour chaque élément du manifeste applicable au PC, l'outil calcule un état :
 | `Pending` | À installer |
 | `NotApplicable` | Non applicable |
 | `MissingFromDepot` | Absent du dépôt |
+| `SkippedPrerequisite` | Ignorée (prérequis) |
 | `Error` | Erreur |
 
 Méthodes de détection, à confirmer en R-09. La famille (Windows 10 ou 11) se lit sur `CurrentBuild`, jamais sur `ProductName` (8.2). Pour les cumulatives, la détection repose sur l'UBR ; la liste des paquets DISM ne sert qu'au diagnostic (son nom de paquet porte la build 26100 même sur une 25H2, et une checkpoint y figure à l'état « Staged », R-02) :
 
 - Cumulative Windows : non applicable si la build courante ne figure pas dans `baseBuilds`. Sinon, à jour si l'UBR courant est supérieur ou égal à `resultingUbr`, à installer dans le cas contraire.
 - Checkpoint : présente si la build courante est une build de base de la branche (26100, 26200 ou 26300) et que l'UBR courant est supérieur ou égal à l'UBR de la checkpoint (1742 pour KB5043080).
-- Enablement package (élément épinglé, 6.4) : non applicable si la build courante ne figure pas dans `appliesToBaseBuilds` (déjà en 26300, ou autre branche) ou si l'option est désactivée ; à installer sinon. Il n'est installé que si l'UBR du PC au moment de l'étape est supérieur ou égal à `minUbr`. Si la cumulative du dépôt n'atteint pas `minUbr`, l'étape est ignorée avec ce motif dans le rapport.
+- SSU autonome Windows 10 (élément épinglé, 6.4) : à installer si la build est 19045 et que l'UBR courant est inférieur à `applyBelowUbr` (3271 pour KB5031539, prérequis des images sans KB5028244), non applicable sinon. Une réinstallation est sans effet : l'état se juge sur l'UBR, pas sur le code retour (R-02).
+- Enablement package (élément épinglé, 6.4) : non applicable si la build courante ne figure pas dans `appliesToBaseBuilds` (déjà en 26300, ou autre branche) ou si l'option est désactivée ; à installer sinon. Prérequis : UBR du PC supérieur ou égal à `minUbr` (voir les règles de prérequis ci-dessous).
 - .NET : présence du KB.
 - Defender : version des signatures (`Get-MpComputerStatus`) comparée à la version de mpam-fe.exe. Si Defender n'est pas l'antivirus actif, l'étape est non applicable.
 - Office : registre ClickToRun (produits installés, version, canal).
@@ -391,13 +394,19 @@ Méthodes de détection, à confirmer en R-09. La famille (Windows 10 ou 11) se 
 Le plan est la liste ordonnée des étapes, avec les points de redémarrage. Ordre par défaut :
 
 1. Définitions Defender (pas de redémarrage).
-2. Checkpoints puis cumulative Windows, puis redémarrage.
+2. SSU autonome Windows 10 si nécessaire, checkpoints, puis cumulative Windows, puis redémarrage.
 3. Enablement package 26H2 si l'option est active et que l'UBR du PC, après le redémarrage de l'étape 2, est supérieur ou égal à `minUbr` ; puis redémarrage.
-4. Cumulative .NET, redémarrage si demandé.
+4. Cumulative .NET, redémarrage si demandé. Le paquet .NET est le même fichier pour 24H2, 25H2 et 26H2 (R-05) : il ne dépend pas de l'enablement package.
 5. Office : installation ou mise à jour.
 6. Contrôle final : nouvelle détection et rapport.
 
 Si la phase 0 montre que certaines étapes peuvent s'enchaîner avant un seul redémarrage (R-02, R-03), le planificateur regroupe les redémarrages.
+
+Règles de prérequis :
+
+- Un prérequis peut être satisfait par une étape antérieure du même plan. L'UBR projeté après une cumulative prévue est son `resultingUbr` ; c'est lui qui sert à évaluer les étapes suivantes (par exemple l'enablement package et son `minUbr`).
+- Juste avant chaque étape, et donc après chaque redémarrage, l'outil revérifie l'état réel du PC (build, UBR, détection de la catégorie) au lieu de se fier au plan.
+- Si un prérequis n'est pas rempli, à la planification ou au moment de l'étape, l'étape passe à l'état `SkippedPrerequisite` (« Ignorée (prérequis) ») avec son motif dans le rapport. Les étapes qui en dépendent sont ignorées de la même façon. Le reste du plan continue.
 
 ### 8.4 Exécution des étapes Windows
 
@@ -497,6 +506,16 @@ Règles de comportement :
 
 Tests unitaires Pester, avec des mocks pour DISM, `Start-Process`, le registre, `Get-CimInstance`, BITS et le réseau. Les jeux de données de test (manifestes, sorties DISM, clés de registre simulées) sont dans `tests/Fixtures/`.
 
+Tests de planification (`tests/Unit/Planner/`) : chaque cas associe une fixture d'état du PC et une fixture de manifeste au plan attendu, étapes dans l'ordre avec leur état et leurs points de redémarrage :
+
+| Cas | État du PC | Plan attendu (principe) |
+|---|---|---|
+| P1 | Windows 11 24H2, 26100.1742 | Cumulative du dépôt, redémarrage ; enablement package si l'UBR projeté atteint `minUbr`, sinon « Ignorée (prérequis) » |
+| P2 | Windows 11 25H2, 26200.9457, cumulative d'octobre au dépôt | Cumulative d'octobre, redémarrage, puis enablement package (UBR projeté ≥ `minUbr`), redémarrage |
+| P3 | Windows 11 25H2, 26200.9550 | Cumulative à jour si celle du dépôt n'est pas plus récente ; enablement package installable d'emblée (UBR réel ≥ `minUbr`), redémarrage |
+| P4 | Windows 11 26H2 à jour | Aucune étape Windows ; enablement package non applicable |
+| P5 | Windows 10 22H2 sans les SSU récents (UBR < 3271) | SSU autonome, puis cumulative, redémarrage |
+
 Tests d'intégration en VM Hyper-V, avec un point de contrôle restauré avant chaque test :
 
 | Test | Situation de départ | Attendu |
@@ -528,6 +547,7 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - Génération d'une ISO Windows à jour en intégrant la cumulative hors ligne.
 - Outil de suppression de logiciels malveillants (MSRT) et mise à jour de la plateforme Defender.
 - Signature des scripts avec un certificat de code.
+- Paquet de préparation ESU Windows 10 (KB5126256 à ce jour) dans le dépôt. Écarté de la v1 : l'inscription à l'ESU demande de toute façon une connexion, et le paquet redémarre le PC de lui-même (R-04).
 
 ## 15. Historique
 
@@ -535,3 +555,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.1 (4 octobre 2026) : manifeste (7.2), `resultingBuild` remplacé par `baseBuilds` et `resultingUbr` ; détection de la cumulative Windows (8.3) adaptée en conséquence. Suite de R-01 : un même KB est publié pour 24H2, 25H2 et 26H2 avec la même UBR et des builds de base différentes.
 - 1.2 (4 octobre 2026) : arborescence (5), dépôt `depot/files/<sha256>/<nom d'origine>`, un dossier par fichier, dédoublonné ; chemin d'exemple du manifeste (7.2) aligné ; purge par comptage de références (7.3) ; ajout de `tests/runner/` et `.github/workflows/`. Suite de R-02 : la checkpoint est jointe à chaque cumulative et DISM explore le dossier du paquet.
 - 1.3 (4 octobre 2026) : distinction Windows 10 / 11 par `CurrentBuild`, libellé par `Win32_OperatingSystem.Caption` (8.2, 8.3) ; détection des cumulatives et des checkpoints par l'UBR, liste DISM réservée au diagnostic (8.3) ; enablement package 26H2 en élément épinglé, nouveau fichier `config/pinned-items.json` (3.2, 5, 6.4, 7.3), installé après la cumulative et son redémarrage si l'UBR atteint `minUbr` (8.3). Suite des mesures sur runner (R-02, R-09) et de R-03.
+- 1.4 (4 octobre 2026) : règles de prérequis du planificateur (UBR projeté, revérification avant chaque étape, état `SkippedPrerequisite`, dépendances ignorées) (8.3) ; SSU autonome Windows 10 KB5031539 en élément épinglé, catégorie `windows-ssu`, champ `applyBelowUbr` (3.2, 6.4, 8.3) ; paquet .NET identique pour 24H2, 25H2 et 26H2 (8.3) ; tests de planification P1 à P5 (12) ; paquet de préparation ESU en évolution (14). Suite de R-04 et R-05.

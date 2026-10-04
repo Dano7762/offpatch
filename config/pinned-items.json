@@ -28,6 +28,18 @@
       ],
       "minUbr": 9550,
       "resultingBuild": 26300
+    },
+    {
+      "id": "win10-x64-ssu-KB5031539",
+      "category": "windows-ssu",
+      "kb": "KB5031539",
+      "arch": "x64",
+      "url": "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2023/10/ssu-19041.3562-x64_de23c91f483b2e609cec3e4a995639d13205f867.msu",
+      "sha1": "de23c91f483b2e609cec3e4a995639d13205f867",
+      "appliesToBaseBuilds": [
+        19045
+      ],
+      "applyBelowUbr": 3271
     }
   ]
 }

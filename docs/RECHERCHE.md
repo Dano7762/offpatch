@@ -154,8 +154,11 @@ Impact : contrôle préalable Windows 10, comportement du mode auto.
     - « Indétectable » sinon, ce qui couvre l'ESU grand public tant que le relevé sur un vrai PC n'a pas montré de trace exploitable. Conformément au cahier des charges (8.2), cela donne un avertissement, et en mode auto l'étape Windows est ignorée sauf si David la force dans le récapitulatif.
   - Les trois identifiants d'activation iront dans la configuration (`config/settings.json`, au bilan de phase), pas dans le code.
   - Build 19044 (LTSC 2021) : hors cible, pas d'ESU Windows 10 ; seule la 19045 est acceptée.
-  - À proposer à David, sans l'appliquer : ajouter le paquet de préparation KB5126256 au dépôt Windows 10 (catégorie à créer), pour qu'un PC puisse s'inscrire plus tard sans téléchargement. Il redémarre le PC automatiquement, ce qui demande une place dans le plan.
-  - À proposer à David : un avertissement quand l'UBR d'un PC Windows 10 est antérieur à KB5028244 (prérequis SSU des images anciennes), plutôt que d'embarquer les SSU autonomes.
+  - Paquet de préparation KB5126256 : **hors v1** (décision de David du 2026-10-04 : l'inscription à l'ESU exige une connexion et le paquet redémarre seul). Noté en évolution, section 14 du cahier des charges.
+  - SSU autonomes des images anciennes (décision de David du 2026-10-04 : les embarquer en éléments épinglés, avec détection et passage avant la cumulative, pas d'avertissement seul) :
+    - **KB5031539** (SSU 19041.3562, octobre 2023), nécessaire si le PC n'a pas KB5028244 = 19045.3271 (release-information, 2023-07-25). Titre au catalogue : `2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)`. Lien résolu par la fenêtre de téléchargement du catalogue : `https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2023/10/ssu-19041.3562-x64_de23c91f483b2e609cec3e4a995639d13205f867.msu`, 16 140 380 octets (ARM64 : `ssu-19041.3562-arm64_2c72074f5308183392636cfc693b834a27f99446.msu`, 14 885 696 octets). Vérifié sur runner (workflow `depot-x64`, https://github.com/Dano7762/offpatch/actions/runs/37202749032) : SHA-1 identique au nom, Authenticode `Valid`, signataire Microsoft Corporation, un seul domaine. Ajouté à `config/pinned-items.json` (x64 seulement, cible `win10-x64`) : `appliesToBaseBuilds` 19045, `applyBelowUbr` 3271. Le nom de fichier ne porte pas de numéro de KB.
+    - **KB5005260** (SSU d'août 2021) : **non embarqué**, sans objet pour la 22H2. Il n'est requis que si le PC n'a pas KB5003173 = 19041/19042/19043.985 (mai 2021) ; or la plus petite build 19045 publiée dans release-information est 19045.2130 (sortie de la 22H2 le 2022-10-18), donc tout PC 22H2 a déjà un UBR supérieur à 985. Le catalogue ne le publie d'ailleurs que pour Windows 10 2004, 20H2 et 21H1, pas pour la 22H2.
+    - À valider sur intervention réelle : besoin ou non de redémarrer après le SSU, code retour d'une réinstallation.
 - À valider sur intervention réelle (`docs/essais/R-04-esu.md`) :
   1. Trace lisible hors ligne d'une inscription ESU grand public (produit de licence, identifiant, état).
   2. Confirmation de la détection entreprise sur un PC avec MAK ESU.
@@ -275,6 +278,7 @@ Impact : `allowedDomains`.
   - Recherche et résolution des liens : `www.catalog.update.microsoft.com` (avec `www.`), pages `Search.aspx` et `DownloadDialog.aspx`. La liste du cahier des charges (6.1) porte `catalog.update.microsoft.com` sans `www.` : à compléter.
   - Fichiers des cumulatives : `catalog.sf.dl.delivery.mp.microsoft.com`, sans aucune redirection (requête HEAD avec suivi des redirections, workflow `depot-x64`, https://github.com/Dano7762/offpatch/actions/runs/37199155132). Absent de la liste actuelle.
   - Correspondance KB → build (R-01) : `learn.microsoft.com`. Absent de la liste actuelle.
+  - Fichiers anciens du catalogue (SSU Windows 10 de 2023, R-04) : `catalog.s.download.windowsupdate.com`, sans redirection (https://github.com/Dano7762/offpatch/actions/runs/37202749032). Absent de la liste actuelle.
 - Sources :
 - Conclusion :
 - Décision :
