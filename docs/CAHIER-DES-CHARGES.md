@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.4 du 4 octobre 2026.
+Version 1.5 du 4 octobre 2026.
 
 ## 1. Contexte
 
@@ -286,7 +286,8 @@ Pour chaque cible cochée :
 3. Comparer avec le manifeste. Un élément déjà présent avec le même hash n'est pas retéléchargé.
 4. Télécharger dans `depot/.tmp/` avec BITS (`Start-BitsTransfer`, reprise possible), et un repli sur `HttpClient` en flux si BITS n'est pas disponible.
 5. Vérifier la signature Microsoft quand elle est exploitable et calculer le SHA-256 (R-10).
-6. Déplacer le fichier à sa place définitive et ajouter l'élément au manifeste.
+6. Pour une cumulative Windows ou .NET, lire dans le .msu le nom et la version du paquet (fichier `update.mum` du .cab, extrait avec `expand.exe`) et les inscrire dans le manifeste (7.2).
+7. Déplacer le fichier à sa place définitive et ajouter l'élément au manifeste.
 
 Ensuite :
 
@@ -317,7 +318,39 @@ L'option `-ListOnly` fait tout sauf les téléchargements : elle affiche ce qui 
       "requiresReboot": true,
       "prerequisites": ["win11-x64-checkpoint-KB0000001"],
       "files": [
-        { "path": "files/<sha256>/nom-du-fichier.msu", "sha256": "…", "size": 0 }
+        {
+          "path": "files/<sha256>/nom-du-fichier.msu",
+          "sha256": "…",
+          "size": 0,
+          "package": { "name": "Package_for_RollupFix", "version": "26100.0000.1.0" }
+        }
+      ],
+      "sourceUrl": "https://catalog.update.microsoft.com/…"
+    },
+    {
+      "id": "win10-x64-dotnet-KB0000002",
+      "category": "dotnet",
+      "target": { "os": "win10", "arch": "x64", "minBuild": 19045, "maxBuild": 19045 },
+      "kb": "KB0000002",
+      "title": "Titre exact relevé dans le catalogue",
+      "releaseDate": "2026-10-13",
+      "order": 40,
+      "requiresReboot": false,
+      "files": [
+        {
+          "path": "files/<sha256>/windows10.0-kb0000003-x64-ndp48_<sha1>.msu",
+          "sha256": "…",
+          "size": 0,
+          "package": { "name": "Package_for_DotNetRollup", "version": "10.0.0000.0" },
+          "netRelease": { "min": 528040, "max": 533319 }
+        },
+        {
+          "path": "files/<sha256>/windows10.0-kb0000004-x64-ndp481_<sha1>.msu",
+          "sha256": "…",
+          "size": 0,
+          "package": { "name": "Package_for_DotNetRollup_481", "version": "10.0.0000.0" },
+          "netRelease": { "min": 533320 }
+        }
       ],
       "sourceUrl": "https://catalog.update.microsoft.com/…"
     }
@@ -325,7 +358,9 @@ L'option `-ListOnly` fait tout sauf les téléchargements : elle affiche ce qui 
 }
 ```
 
-Les valeurs ci-dessus illustrent le format. Les chemins dans `files` sont relatifs à `depot/`. Les champs `baseBuilds` et `resultingUbr` servent à la détection des cumulatives Windows. Un même paquet s'applique à plusieurs versions qui partagent une branche de maintenance : chacune a sa build de base (26100 pour 24H2, 26200 pour 25H2, 26300 pour 26H2) et toutes reçoivent le même UBR. `baseBuilds` liste ces builds de base, `resultingUbr` est l'UBR obtenu après installation. Pour Windows 11, l'UBR est relevé dans le titre du catalogue. Pour Windows 10, dont le titre ne porte pas de build, il vient de la correspondance KB → build publiée par Microsoft (R-01, R-09). Une source Office est un élément de catégorie `office-source` avec son canal, sa version, ses langues et le dossier concerné.
+Les valeurs ci-dessus illustrent le format. Les chemins dans `files` sont relatifs à `depot/`. Les champs `baseBuilds` et `resultingUbr` servent à la détection des cumulatives Windows. Un même paquet s'applique à plusieurs versions qui partagent une branche de maintenance : chacune a sa build de base (26100 pour 24H2, 26200 pour 25H2, 26300 pour 26H2) et toutes reçoivent le même UBR. `baseBuilds` liste ces builds de base, `resultingUbr` est l'UBR obtenu après installation. Pour Windows 11, l'UBR est relevé dans le titre du catalogue. Pour Windows 10, dont le titre ne porte pas de build, il vient de la correspondance KB → build publiée par Microsoft (page release-information), ce qui permet de sélectionner la cumulative avant tout téléchargement (R-01, R-09). Après téléchargement, la version du paquet lue dans le .msu sert de contre-vérification de `resultingUbr` : en cas de divergence, l'outil écrit un avertissement dans le journal et la valeur lue dans le .msu fait foi pour la détection.
+
+`package` (par fichier) : nom et version du paquet lus dans le .msu au téléchargement (7.1). Pour une cumulative .NET, c'est la référence de détection (8.3). `netRelease` (par fichier, cumulatives .NET Windows 10) : plage de la valeur `Release` de .NET Framework 4 pour laquelle le fichier s'applique ; 4.8 de 528040 à 533319, 4.8.1 à partir de 533320 (R-05). Un élément .NET Windows 10 porte les deux fichiers ; l'outil installe celui qui correspond au PC. Une source Office est un élément de catégorie `office-source` avec son canal, sa version, ses langues et le dossier concerné.
 
 ### 7.3 Purge
 
@@ -387,7 +422,7 @@ Méthodes de détection, à confirmer en R-09. La famille (Windows 10 ou 11) se 
 - Checkpoint : présente si la build courante est une build de base de la branche (26100, 26200 ou 26300) et que l'UBR courant est supérieur ou égal à l'UBR de la checkpoint (1742 pour KB5043080).
 - SSU autonome Windows 10 (élément épinglé, 6.4) : à installer si la build est 19045 et que l'UBR courant est inférieur à `applyBelowUbr` (3271 pour KB5031539, prérequis des images sans KB5028244), non applicable sinon. Une réinstallation est sans effet : l'état se juge sur l'UBR, pas sur le code retour (R-02).
 - Enablement package (élément épinglé, 6.4) : non applicable si la build courante ne figure pas dans `appliesToBaseBuilds` (déjà en 26300, ou autre branche) ou si l'option est désactivée ; à installer sinon. Prérequis : UBR du PC supérieur ou égal à `minUbr` (voir les règles de prérequis ci-dessous).
-- .NET : présence du KB.
+- .NET : à jour si la liste des paquets DISM contient un paquet de même nom que `package.name`, à l'état `Installed`, de version supérieure ou égale à `package.version` ; à installer sinon. Sous Windows 10, le fichier est choisi d'après la valeur `Release` de `HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full` (`netRelease`). `Get-HotFix` ne sert qu'au diagnostic : une cumulative plus récente fait disparaître le KB du dépôt de sa liste (R-05).
 - Defender : version des signatures (`Get-MpComputerStatus`) comparée à la version de mpam-fe.exe. Si Defender n'est pas l'antivirus actif, l'étape est non applicable.
 - Office : registre ClickToRun (produits installés, version, canal).
 
@@ -516,18 +551,21 @@ Tests de planification (`tests/Unit/Planner/`) : chaque cas associe une fixture 
 | P4 | Windows 11 26H2 à jour | Aucune étape Windows ; enablement package non applicable |
 | P5 | Windows 10 22H2 sans les SSU récents (UBR < 3271) | SSU autonome, puis cumulative, redémarrage |
 
-Tests d'intégration en VM Hyper-V, avec un point de contrôle restauré avant chaque test :
+Tests réels, selon deux moyens :
 
-| Test | Situation de départ | Attendu |
-|---|---|---|
-| T1 | Windows 11 26H2 x64 installé depuis une ISO, sans Office | Mode auto complet, Office Famille 2024 installé, rapport sans erreur |
-| T2 | Windows 11 24H2 x64 avec un Office préinstallé | Enablement package appliqué, ancien Office retiré, profil LTSC 2024 installé avec une clé |
-| T3 | Windows 11 25H2 x64 déjà à jour | Rien à installer, rapport cohérent |
-| T4 | Windows 10 22H2 x64 avec ESU actif | Cumulative ESU installée |
-| T5 | Windows 10 22H2 x64 sans ESU | Avertissement, aucune étape Windows en mode auto |
-| T6 | Windows 11 ARM64 sur matériel réel | Mode manuel complet, Office 64 bits fonctionnel |
-| T7 | Support débranché pendant un redémarrage | Fenêtre d'attente, reprise dès le rebranchement, même sur une autre lettre de lecteur |
-| T8 | Préparation d'un support en FAT32 | Refus avec message explicite |
+- **Runners GitHub hébergés** (dépôt privé, jetables), pour ce qu'ils couvrent : CI à chaque push (PSScriptAnalyzer et Pester sous Windows PowerShell 5.1), face Dépôt (recherche au catalogue, téléchargements, contrôles d'intégrité, `windows-2025`), Windows 11 ARM64 client sans redémarrage (`windows-11-arm`). Les workflows lourds se déclenchent à la main.
+- **Interventions réelles** pour le reste : tout ce qui demande un redémarrage, Windows 11 x64 client, Windows 10, un support physique. On commence toujours par l'action `Plan`, en lecture seule, avant toute installation.
+
+| Test | Situation de départ | Attendu | Où |
+|---|---|---|---|
+| T1 | Windows 11 26H2 x64 installé depuis une ISO, sans Office | Mode auto complet, Office Famille 2024 installé, rapport sans erreur | Intervention réelle (redémarrages, x64 client) |
+| T2 | Windows 11 24H2 x64 avec un Office préinstallé | Enablement package appliqué, ancien Office retiré, profil LTSC 2024 installé avec une clé | Intervention réelle (redémarrages, x64 client) |
+| T3 | Windows 11 25H2 x64 déjà à jour | Rien à installer, rapport cohérent | Runner `windows-11-arm` pour l'action `Plan` sur un 25H2 à jour (en ARM64), puis intervention réelle en x64 |
+| T4 | Windows 10 22H2 x64 avec ESU actif | Cumulative ESU installée | Intervention réelle (Windows 10) |
+| T5 | Windows 10 22H2 x64 sans ESU | Avertissement, aucune étape Windows en mode auto | Intervention réelle (Windows 10) |
+| T6 | Windows 11 ARM64 | Mode manuel complet, Office 64 bits fonctionnel | Runner `windows-11-arm` pour les étapes sans redémarrage, puis matériel réel |
+| T7 | Support débranché pendant un redémarrage | Fenêtre d'attente, reprise dès le rebranchement, même sur une autre lettre de lecteur | Intervention réelle (redémarrage, support physique) |
+| T8 | Préparation d'un support en FAT32 | Refus avec message explicite | Runner `windows-2025` avec un disque virtuel formaté en FAT32, puis support réel |
 
 Les résultats sont notés dans le journal de `TODO.md`.
 
@@ -556,3 +594,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.2 (4 octobre 2026) : arborescence (5), dépôt `depot/files/<sha256>/<nom d'origine>`, un dossier par fichier, dédoublonné ; chemin d'exemple du manifeste (7.2) aligné ; purge par comptage de références (7.3) ; ajout de `tests/runner/` et `.github/workflows/`. Suite de R-02 : la checkpoint est jointe à chaque cumulative et DISM explore le dossier du paquet.
 - 1.3 (4 octobre 2026) : distinction Windows 10 / 11 par `CurrentBuild`, libellé par `Win32_OperatingSystem.Caption` (8.2, 8.3) ; détection des cumulatives et des checkpoints par l'UBR, liste DISM réservée au diagnostic (8.3) ; enablement package 26H2 en élément épinglé, nouveau fichier `config/pinned-items.json` (3.2, 5, 6.4, 7.3), installé après la cumulative et son redémarrage si l'UBR atteint `minUbr` (8.3). Suite des mesures sur runner (R-02, R-09) et de R-03.
 - 1.4 (4 octobre 2026) : règles de prérequis du planificateur (UBR projeté, revérification avant chaque étape, état `SkippedPrerequisite`, dépendances ignorées) (8.3) ; SSU autonome Windows 10 KB5031539 en élément épinglé, catégorie `windows-ssu`, champ `applyBelowUbr` (3.2, 6.4, 8.3) ; paquet .NET identique pour 24H2, 25H2 et 26H2 (8.3) ; tests de planification P1 à P5 (12) ; paquet de préparation ESU en évolution (14). Suite de R-04 et R-05.
+- 1.5 (4 octobre 2026) : détection .NET par comparaison de la version du paquet lue dans le .msu avec la liste DISM, choix 4.8 / 4.8.1 sous Windows 10 par la valeur `Release` (8.3) ; lecture du .msu au téléchargement (7.1) ; champs `package` et `netRelease` du manifeste, contre-vérification de `resultingUbr` par le .msu, la valeur du .msu faisant foi en cas de divergence (7.2) ; section 12 : tests réels sur runners GitHub hébergés ou sur intervention réelle, matrice T1 à T8 avec le lieu de chaque test, à la place des VM Hyper-V. Suite de R-05.

@@ -71,6 +71,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./app/OffPatch-Cli.ps1 -
 
 Pester 5 et PSScriptAnalyzer sont des outils de développement. L'outil livré ne doit jamais en dépendre.
 
+Avant chaque push, sans exception : tests Pester et PSScriptAnalyzer en local, sans erreur. La CI ne remplace pas cette vérification.
+
 ## Git
 
 - Exclus du dépôt git : `depot/`, `rapports/`, `logs/`, `scratch/`, les binaires de `tools/`.

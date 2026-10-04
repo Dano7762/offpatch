@@ -10,7 +10,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [ ] R-02 Cumulatives checkpoint
 - [x] R-03 Enablement package 26H2
 - [ ] R-04 Windows 10 22H2 et ESU
-- [ ] R-05 Cumulatives .NET Framework
+- [x] R-05 Cumulatives .NET Framework
 - [ ] R-06 Définitions Defender
 - [ ] R-07 ODT et sources Office
 - [ ] R-08 Office déjà présent
@@ -125,3 +125,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-04 | 0 | R-04 dépouillé : ESU entreprise détectable hors ligne (WMI `SoftwareLicensingProduct`, 3 identifiants d'activation documentés), ESU grand public sans méthode hors ligne documentée, paquet de préparation KB5126256 au catalogue, aucune doc sur le contrôle de licence à l'installation ; relevé en lecture seule `docs/essais/R-04-esu.md` | R-04 bloqué : relevé sur un vrai PC Windows 10 ; propositions (KB5126256 au dépôt, avertissement SSU) à trancher ; suite : R-05 |
 | 2026-10-04 | 0 | Cahier des charges 1.4 (règles de prérequis du planificateur, `SkippedPrerequisite`, SSU Windows 10 en élément épinglé, tests P1 à P5, KB5126256 en évolution) ; KB5031539 vérifié sur runner et ajouté à `pinned-items.json` ; KB5005260 écarté (sans objet en 22H2) ; tâche de tests de planification ajoutée en phase 4 | R-05 en cours |
 | 2026-10-04 | 0 | R-05 : titres et motifs .NET vérifiés (Windows 11 : même fichier pour 24H2/25H2/26H2 ; Windows 10 : entrée « 3.5, 4.8 and 4.8.1 » à deux fichiers, choix par la valeur `Release`) ; workflow `msu-inspect` : version du paquet lue dans le .msu identique à celle de la liste DISM | Accord de David sur la détection .NET par version de paquet (cahier des charges 8.3), puis R-06 |
+| 2026-10-04 | 0 | R-05 tranché (détection .NET par version de paquet) ; cahier des charges 1.5 (7.1, 7.2 `package` et `netRelease`, 8.3, section 12 runners et interventions réelles avec matrice T1 à T8) ; R-09 : contre-vérification de `resultingUbr` par le .msu ; KB5005260 retiré (justification en R-04) ; CLAUDE.md : Pester et PSScriptAnalyzer en local avant chaque push | R-06 |

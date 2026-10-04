@@ -157,7 +157,7 @@ Impact : contrôle préalable Windows 10, comportement du mode auto.
   - Paquet de préparation KB5126256 : **hors v1** (décision de David du 2026-10-04 : l'inscription à l'ESU exige une connexion et le paquet redémarre seul). Noté en évolution, section 14 du cahier des charges.
   - SSU autonomes des images anciennes (décision de David du 2026-10-04 : les embarquer en éléments épinglés, avec détection et passage avant la cumulative, pas d'avertissement seul) :
     - **KB5031539** (SSU 19041.3562, octobre 2023), nécessaire si le PC n'a pas KB5028244 = 19045.3271 (release-information, 2023-07-25). Titre au catalogue : `2023-10 Servicing Stack Update for Windows 10 Version 22H2 for x64-based Systems (KB5031539)`. Lien résolu par la fenêtre de téléchargement du catalogue : `https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2023/10/ssu-19041.3562-x64_de23c91f483b2e609cec3e4a995639d13205f867.msu`, 16 140 380 octets (ARM64 : `ssu-19041.3562-arm64_2c72074f5308183392636cfc693b834a27f99446.msu`, 14 885 696 octets). Vérifié sur runner (workflow `depot-x64`, https://github.com/Dano7762/offpatch/actions/runs/37202749032) : SHA-1 identique au nom, Authenticode `Valid`, signataire Microsoft Corporation, un seul domaine. Ajouté à `config/pinned-items.json` (x64 seulement, cible `win10-x64`) : `appliesToBaseBuilds` 19045, `applyBelowUbr` 3271. Le nom de fichier ne porte pas de numéro de KB.
-    - **KB5005260** (SSU d'août 2021) : **non embarqué**, sans objet pour la 22H2. Il n'est requis que si le PC n'a pas KB5003173 = 19041/19042/19043.985 (mai 2021) ; or la plus petite build 19045 publiée dans release-information est 19045.2130 (sortie de la 22H2 le 2022-10-18), donc tout PC 22H2 a déjà un UBR supérieur à 985. Le catalogue ne le publie d'ailleurs que pour Windows 10 2004, 20H2 et 21H1, pas pour la 22H2.
+    - **KB5005260** (SSU d'août 2021) : **non embarqué** (retrait validé par David le 2026-10-04), sans objet pour la 22H2. Il n'est requis que si le PC n'a pas KB5003173 = 19041/19042/19043.985 (mai 2021) ; or la plus petite build 19045 publiée dans release-information est 19045.2130 (sortie de la 22H2 le 2022-10-18), donc tout PC 22H2 a déjà un UBR supérieur à 985. Le catalogue ne le publie d'ailleurs que pour Windows 10 2004, 20H2 et 21H1, pas pour la 22H2.
     - À valider sur intervention réelle : besoin ou non de redémarrer après le SSU, code retour d'une réinstallation.
 - À valider sur intervention réelle (`docs/essais/R-04-esu.md`) :
   1. Trace lisible hors ligne d'une inscription ESU grand public (produit de licence, identifiant, état).
@@ -170,7 +170,7 @@ Question : titres exacts au catalogue pour chaque cible, versions de .NET Framew
 
 Impact : catégorie `dotnet`, détection.
 
-- Statut : En cours (recherche terminée ; la méthode de détection proposée modifie le cahier des charges 8.3 et attend l'accord de David)
+- Statut : Tranché (décision de David du 2026-10-04 ; cahier des charges 1.5, 7.1, 7.2 et 8.3)
 - Sources (consultées le 2026-10-04) :
   - https://support.microsoft.com/help/5126052 : « Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 24H2, Windows 11, version 25H2 and Microsoft server operating system 24H2 ». Prérequis : « you must have .NET Framework 3.5 or 4.8.1 installed ». Redémarrage : « if any affected files are being used ».
   - https://support.microsoft.com/help/5126046 : article chapeau Windows 10 21H2/22H2 (3.5 et 4.8), qui renvoie aux articles par produit, dont KB5126146 « Cumulative Update for .NET Framework 3.5, 4.8 and 4.8.1 for Windows 10 Version 22H2 ». Les pages KB5126146 et KB5126421 renvoient une erreur.
@@ -188,12 +188,12 @@ Impact : catégorie `dotnet`, détection.
   - `Get-HotFix` liste KB5126052 sur les deux runners. Mais une cumulative .NET plus récente installée par Windows Update ferait disparaître le KB du dépôt de cette liste : la présence du KB ne suffit pas pour dire « à jour ».
   - Release .NET 4 relevée sur les runners : 533509, valeur absente du tableau Learn mais supérieure à 533320 (4.8.1) ; d'où la règle « supérieur ou égal ».
   - .NET 3.5 est une fonctionnalité à la demande (`Microsoft-Windows-NetFx3-OnDemand-Package`) ; la cumulative la met à jour si elle est présente.
-- Décision proposée (le cahier des charges 8.3 dit aujourd'hui « .NET : présence du KB », d'où la demande d'accord) :
+- Décision (validée par David le 2026-10-04) :
   - Au téléchargement, l'outil lit dans chaque .msu .NET le nom et la version du paquet (`update.mum`, via `expand.exe`) et les inscrit dans le manifeste.
   - Sur le PC : à jour si la liste DISM contient un paquet de même nom, état `Installed`, de version supérieure ou égale ; à installer sinon. `Get-HotFix` reste un complément de diagnostic.
   - Windows 10 : choix du fichier selon la valeur `Release` (≥ 533320 → fichier `ndp481`, sinon `ndp48`).
   - Sélection mensuelle : pas de build dans le titre ; on retient l'entrée la plus récente parmi les non-préversions du mois courant et du précédent. En cas d'égalité, la version de paquet la plus élevée.
-  - Piste pour R-09 : la même lecture de `update.mum` dans la cumulative Windows 10 pourrait donner sa build sans passer par la page release-information. À essayer.
+  - Cumulative Windows 10 (décision de David, voir R-09) : release-information reste la source de sélection ; la lecture du .msu sert de contre-vérification.
   - Reste à valider sur intervention réelle : Windows 10 (choix ndp48 ou ndp481, liste DISM après installation, nom du KB dans `Get-HotFix`) et code retour quand la cumulative .NET est déjà présente (R-14).
 
 ## R-06 Définitions Defender
@@ -248,6 +248,7 @@ Impact : champ `resultingBuild`, états `UpToDate` et `Pending`.
   - Règle de détection des cumulatives (même décision) : par l'UBR (voir R-02), la liste DISM et `Get-HotFix` ne servant qu'au diagnostic.
   - La liste DISM nomme les cumulatives `Package_for_RollupFix~…~26100.<UBR>.*`, sans numéro de KB, avec la build 26100 même sur 25H2 (voir R-02).
   - `Get-HotFix` voit la cumulative courante mais pas la checkpoint.
+  - Cumulative Windows 10 (décision de David du 2026-10-04, cahier des charges 1.5, 7.2) : la page release-information reste la source de la sélection, l'UBR étant connu avant le téléchargement. Après téléchargement, la version du paquet lue dans le .msu (`update.mum`, comme pour .NET en R-05) contre-vérifie `resultingUbr` ; en cas de divergence, avertissement dans le journal, et la valeur du .msu fait foi pour la détection. Reste à vérifier sur runner la forme de cette version pour une cumulative Windows 10 (le paquet .NET donne `10.0.9347.1`).
 - Sources :
 - Conclusion :
 - Décision :
