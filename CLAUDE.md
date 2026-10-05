@@ -73,6 +73,8 @@ Pester 5 et PSScriptAnalyzer sont des outils de développement. L'outil livré n
 
 Avant chaque push, sans exception : tests Pester et PSScriptAnalyzer en local, sans erreur. La CI ne remplace pas cette vérification.
 
+Les fichiers se modifient avec l'outil d'édition natif, pas avec des scripts Python générés. Si un script est indispensable, il va dans `scratch/`. Relire les lignes modifiées avant chaque push.
+
 ## Git
 
 - Exclus du dépôt git : `depot/`, `rapports/`, `logs/`, `scratch/`, les binaires de `tools/`.
