@@ -68,6 +68,17 @@ function Add-State {
     if (Test-Path $word) { $wordVersion = (Get-Item $word).VersionInfo.FileVersion }
     if (Test-Path $client) { $clientVersion = (Get-Item $client).VersionInfo.FileVersion }
     $lines.Add(('  Fichiers : WINWORD.EXE {0}, OfficeClickToRun.exe {1}' -f $wordVersion, $clientVersion))
+    $service = Get-Service -Name 'ClickToRunSvc' -ErrorAction SilentlyContinue
+    $serviceState = 'absent'
+    if ($service) { $serviceState = [string]$service.Status }
+    $wordState = 'non lancé'
+    if (Test-Path $word) {
+        # Démarrage de Word sans document, invisible : vivant au bout de 20 s = lançable.
+        $process = Start-Process -FilePath $word -ArgumentList '/q', '/n' -PassThru -WindowStyle Hidden
+        Start-Sleep -Seconds 20
+        if ($process.HasExited) { $wordState = "arrêté (code $($process.ExitCode))" } else { $wordState = 'en cours après 20 s'; Stop-Process -Id $process.Id -Force }
+    }
+    $lines.Add(('  Service ClickToRunSvc : {0} ; démarrage de Word : {1}' -f $serviceState, $wordState))
     $script:step++
     & reg.exe export 'HKLM\SOFTWARE\Microsoft\Office\ClickToRun' (Join-Path $OutputDirectory ('{0:00}-registre-clicktorun.reg' -f $script:step)) /y | Out-Null
     $s
