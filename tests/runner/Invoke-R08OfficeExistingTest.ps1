@@ -15,6 +15,10 @@
       HomePremConfigure : O365HomePremRetail en version ancienne depuis le CDN, puis, CDN bloqué, setup.exe /configure
                           sur la source Current locale (téléchargée pour Home2024Retail).
       HomePremC2RClient : même départ, puis UpdateUrl local et OfficeC2RClient.exe /update.
+      MultiLangPlain    : Home2024Retail fr-fr + en-us en version ancienne depuis le CDN, puis, CDN bloqué, /configure
+                          depuis une source fr-fr seule avec <Language ID="fr-fr" />.
+      MultiLangMatch    : même départ, puis /configure depuis la source fr-fr seule avec <Language ID="MatchInstalled" />.
+      SourceSize        : taille d'une source Current fr-fr seule, puis fr-fr + en-us (téléchargements seulement).
     Les applications du Store (application Microsoft 365, Office Hub) sont relevées avant et après, jamais modifiées.
 
 .EXAMPLE
@@ -22,7 +26,7 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [Parameter(Mandatory)][ValidateSet('RemoveAdd', 'UpdateConfigure', 'UpdateC2RClient', 'HomePremConfigure', 'HomePremC2RClient')][string]$Scenario,
+    [Parameter(Mandatory)][ValidateSet('RemoveAdd', 'UpdateConfigure', 'UpdateC2RClient', 'HomePremConfigure', 'HomePremC2RClient', 'MultiLangPlain', 'MultiLangMatch', 'SourceSize')][string]$Scenario,
     [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')][string]$OlderVersion = '16.0.20430.20092',
     [Parameter(Mandatory)][string]$OutputDirectory
 )
@@ -56,7 +60,9 @@ function Invoke-Step {
 function Add-State {
     param([string]$Label)
     $s = Get-ClickToRunState
-    $lines.Add(('- État après {0} : installé {1}, version {2}, produits {3}, langues (dossiers) {4}, UpdateUrl {5}' -f $Label, $s.Installed, $s.Version, $s.Products, $s.LanguageFolders, $s.UpdateUrl))
+    $lines.Add(('- État après {0} : installé {1}, version {2}, produits {3}, langues (registre) [{4}], UpdateUrl {5}' -f $Label, $s.Installed, $s.Version, $s.Products, $s.Languages, $s.UpdateUrl))
+    $script:step++
+    & reg.exe export 'HKLM\SOFTWARE\Microsoft\Office\ClickToRun' (Join-Path $OutputDirectory ('{0:00}-registre-clicktorun.reg' -f $script:step)) /y | Out-Null
     $s
 }
 
@@ -123,6 +129,29 @@ try {
                 Invoke-C2RClientUpdate -ExpectedVersion $latest
             }
             Add-State -Label 'mise à jour hors ligne' | Out-Null
+        }
+        { $_ -in 'MultiLangPlain', 'MultiLangMatch' } {
+            Invoke-Step -Label 'install-bilingue-cdn' -Mode 'configure' -Xml (Get-OdtConfigurationXml -ProductId 'Home2024Retail' -Language 'fr-fr', 'en-us' -Version $OlderVersion -Display) | Out-Null
+            Add-State -Label "installation de Home2024Retail $OlderVersion fr-fr + en-us (CDN)" | Out-Null
+            Set-OfficeCdnBlock -Enabled $true -BackupPath $hostsBackup
+            $lines.Add('- CDN Office bloqué ; source locale fr-fr seule')
+            $language = 'fr-fr'
+            if ($Scenario -eq 'MultiLangMatch') { $language = 'MatchInstalled' }
+            $result = Invoke-Step -Label "configure-$language" -Mode 'configure' -Xml (Get-OdtConfigurationXml -SourcePath $source -ProductId 'Home2024Retail' -Language $language -NoCdnFallback -Display)
+            $lines.Add(('- Code retour de la mise à jour avec Language ID="{0}" : {1} (0x{1:X8})' -f $language, $result.ExitCode))
+            Add-State -Label "mise à jour depuis une source fr-fr seule (Language $language)" | Out-Null
+        }
+        'SourceSize' {
+            $sizeOf = { param($path) $total = [int64]0; foreach ($f in @(Get-ChildItem -Path $path -Recurse -File)) { $total += $f.Length }; [math]::Round($total / 1MB, 1) }
+            $lines.Add("- Taille de la source Current fr-fr seule : $(& $sizeOf $source) Mo")
+            $source2 = Join-Path $work 'source-fr-en'
+            New-Item -ItemType Directory -Force -Path $source2 | Out-Null
+            Invoke-Step -Label 'source-fr-en' -Mode 'download' -Xml (Get-OdtConfigurationXml -SourcePath $source2 -ProductId 'Home2024Retail' -Language 'fr-fr', 'en-us') | Out-Null
+            $lines.Add("- Taille de la source Current fr-fr + en-us : $(& $sizeOf $source2) Mo")
+            foreach ($dir in @(Get-ChildItem -Path (Join-Path $source2 'Office\Data') -Recurse -Directory)) {
+                $files = @(Get-ChildItem -Path $dir.FullName -File | Sort-Object Length -Descending | Select-Object -First 3 | ForEach-Object { '{0} ({1} Mo)' -f $_.Name, [math]::Round($_.Length / 1MB, 1) })
+                $lines.Add(('    {0} : plus gros fichiers {1}' -f $dir.Name, ($files -join ', ')))
+            }
         }
         { $_ -in 'HomePremConfigure', 'HomePremC2RClient' } {
             Invoke-Step -Label 'homeprem-cdn-ancienne' -Mode 'configure' -Xml (Get-OdtConfigurationXml -ProductId 'O365HomePremRetail' -Version $OlderVersion -Display) | Out-Null

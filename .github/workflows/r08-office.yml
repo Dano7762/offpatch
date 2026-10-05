@@ -10,6 +10,10 @@ on:
         description: 'Version ancienne du Current Channel'
         required: true
         default: '16.0.20430.20092'
+      scenarios:
+        description: 'Scénarios à lancer (liste JSON)'
+        required: true
+        default: '["RemoveAdd","MultiLangPlain","MultiLangMatch","SourceSize"]'
 
 permissions:
   contents: read
@@ -19,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [RemoveAdd, UpdateConfigure, UpdateC2RClient, HomePremConfigure, HomePremC2RClient]
+        scenario: ${{ fromJSON(inputs.scenarios) }}
     runs-on: windows-11-arm
     timeout-minutes: 240
     defaults:

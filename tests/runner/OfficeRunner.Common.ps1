@@ -56,7 +56,7 @@ function Get-ClickToRunState {
         $cultures = @(Get-ChildItem -Path $root -Directory | Where-Object { $_.Name -match '^\d{4}$' } | ForEach-Object { $_.Name })
     }
     if (-not $c2r) {
-        return [pscustomobject]@{ Installed = $false; Version = $null; Products = $null; Platform = $null; UpdateUrl = $null; UpdatesEnabled = $null; CDNBaseUrl = $null; LanguageFolders = ($cultures -join ',') }
+        return [pscustomobject]@{ Installed = $false; Version = $null; Products = $null; Platform = $null; UpdateUrl = $null; UpdatesEnabled = $null; CDNBaseUrl = $null; LanguageFolders = ($cultures -join ','); Languages = $null }
     }
     $value = { param($name) if ($c2r.PSObject.Properties[$name]) { $c2r.$name } else { $null } }
     [pscustomobject]@{
@@ -68,7 +68,34 @@ function Get-ClickToRunState {
         UpdatesEnabled  = & $value 'UpdatesEnabled'
         CDNBaseUrl      = & $value 'CDNBaseUrl'
         LanguageFolders = ($cultures -join ',')
+        Languages       = Get-ClickToRunLanguage
     }
+}
+
+function Get-ClickToRunLanguage {
+    <#
+    .SYNOPSIS
+        Relève, en lecture seule, les langues déclarées par Click-to-Run dans le registre.
+    .DESCRIPTION
+        Clés de langue (xx-xx) sous ProductReleaseIDs, avec le produit parent, et valeurs de
+        ClickToRun\Configuration dont le nom évoque une langue ou une culture.
+    #>
+    [CmdletBinding()]
+    param()
+    $found = New-Object System.Collections.Generic.List[string]
+    $releaseIds = 'HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\ProductReleaseIDs'
+    if (Test-Path $releaseIds) {
+        foreach ($k in @(Get-ChildItem -Path $releaseIds -Recurse -ErrorAction SilentlyContinue)) {
+            if ($k.PSChildName -match '^[a-z]{2}-[a-z]{2}$') { $found.Add(('{0}:{1}' -f $k.PSParentPath.Split('\')[-1], $k.PSChildName)) }
+        }
+    }
+    $config = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration' -ErrorAction SilentlyContinue
+    if ($config) {
+        foreach ($p in $config.PSObject.Properties) {
+            if ($p.Name -match '(?i)culture|language') { $found.Add(('{0}={1}' -f $p.Name, $p.Value)) }
+        }
+    }
+    @($found | Sort-Object -Unique) -join '; '
 }
 
 function Get-StoreOfficeApp {
