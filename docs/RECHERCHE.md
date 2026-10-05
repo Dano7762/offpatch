@@ -324,7 +324,7 @@ Question : quelle méthode est la plus fiable entre la comparaison build et UBR,
 
 Impact : champ `resultingBuild`, états `UpToDate` et `Pending`.
 
-- Statut : À vérifier
+- Statut : Tranché (proposition sur la détection Office à valider par David)
 - Pistes (2026-10-04, runner `windows-11-arm`, https://github.com/Dano7762/offpatch/actions/runs/37199152736) :
   - Sur Windows 11 25H2, la valeur de registre `ProductName` (`HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion`) vaut « Windows 10 Enterprise ». C'est un comportement connu de Windows 11, pas une anomalie du runner.
   - Règle (décision de David du 2026-10-04, cahier des charges 1.3, 8.2 et 8.3) : Windows 10 et Windows 11 se distinguent par `CurrentBuild` (22000 et plus = Windows 11), jamais par `ProductName`. Le libellé affiché vient de `Win32_OperatingSystem.Caption`. Mis en œuvre dans `app/module/OffPatch/Private/Get-OpWindowsIdentity.ps1`, test Pester `tests/Unit/Get-OpWindowsIdentity.Tests.ps1` (registre simulé « Windows 10 Pro » + build 26200 → Windows 11).
@@ -332,9 +332,22 @@ Impact : champ `resultingBuild`, états `UpToDate` et `Pending`.
   - La liste DISM nomme les cumulatives `Package_for_RollupFix~…~26100.<UBR>.*`, sans numéro de KB, avec la build 26100 même sur 25H2 (voir R-02).
   - `Get-HotFix` voit la cumulative courante mais pas la checkpoint.
   - Cumulative Windows 10 (décision de David du 2026-10-04, cahier des charges 1.5, 7.2) : la page release-information reste la source de la sélection, l'UBR étant connu avant le téléchargement. Après téléchargement, la version du paquet lue dans le .msu (`update.mum`, comme pour .NET en R-05) contre-vérifie `resultingUbr` ; en cas de divergence, avertissement dans le journal, et la valeur du .msu fait foi pour la détection. Reste à vérifier sur runner la forme de cette version pour une cumulative Windows 10 (le paquet .NET donne `10.0.9347.1`).
-- Sources :
+- Sources (2026-10-04 et 2026-10-05) :
+  - Runners `windows-11-arm` : https://github.com/Dano7762/offpatch/actions/runs/37199152736 et https://github.com/Dano7762/offpatch/actions/runs/37199356179 (liste DISM, `Get-HotFix`, registre).
+  - Workflow `msu-inspect` sur `windows-2025` (2026-10-05) : https://github.com/Dano7762/offpatch/actions/runs/37296744436, ouverture de `windows10.0-kb5129236-x64_4413bfb0ab8a665cd0244ed67ec361170bb12ecb.msu` (lien résolu par la fenêtre de téléchargement du catalogue) et de `windows11.0-kb5129195-x64_….msu`.
+  - https://learn.microsoft.com/en-us/windows/release-health/release-information : KB5129236 = 19045.7727.
+  - R-01, R-02, R-05 et R-08 pour les éléments déjà établis.
 - Conclusion :
+  - **Méthode la plus fiable pour les cumulatives Windows : build et UBR** (`CurrentBuild` et `UBR` de `HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion`). Les cumulatives sont cumulatives : un UBR supérieur ou égal à celui de la cumulative du dépôt signifie qu'elle est couverte, y compris par une cumulative plus récente installée par Windows Update. La liste DISM (`Package_for_RollupFix~…~<build de branche>.<UBR>.*`, sans KB, checkpoint à l'état « Staged ») et `Get-HotFix` (qui ne voit pas la checkpoint et ne liste que le dernier KB) ne servent qu'au diagnostic.
+  - **Build résultante au téléchargement** :
+    - Windows 11 : UBR lu dans le titre du catalogue (`… (KB5129195) (26100.9457)`, R-01). Le .msu d'une cumulative Windows 11 24H2 ou plus récente n'est pas lisible par `expand.exe` (aucun contenu listé) : pas de contre-vérification par le .msu, le titre fait foi.
+    - Windows 10 : UBR tiré de la page release-information avant le téléchargement (R-01), puis contre-vérifié par le .msu : le .cab principal contient `update.mum` avec `Package_for_RollupFix` en **19041.7727.1.0** pour KB5129236, soit l'UBR 7727 attendu (19045.7727). La version porte la build de branche 19041 ; l'UBR est le troisième nombre. Le .msu embarque aussi le SSU du mois (`SSU-19041.7714-x64.cab`, `Package_for_ServicingStack_7714` 19041.7714.1.3), ce qui n'enlève rien au besoin du SSU autonome KB5031539 sur les images antérieures à KB5028244 (R-04).
+  - Famille Windows 10 / 11 par `CurrentBuild`, jamais par `ProductName` (« Windows 10 Enterprise » sur un Windows 11 25H2).
+  - **Office (constat de R-08)** : après un échec de l'ODT (17002), `VersionToReport` peut annoncer une version que les applications n'ont pas (16.0.20430.20140 annoncé, `WINWORD.EXE` resté en 16.0.20430.20092), parce que le client Click-to-Run s'est mis à jour seul.
 - Décision :
+  - Cumulatives Windows : détection par build et UBR, conformément au cahier des charges 8.3 (`baseBuilds`, `resultingUbr`) ; aucune modification nécessaire.
+  - Contre-vérification Windows 10 : lire `Package_for_RollupFix` dans `update.mum` et comparer son troisième nombre à `resultingUbr` ; en cas de divergence, avertissement et la valeur du .msu fait foi (cahier des charges 7.2). Pas de contre-vérification pour Windows 11.
+  - **Proposition à valider par David** (cahier des charges 8.3, ligne Office) : juger la version installée d'Office sur la version de fichier d'une application du produit (par exemple `WINWORD.EXE`, ou `EXCEL.EXE` pour un produit sans Word), et garder `VersionToReport` comme valeur de diagnostic ; en cas d'écart entre les deux, avertissement dans le rapport. Sans cela, un Office resté à l'ancienne version après un échec serait déclaré à jour.
 
 ## R-10 Contrôle d'intégrité
 

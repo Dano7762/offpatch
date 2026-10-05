@@ -14,7 +14,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [x] R-06 Définitions Defender
 - [x] R-07 ODT et sources Office
 - [x] R-08 Office déjà présent
-- [ ] R-09 Détection des cumulatives installées
+- [x] R-09 Détection des cumulatives installées
 - [ ] R-10 Contrôle d'intégrité
 - [ ] R-11 MSCatalogLTS
 - [ ] R-12 Volumes
@@ -135,3 +135,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-04 | 0 | R-07 tranché : structure de la source et rôle de `v64.cab` mesurés (`r07-office`), règle de purge validée et installation hors ligne de Home2024Retail réussie sur ARM64 avec le CDN bloqué (`r07-install`, exécutables Office x64 émulés) ; cahier des charges 1.8 (3.3 sans « à vérifier », source Current unique, aucun profil pris en charge sur Windows 10 22H2 : avertissement en 8.2, 8.6, 8.8) | R-08 |
 | 2026-10-04 | 0 | R-08 sur runner ARM64 (5 scénarios réussis) : `<Remove All>` + `<Add>` dans le même XML validé, mise à jour hors ligne par `/configure` (192 s) et par `OfficeC2RClient` + `UpdateUrl` temporaire (105 s), la source Current met à jour un O365HomePremRetail ; applications du Store intactes ; cahier des charges 1.9 (portée de `allowedDomains`) ; R-07 ARM64 « non concluant » | Langues (retrait, Office multilingue) à vérifier ; proposition pour le tableau 8.5 à trancher par David |
 | 2026-10-05 | 0 | R-08 tranché : retrait de en-us confirmé par le registre Click-to-Run ; Office bilingue mis à jour depuis une source fr-fr seule → 17002 (avec ou sans `MatchInstalled`), client Click-to-Run mis à jour mais pas les applications, `VersionToReport` trompeur, Office utilisable ; source Current fr-fr 3 605 Mo, fr-fr + en-us 3 955 Mo ; cahier des charges 1.10 (langues par source, contrôle des langues avant l'ODT, tableau 8.5, `/configure` seul, retrait explicite) ; CLAUDE.md : édition par l'outil natif | R-09 (proposer la version de `WINWORD.EXE` comme contrôle de la détection Office) |
+| 2026-10-05 | 0 | R-09 tranché : détection des cumulatives par build et UBR (DISM et `Get-HotFix` en diagnostic) ; .msu Windows 10 KB5129236 : `Package_for_RollupFix` 19041.7727.1.0 = UBR attendu, SSU du mois embarqué ; .msu Windows 11 illisible par `expand.exe`, l'UBR du titre fait foi | Décision de David sur la détection Office par la version de `WINWORD.EXE` ; suite : R-10 |
