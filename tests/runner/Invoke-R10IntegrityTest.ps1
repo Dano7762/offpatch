@@ -119,15 +119,17 @@ try {
                 New-NetFirewallRule -DisplayName $firewallRule -Direction Outbound -Action Block -Program $ps | Out-Null
                 $probe = Join-Path $work 'probe.ps1'
                 @'
-param([string[]]$Files)
-foreach ($f in $Files) {
+param([string]$ListPath)
+foreach ($f in (Get-Content -Path $ListPath -Encoding UTF8)) {
     $t = Measure-Command { $s = Get-AuthenticodeSignature -FilePath $f }
     $web = 'injoignable'
     try { Invoke-WebRequest -Uri 'https://crl.microsoft.com' -UseBasicParsing -TimeoutSec 5 | Out-Null; $web = 'joignable' } catch { }
     '{0}|{1}|{2}|{3}' -f (Split-Path -Leaf $f), $s.Status, [math]::Round($t.TotalSeconds, 1), $web
 }
 '@ | Set-Content -Path $probe -Encoding UTF8
-                $result = & $ps -NoProfile -ExecutionPolicy Bypass -File $probe -Files $files.ToArray()
+                $list = Join-Path $work 'fichiers.txt'
+                $files | Set-Content -Path $list -Encoding UTF8
+                $result = & $ps -NoProfile -ExecutionPolicy Bypass -File $probe -ListPath $list
                 Remove-NetFirewallRule -DisplayName $firewallRule
                 $lines.Add('')
                 $lines.Add('### Hors ligne (cache vidé, sorties de powershell.exe bloquées)')
@@ -166,8 +168,12 @@ foreach ($f in $Files) {
             $lines.Add("- Octet inversé au milieu de $($target.Name) ($([math]::Round($target.Length / 1MB, 1)) Mo) dans la copie de la source")
             Set-OfficeCdnBlock -Enabled $true -BackupPath $hostsBackup
             $lines.Add('- CDN Office bloqué')
-            $install = Invoke-OdtSetup -Setup $setup -Mode 'configure' -Xml (Get-OdtConfigurationXml -SourcePath $corrupt -ProductId 'Home2024Retail' -NoCdnFallback -Display) -ConfigPath (Join-Path $OutputDirectory '02-install-corrompue.xml')
-            $lines.Add(('- Installation depuis la source corrompue : code {0} (0x{0:X8}), {1} s' -f $install.ExitCode, $install.Seconds))
+            $install = Invoke-OdtSetup -Setup $setup -Mode 'configure' -Xml (Get-OdtConfigurationXml -SourcePath $corrupt -ProductId 'Home2024Retail' -NoCdnFallback -Display) -ConfigPath (Join-Path $OutputDirectory '02-install-corrompue.xml') -TimeoutMinutes 20
+            if ($install.TimedOut) {
+                $lines.Add(('- Installation depuis la source corrompue : toujours en cours après {0} s, setup.exe arrêté (délai de 20 min)' -f $install.Seconds))
+            } else {
+                $lines.Add(('- Installation depuis la source corrompue : code {0} (0x{0:X8}), {1} s' -f $install.ExitCode, $install.Seconds))
+            }
             $state = Get-ClickToRunState
             $lines.Add("- Office après coup : installé $($state.Installed), version $($state.Version), produits $($state.Products)")
         }

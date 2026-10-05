@@ -33,12 +33,21 @@ function Invoke-OdtSetup {
         [Parameter(Mandatory)][string]$Setup,
         [Parameter(Mandatory)][ValidateSet('download', 'configure')][string]$Mode,
         [Parameter(Mandatory)][string]$Xml,
-        [Parameter(Mandatory)][string]$ConfigPath
+        [Parameter(Mandatory)][string]$ConfigPath,
+        [int]$TimeoutMinutes = 0
     )
     Set-Content -Path $ConfigPath -Value $Xml -Encoding UTF8
     $started = Get-Date
-    $process = Start-Process -FilePath $Setup -ArgumentList "/$Mode", $ConfigPath -Wait -PassThru -WorkingDirectory (Split-Path -Parent $Setup)
-    [pscustomobject]@{ ExitCode = $process.ExitCode; Seconds = [math]::Round(((Get-Date) - $started).TotalSeconds) }
+    if ($TimeoutMinutes -le 0) {
+        $process = Start-Process -FilePath $Setup -ArgumentList "/$Mode", $ConfigPath -Wait -PassThru -WorkingDirectory (Split-Path -Parent $Setup)
+        return [pscustomobject]@{ ExitCode = $process.ExitCode; Seconds = [math]::Round(((Get-Date) - $started).TotalSeconds); TimedOut = $false }
+    }
+    $process = Start-Process -FilePath $Setup -ArgumentList "/$Mode", $ConfigPath -PassThru -WorkingDirectory (Split-Path -Parent $Setup)
+    if ($process.WaitForExit($TimeoutMinutes * 60000)) {
+        return [pscustomobject]@{ ExitCode = $process.ExitCode; Seconds = [math]::Round(((Get-Date) - $started).TotalSeconds); TimedOut = $false }
+    }
+    $process.Kill()
+    [pscustomobject]@{ ExitCode = $null; Seconds = [math]::Round(((Get-Date) - $started).TotalSeconds); TimedOut = $true }
 }
 
 function Get-ClickToRunState {
