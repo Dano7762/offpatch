@@ -15,6 +15,9 @@
     la consommation finale (sans redémarrage) et le pic, avec la taille du magasin de composants avant et après
     (DISM /Cleanup-Image /AnalyzeComponentStore). -AllowPreview accepte une préversion cumulative, seule
     installable quand l'image du runner est déjà à jour : réservé à cette mesure.
+    -PinnedItemId (élément de config/pinned-items.json, par exemple l'enablement package) : le fichier épinglé est
+    téléchargé et contrôlé par Test-PinnedFile.ps1, puis passé à DISM au premier passage juste avant les prérequis
+    de la cumulative et juste après la cible, sans redémarrage (R-03, R-14).
     Les codes retour de DISM sont relevés, pas jugés : le script n'échoue que sur une erreur imprévue.
 
 .EXAMPLE
@@ -26,7 +29,8 @@ param(
     [ValidateSet('x64', 'arm64')][string]$Arch = 'arm64',
     [Parameter(Mandatory)][string]$OutputDirectory,
     [string]$WorkDirectory,
-    [switch]$AllowPreview
+    [switch]$AllowPreview,
+    [string]$PinnedItemId
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -62,8 +66,13 @@ function Invoke-DismAddPackage {
     $log = Join-Path $OutputDirectory "dism-$Label.log"
     $console = Join-Path $OutputDirectory "dism-$Label-console.txt"
     $started = Get-Date
-    & dism.exe /English /Online /Add-Package "/PackagePath:$PackagePath" /NoRestart "/LogPath:$log" | Out-File -FilePath $console -Encoding UTF8
+    $output = @(& dism.exe /English /Online /Add-Package "/PackagePath:$PackagePath" /NoRestart "/LogPath:$log")
     $code = $LASTEXITCODE
+    $output | Out-File -FilePath $console -Encoding UTF8
+    # Message de DISM : lignes utiles de la console, sans l'en-tête ni la barre de progression.
+    $message = @($output | ForEach-Object { "$_".Trim() } | Where-Object {
+            $_ -and $_ -notmatch '^\[[= ]*[\d.]*%?[= ]*\]$' -and $_ -notmatch '^(Deployment Image Servicing|Version:|Image Version:|Processing \d+ of \d+)'
+        }) -join ' / '
     $result = [pscustomobject]@{
         Label         = $Label
         Package       = Split-Path -Leaf $PackagePath
@@ -72,6 +81,7 @@ function Invoke-DismAddPackage {
         Seconds       = [math]::Round(((Get-Date) - $started).TotalSeconds)
         RebootPending = (Test-Path $cbsKey)
         Ubr           = [int](Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion').UBR
+        Message       = $message
     }
     Write-Host ("{0} : code {1} ({2}), {3} s, redémarrage en attente : {4}" -f $Label, $result.ExitCode, $result.ExitCodeHex, $result.Seconds, $result.RebootPending)
     $result
@@ -120,6 +130,18 @@ if ($target.Count -ne 1) { throw "Cible introuvable ou en double pour $Kb dans l
 $freeAfterDownload = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object { '{0} {1} Go' -f $_.DeviceID, [math]::Round($_.FreeSpace / 1GB, 1) })
 Write-Host ("Espace libre après téléchargement : {0}" -f ($freeAfterDownload -join ', '))
 
+# Élément épinglé (facultatif) : lien, SHA-1 et signature contrôlés par Test-PinnedFile.ps1.
+$pinned = $null
+if ($PinnedItemId) {
+    $pinnedConfig = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'config\pinned-items.json'
+    $item = @((Get-Content -Path $pinnedConfig -Raw -Encoding UTF8 | ConvertFrom-Json).items | Where-Object { $_.id -eq $PinnedItemId })
+    if ($item.Count -ne 1) { throw "Élément épinglé introuvable dans pinned-items.json : $PinnedItemId" }
+    $pinnedReport = Join-Path $OutputDirectory 'pinned.json'
+    & (Join-Path $PSScriptRoot 'Test-PinnedFile.ps1') -Url $item[0].url -Destination (Join-Path $WorkDirectory 'pinned') -ReportPath $pinnedReport
+    $pinned = @((Get-Content -Path $pinnedReport -Raw -Encoding UTF8 | ConvertFrom-Json).Files)[0]
+    if ($pinned.Sha1 -ne $item[0].sha1) { throw "SHA-1 de l'élément épinglé différent de pinned-items.json : $($pinned.Sha1)" }
+}
+
 # Espace disque pendant DISM : échantillonnage dans un job séparé, arrêté par un fichier témoin.
 $storeBefore = Get-ComponentStoreSize -Suffix 'avant'
 $freeBeforeDism = Get-SystemDriveFreeByte
@@ -139,6 +161,9 @@ $sampler = Start-Job -ScriptBlock {
 # 4 et 5. Méthode 1, puis répétition pour le cas « déjà installé »
 $steps = New-Object System.Collections.Generic.List[object]
 foreach ($pass in 1, 2) {
+    if ($pinned -and $pass -eq 1 -and $PSCmdlet.ShouldProcess($pinned.Name, 'DISM /Add-Package')) {
+        $steps.Add((Invoke-DismAddPackage -Label ("passe1-epingle-avant-{0}" -f $pinned.Kb) -PackagePath $pinned.Path))
+    }
     foreach ($p in $prerequisites) {
         if ($PSCmdlet.ShouldProcess($p.Name, 'DISM /Add-Package')) {
             $steps.Add((Invoke-DismAddPackage -Label ("passe{0}-prerequis-{1}" -f $pass, $p.Kb) -PackagePath $p.Path))
@@ -146,6 +171,9 @@ foreach ($pass in 1, 2) {
     }
     if ($PSCmdlet.ShouldProcess($target[0].Name, 'DISM /Add-Package')) {
         $steps.Add((Invoke-DismAddPackage -Label ("passe{0}-cible-{1}" -f $pass, $target[0].Kb) -PackagePath $target[0].Path))
+    }
+    if ($pinned -and $pass -eq 1 -and $PSCmdlet.ShouldProcess($pinned.Name, 'DISM /Add-Package')) {
+        $steps.Add((Invoke-DismAddPackage -Label ("passe1-epingle-apres-{0}" -f $pinned.Kb) -PackagePath $pinned.Path))
     }
 }
 
@@ -212,9 +240,17 @@ $lines.Add("- Système : $($before.ProductName), $($before.EditionId), $($before
 $lines.Add("- Build avant : $($before.CurrentBuild).$($before.Ubr) ; après (sans redémarrage) : $($after.CurrentBuild).$($after.Ubr)")
 $lines.Add("- Déjà à jour au départ (UBR ≥ celui de l'entrée) : $alreadyUpToDate")
 $lines.Add('')
-$lines.Add('| Étape | Paquet | Code | Hex | Durée (s) | Redémarrage en attente |')
-$lines.Add('|---|---|---|---|---|---|')
-foreach ($s in $steps) { $lines.Add("| $($s.Label) | $($s.Package) | $($s.ExitCode) | $($s.ExitCodeHex) | $($s.Seconds) | $($s.RebootPending) |") }
+$lines.Add('| Étape | Paquet | Code | Hex | Durée (s) | Redémarrage en attente | UBR après | Message DISM |')
+$lines.Add('|---|---|---|---|---|---|---|---|')
+foreach ($s in $steps) { $lines.Add("| $($s.Label) | $($s.Package) | $($s.ExitCode) | $($s.ExitCodeHex) | $($s.Seconds) | $($s.RebootPending) | $($s.Ubr) | $($s.Message -replace '\|', '/') |") }
+if ($pinned) {
+    $lines.Add('')
+    $lines.Add("### Paquets $($pinned.Kb) dans la liste DISM après coup")
+    $lines.Add('')
+    $pinnedLines = @(Get-Content -Path (Join-Path $OutputDirectory 'packages-apres.txt') -Encoding UTF8 | Where-Object { $_ -match $pinned.Kb })
+    if ($pinnedLines.Count -eq 0) { $lines.Add('- aucun') }
+    foreach ($l in $pinnedLines) { $lines.Add('- `' + ($l -replace '\s+', ' ').Trim() + '`') }
+}
 $lines.Add('')
 $lines.Add("### Espace disque sur $($disk.Drive) (R-12, sans redémarrage)")
 $lines.Add('')
