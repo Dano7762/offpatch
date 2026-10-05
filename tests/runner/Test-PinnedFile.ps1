@@ -5,7 +5,7 @@
 .DESCRIPTION
     Script réservé aux runners GitHub. Pour chaque URL : refus si le domaine n'est pas autorisé, relevé des
     redirections, téléchargement, taille, SHA-1 comparé à l'empreinte du nom de fichier, SHA-256, signature
-    Authenticode. Le rapport a le même format que celui de Save-CatalogEntryFile.ps1 (Write-DownloadSummary.ps1).
+    Authenticode et racine comparée à integrity.trustedRootThumbprints (un refus fait échouer le script). Le rapport a le même format que celui de Save-CatalogEntryFile.ps1 (Write-DownloadSummary.ps1).
     Sert à valider les liens de l'enablement package (R-03), absent du catalogue.
 
 .EXAMPLE
@@ -21,6 +21,9 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$toolRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+. (Join-Path $toolRoot 'app\module\OffPatch\Private\Test-OpFileSignature.ps1')
+$trustedRoots = @((Get-Content -Path (Join-Path $toolRoot 'config\settings.json') -Raw -Encoding UTF8 | ConvertFrom-Json).integrity.trustedRootThumbprints)
 
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 $files = foreach ($u in $Url) {
@@ -48,6 +51,7 @@ $files = foreach ($u in $Url) {
     $signature = Get-AuthenticodeSignature -FilePath $file
     $signer = $null
     if ($signature.SignerCertificate) { $signer = $signature.SignerCertificate.Subject }
+    $check = Test-OpFileSignature -Path $file -TrustedRootThumbprint $trustedRoots
     $item = [pscustomobject]@{
         Name               = $name
         Kb                 = [regex]::Match($name, '(?i)-(kb\d+)-').Groups[1].Value.ToUpperInvariant()
@@ -61,6 +65,10 @@ $files = foreach ($u in $Url) {
         AuthenticodeStatus = [string]$signature.Status
         AuthenticodeType   = [string]$signature.SignatureType
         Signer             = $signer
+        RootSubject        = $check.RootSubject
+        RootThumbprint     = $check.RootThumbprint
+        RootTrusted        = $check.IsTrusted
+        SignatureReason    = $check.Reason
         Hosts              = @($hosts | Select-Object -Unique)
         Url                = $u
         DownloadSeconds    = [math]::Round(((Get-Date) - $started).TotalSeconds)
@@ -80,3 +88,8 @@ $reportFolder = Split-Path -Parent $ReportPath
 if ($reportFolder) { New-Item -ItemType Directory -Force -Path $reportFolder | Out-Null }
 $report | ConvertTo-Json -Depth 5 | Set-Content -Path ($ReportPath + '.tmp') -Encoding UTF8
 Move-Item -Path ($ReportPath + '.tmp') -Destination $ReportPath -Force
+# Critères du cahier des charges (7.1) : un fichier refusé fait échouer le job, après écriture du rapport.
+$refused = @($report.Files | Where-Object { -not $_.RootTrusted })
+if ($refused.Count -gt 0) {
+    throw ("Signature refusée : " + (@($refused | ForEach-Object { "$($_.Name) : $($_.SignatureReason)" }) -join ' ; '))
+}

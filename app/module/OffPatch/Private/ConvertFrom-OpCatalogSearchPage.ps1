@@ -6,7 +6,8 @@
     .DESCRIPTION
         Fonction pure, sans accès réseau : elle reçoit le HTML de la page et renvoie un objet par ligne
         (identifiant de mise à jour, titre, produits, classification, date, taille). Elle signale aussi
-        une page « aucun résultat » et une page pleine (25 lignes, risque de troncature, R-01).
+        une page « aucun résultat » et lit le compteur « page N of M » : HasNextPage indique qu'une page
+        suivante existe (page pleine de 25 lignes et compteur non atteint), pour la pagination (R-11).
         Une structure de page inattendue lève une erreur explicite plutôt que de renvoyer une liste vide.
     #>
     [CmdletBinding()]
@@ -45,9 +46,25 @@
         }
     }
 
+    # Compteur du catalogue : « 26 - 50 of 76 (page 2 of 4) ». Absent sur la page « aucun résultat ».
+    $pageNumber = $null
+    $pageCount = $null
+    $totalCount = $null
+    $counter = [regex]::Match($Html, 'id="ctl00_catalogBody_searchDuration">\s*\d+\s*-\s*\d+\s+of\s+(\d+)\s+\(page\s+(\d+)\s+of\s+(\d+)\)')
+    if ($counter.Success) {
+        $totalCount = [int]$counter.Groups[1].Value
+        $pageNumber = [int]$counter.Groups[2].Value
+        $pageCount = [int]$counter.Groups[3].Value
+    }
+    $hasNextPage = ($rows.Count -ge 25)
+    if ($hasNextPage -and $counter.Success) { $hasNextPage = ($pageNumber -lt $pageCount) }
+
     [pscustomobject]@{
-        NoResults = $noResults
-        IsFull    = ($rows.Count -ge 25)
-        Items     = @($items)
+        NoResults   = $noResults
+        PageNumber  = $pageNumber
+        PageCount   = $pageCount
+        TotalCount  = $totalCount
+        HasNextPage = $hasNextPage
+        Items       = @($items)
     }
 }

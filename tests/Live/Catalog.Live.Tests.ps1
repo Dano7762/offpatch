@@ -1,6 +1,6 @@
 ﻿# Contrat avec le Microsoft Update Catalog en ligne (R-11) : les fonctions d'analyse doivent reconnaître les pages
-# actuelles du site. Lecture seule, deux requêtes, aucun téléchargement de fichier. Tag Live : lancé par une étape
-# dédiée de la CI, pour qu'une casse du site se voie dès le push suivant.
+# actuelles du site. Lecture seule, quelques requêtes, aucun téléchargement de fichier. Tag Live : exclu de ci.yml,
+# lancé chaque mercredi et à la demande par catalog-contract.yml.
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification = 'Variables partagées entre blocs Pester, non vues par l''analyse.')]
 param()
 
@@ -8,6 +8,7 @@ BeforeAll {
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     . (Join-Path $root 'app\module\OffPatch\Private\ConvertFrom-OpCatalogSearchPage.ps1')
     . (Join-Path $root 'app\module\OffPatch\Private\ConvertFrom-OpCatalogDownloadDialog.ps1')
+    . (Join-Path $root 'app\module\OffPatch\Private\Find-OpCatalogUpdate.ps1')
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 }
 
@@ -22,5 +23,12 @@ Describe 'Microsoft Update Catalog en ligne' -Tag 'Live' {
         $dialog = (Invoke-WebRequest -Uri 'https://www.catalog.update.microsoft.com/DownloadDialog.aspx' -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded' -UseBasicParsing -ErrorAction Stop).Content
         $files = @(ConvertFrom-OpCatalogDownloadDialog -Html $dialog)
         ($files | Where-Object { $_.FileName -match '^windows11\.0-kb5043080-x64_[0-9a-f]{40}\.msu$' }) | Should -Not -BeNullOrEmpty
+    }
+
+    It 'la pagination (&p=) ramène toutes les lignes annoncées par le compteur' {
+        $query = '2026-09 Cumulative Update Windows 11'
+        $first = ConvertFrom-OpCatalogSearchPage -Html (Invoke-WebRequest -Uri ('https://www.catalog.update.microsoft.com/Search.aspx?q=' + [uri]::EscapeDataString($query)) -UseBasicParsing -ErrorAction Stop).Content
+        $first.HasNextPage | Should -BeTrue
+        @(Find-OpCatalogUpdate -Query $query).Count | Should -Be $first.TotalCount
     }
 }

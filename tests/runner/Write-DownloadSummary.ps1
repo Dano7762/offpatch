@@ -25,10 +25,13 @@ $lines.Add("## Téléchargement : $($report.Kb) ($($report.Arch))")
 $lines.Add('')
 $lines.Add("Entrée : $($report.EntryTitle)")
 $lines.Add('')
-$lines.Add('| Fichier | Rôle | Octets | > 4 Gio | SHA-1 = nom | Authenticode | Type | Signataire | Domaines | Durée (s) |')
-$lines.Add('|---|---|---|---|---|---|---|---|---|---|')
+$lines.Add('| Fichier | Rôle | Octets | > 4 Gio | SHA-1 = nom | Authenticode | Type | Signataire | Racine (empreinte) | Racine de confiance | Domaines | Durée (s) |')
+$lines.Add('|---|---|---|---|---|---|---|---|---|---|---|---|')
 foreach ($f in $report.Files) {
-    $lines.Add(('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} |' -f $f.Name, $f.Role, $f.Size, ([int64]$f.Size -gt $fat32Limit), $f.Sha1Matches, $f.AuthenticodeStatus, $f.AuthenticodeType, $f.Signer, (@($f.Hosts) -join ' → '), $f.DownloadSeconds))
+    $rootTrusted = $null
+    $rootText = $null
+    if ($f.PSObject.Properties['RootTrusted']) { $rootTrusted = $f.RootTrusted; $rootText = "$($f.RootSubject) ($($f.RootThumbprint))" }
+    $lines.Add(('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} | {11} |' -f $f.Name, $f.Role, $f.Size, ([int64]$f.Size -gt $fat32Limit), $f.Sha1Matches, $f.AuthenticodeStatus, $f.AuthenticodeType, $f.Signer, $rootText, $rootTrusted, (@($f.Hosts) -join ' → '), $f.DownloadSeconds))
 }
 $summary = $lines -join "`n"
 $summary | Set-Content -Path $OutputPath -Encoding UTF8

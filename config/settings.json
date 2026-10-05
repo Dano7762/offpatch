@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "targets": ["win11-x64", "win11-arm64", "win10-x64"],
+  "windows": {
+    "includeEnablementPackage": true
+  },
+  "office": {
+    "sources": {
+      "current": { "languages": ["fr-fr", "en-us"] },
+      "perpetualvl2024": { "languages": ["fr-fr"] },
+      "perpetualvl2021": { "languages": ["fr-fr"] }
+    },
+    "clientEdition": "64"
+  },
+  "retention": {
+    "windowsMonths": 2,
+    "officeVersions": 1
+  },
+  "client": {
+    "minFreeSpaceGB": 20,
+    "maxAutoReboots": 5,
+    "rebootCountdownSeconds": 30,
+    "staleDepotWarningDays": 35,
+    "pauseWindowsUpdateDuringSession": true,
+    "odtTimeoutMinutes": 30
+  },
+  "logging": {
+    "level": "INFO"
+  },
+  "integrity": {
+    "trustedRootThumbprints": ["3B1EFD3A66EA28B16697394703A72CA340A05BD5"]
+  },
+  "allowedDomains": [
+    "catalog.update.microsoft.com",
+    "download.windowsupdate.com",
+    "download.microsoft.com",
+    "go.microsoft.com",
+    "officecdn.microsoft.com"
+  ]
+}

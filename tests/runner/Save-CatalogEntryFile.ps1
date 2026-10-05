@@ -6,7 +6,11 @@
     Script réservé aux runners GitHub (jamais livré avec l'outil). Cherche l'entrée Windows 11 du KB demandé
     pour l'architecture voulue, résout ses liens (cumulative et checkpoints), télécharge chaque fichier avec
     curl.exe, puis relève pour chacun : taille, SHA-1 comparé à celui du nom de fichier, SHA-256, signature
-    Authenticode et domaines traversés par les redirections (R-10, R-12, R-13).
+    Authenticode, racine de la chaîne comparée à integrity.trustedRootThumbprints (config/settings.json) et
+    domaines traversés par les redirections (R-10, R-12, R-13). Un fichier dont la signature est refusée
+    fait échouer le script après l'écriture du rapport.
+    La recherche et la lecture des pages passent par les fonctions du module (Find-OpCatalogUpdate, pagination).
+    -AllowPreview accepte une préversion cumulative : réservé aux mesures (R-12), jamais retenu par OffPatch.
     Chaque fichier est rangé seul dans un dossier nommé par son SHA-256, comme dans le dépôt (cahier des charges, section 5).
     Aucune installation.
 
@@ -24,35 +28,50 @@ param(
     [Parameter(Mandatory)][string]$Destination,
     [string]$ReportPath,
     [string]$DiagnosticDirectory,
-    [switch]$ListOnly
+    [switch]$ListOnly,
+    [switch]$AllowPreview
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+$module = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'app\module\OffPatch\Private'
+foreach ($name in 'ConvertFrom-OpCatalogSearchPage', 'ConvertFrom-OpCatalogDownloadDialog', 'Find-OpCatalogUpdate', 'Test-OpFileSignature') {
+    . (Join-Path $module "$name.ps1")
+}
+$settingsPath = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'config\settings.json'
+$trustedRoots = @((Get-Content -Path $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json).integrity.trustedRootThumbprints)
+
 function Get-CatalogEntryId {
-    param([string]$Kb, [string]$Arch, [string]$DiagnosticDirectory)
-    $html = ''
+    param([string]$Kb, [string]$Arch, [string]$DiagnosticDirectory, [switch]$AllowPreview)
+    $exclude = 'Preview|Dynamic|Server|\.NET'
+    if ($AllowPreview) { $exclude = 'Dynamic|Server|\.NET' }
     $titles = @()
+    $lastError = $null
     foreach ($attempt in 1..3) {
-        $response = Invoke-WebRequest -Uri ('https://www.catalog.update.microsoft.com/Search.aspx?q=' + $Kb) -UseBasicParsing -ErrorAction Stop
-        $html = $response.Content
-        $rows = [regex]::Matches($html, '(?s)<tr id="([0-9a-f\-]+)_R\d+".*?</tr>')
-        $titles = @(foreach ($row in $rows) { ([regex]::Match($row.Value, "(?s)_link'[^>]*>(.*?)</a>").Groups[1].Value -replace '\s+', ' ').Trim() })
-        for ($i = 0; $i -lt $rows.Count; $i++) {
-            if ($titles[$i] -match "Windows 11, version \d\dH\d for $Arch-based Systems" -and $titles[$i] -notmatch 'Preview|Dynamic|Server|\.NET') {
-                return [pscustomobject]@{ Id = $rows[$i].Groups[1].Value; Title = $titles[$i] }
-            }
+        try {
+            $items = @(Find-OpCatalogUpdate -Query $Kb)
+            $titles = @($items | ForEach-Object { $_.Title })
+            $entry = $items | Where-Object { $_.Title -match "Windows 11, version \d\dH\d for $Arch-based Systems" -and $_.Title -notmatch $exclude } | Select-Object -First 1
+            if ($entry) { return [pscustomobject]@{ Id = $entry.UpdateId; Title = $entry.Title } }
+            Write-Host ("Tentative {0} : {1} ligne(s) de résultat, aucune ne convient" -f $attempt, $items.Count)
+        } catch {
+            $lastError = $_.Exception.Message
+            Write-Host ("Tentative {0} : {1}" -f $attempt, $lastError)
         }
-        Write-Host ("Tentative {0} : HTTP {1}, {2} octets, {3} ligne(s) de résultat" -f $attempt, $response.StatusCode, $html.Length, $rows.Count)
         $titles | ForEach-Object { Write-Host "  $_" }
         Start-Sleep -Seconds (10 * $attempt)
     }
     if ($DiagnosticDirectory) {
         New-Item -ItemType Directory -Force -Path $DiagnosticDirectory | Out-Null
-        Set-Content -Path (Join-Path $DiagnosticDirectory "catalog-search-$Kb.html") -Value $html -Encoding UTF8
+        try {
+            $html = (Invoke-WebRequest -Uri ('https://www.catalog.update.microsoft.com/Search.aspx?q=' + $Kb) -UseBasicParsing -ErrorAction Stop).Content
+            Set-Content -Path (Join-Path $DiagnosticDirectory "catalog-search-$Kb.html") -Value $html -Encoding UTF8
+        } catch {
+            Write-Host "Page de diagnostic non récupérée : $($_.Exception.Message)"
+        }
     }
-    throw "Aucune entrée Windows 11 $Arch pour $Kb"
+    throw "Aucune entrée Windows 11 $Arch pour $Kb ($lastError)"
 }
 
 function Get-CatalogDownloadUrl {
@@ -60,9 +79,7 @@ function Get-CatalogDownloadUrl {
     $payload = '[{"size":0,"languages":"","uidInfo":"' + $EntryId + '","updateID":"' + $EntryId + '"}]'
     $body = 'updateIDs=' + [uri]::EscapeDataString($payload)
     $dialog = (Invoke-WebRequest -Uri 'https://www.catalog.update.microsoft.com/DownloadDialog.aspx' -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded' -UseBasicParsing -ErrorAction Stop).Content
-    $urls = @([regex]::Matches($dialog, "\.url = '([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-    if ($urls.Count -eq 0) { throw "Aucun lien de téléchargement pour l'entrée $EntryId" }
-    $urls
+    @(ConvertFrom-OpCatalogDownloadDialog -Html $dialog | ForEach-Object { $_.Url })
 }
 
 function Get-RedirectHost {
@@ -80,7 +97,7 @@ function Get-RedirectHost {
     @($hosts | Select-Object -Unique)
 }
 
-$entry = Get-CatalogEntryId -Kb $Kb -Arch $Arch -DiagnosticDirectory $DiagnosticDirectory
+$entry = Get-CatalogEntryId -Kb $Kb -Arch $Arch -DiagnosticDirectory $DiagnosticDirectory -AllowPreview:$AllowPreview
 Write-Host "Entrée : $($entry.Title)"
 $urls = Get-CatalogDownloadUrl -EntryId $entry.Id
 if ($ListOnly) {
@@ -111,6 +128,7 @@ $files = foreach ($url in $urls) {
     $signature = Get-AuthenticodeSignature -FilePath $final
     $signer = $null
     if ($signature.SignerCertificate) { $signer = $signature.SignerCertificate.Subject }
+    $check = Test-OpFileSignature -Path $final -TrustedRootThumbprint $trustedRoots
     $kbInName = [regex]::Match($name, '(?i)-(kb\d+)-').Groups[1].Value.ToUpperInvariant()
 
     $item = [pscustomobject]@{
@@ -126,11 +144,16 @@ $files = foreach ($url in $urls) {
         AuthenticodeStatus = [string]$signature.Status
         AuthenticodeType  = [string]$signature.SignatureType
         Signer            = $signer
+        RootSubject       = $check.RootSubject
+        RootThumbprint    = $check.RootThumbprint
+        RootTrusted       = $check.IsTrusted
+        SignatureReason   = $check.Reason
         Hosts             = $hosts
         Url               = $url
         DownloadSeconds   = $seconds
     }
     Write-Host ("  {0} octets, SHA-1 conforme : {1}, Authenticode : {2} ({3})" -f $item.Size, $item.Sha1Matches, $item.AuthenticodeStatus, $item.Signer)
+    Write-Host ("  Racine : {0} ({1}), de confiance : {2} {3}" -f $item.RootSubject, $item.RootThumbprint, $item.RootTrusted, $item.SignatureReason)
     Write-Host ("  Domaines : {0}" -f ($hosts -join ', '))
     $item
 }
@@ -148,5 +171,10 @@ if ($ReportPath) {
     $temp = $ReportPath + '.tmp'
     $report | ConvertTo-Json -Depth 5 | Set-Content -Path $temp -Encoding UTF8
     Move-Item -Path $temp -Destination $ReportPath -Force
+}
+# Critères du cahier des charges (7.1) : un fichier refusé fait échouer le job, après écriture du rapport.
+$refused = @($report.Files | Where-Object { -not $_.RootTrusted })
+if ($refused.Count -gt 0) {
+    throw ("Signature refusée : " + (@($refused | ForEach-Object { "$($_.Name) : $($_.SignatureReason)" }) -join ' ; '))
 }
 $report
