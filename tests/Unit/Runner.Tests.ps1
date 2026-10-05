@@ -117,3 +117,14 @@ Describe 'Get-OdtConfigurationXml' {
         $xml.Configuration.Remove.All | Should -Be 'TRUE'
     }
 }
+
+Describe 'Invoke-R10IntegrityTest.ps1' {
+    BeforeEach { $savedFlag = $env:GITHUB_ACTIONS }
+    AfterEach { $env:GITHUB_ACTIONS = $savedFlag }
+
+    It 'refuse de s''exécuter hors d''un runner GitHub' {
+        $env:GITHUB_ACTIONS = 'false'
+        { & (Join-Path $runner 'Invoke-R10IntegrityTest.ps1') -Scenario 'Signatures' -OutputDirectory $TestDrive -WhatIf } |
+            Should -Throw -ExpectedMessage '*runner GitHub*'
+    }
+}

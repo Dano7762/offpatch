@@ -1,0 +1,38 @@
+# R-10 : signatures Authenticode des fichiers du dépôt (en ligne et hors ligne) et intégrité d'une source Office
+# (fichier .dat corrompu, installation hors ligne), sur runners Windows 11 ARM64 jetables.
+# Déclenchement manuel uniquement. Modifie le système du runner (pare-feu, fichier hosts, installation d'Office).
+name: r10-integrity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [Signatures, OfficeSource]
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai R-10
+        env:
+          R10_SCENARIO: ${{ matrix.scenario }}
+        run: ./tests/runner/Invoke-R10IntegrityTest.ps1 -Scenario $env:R10_SCENARIO -OutputDirectory "$env:RUNNER_TEMP\r10-out"
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: r10-integrity-${{ matrix.scenario }}
+          path: ${{ runner.temp }}/r10-out
+          retention-days: 30
+          if-no-files-found: warn
