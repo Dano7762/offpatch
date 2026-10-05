@@ -61,6 +61,13 @@ function Add-State {
     param([string]$Label)
     $s = Get-ClickToRunState
     $lines.Add(('- État après {0} : installé {1}, version {2}, produits {3}, langues (registre) [{4}], UpdateUrl {5}' -f $Label, $s.Installed, $s.Version, $s.Products, $s.Languages, $s.UpdateUrl))
+    $word = Join-Path $env:ProgramFiles 'Microsoft Officeoot\Office16\WINWORD.EXE'
+    $client = Join-Path ${env:CommonProgramFiles} 'microsoft shared\ClickToRun\OfficeClickToRun.exe'
+    $wordVersion = $null
+    $clientVersion = $null
+    if (Test-Path $word) { $wordVersion = (Get-Item $word).VersionInfo.FileVersion }
+    if (Test-Path $client) { $clientVersion = (Get-Item $client).VersionInfo.FileVersion }
+    $lines.Add(('  Fichiers : WINWORD.EXE {0}, OfficeClickToRun.exe {1}' -f $wordVersion, $clientVersion))
     $script:step++
     & reg.exe export 'HKLM\SOFTWARE\Microsoft\Office\ClickToRun' (Join-Path $OutputDirectory ('{0:00}-registre-clicktorun.reg' -f $script:step)) /y | Out-Null
     $s
