@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.11 du 5 octobre 2026.
+Version 1.12 du 5 octobre 2026.
 
 ## 1. Contexte
 
@@ -179,7 +179,8 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
     "maxAutoReboots": 5,
     "rebootCountdownSeconds": 30,
     "staleDepotWarningDays": 35,
-    "pauseWindowsUpdateDuringSession": true
+    "pauseWindowsUpdateDuringSession": true,
+    "odtTimeoutMinutes": 30
   },
   "logging": {
     "level": "INFO"
@@ -301,7 +302,7 @@ Pour chaque cible cochée :
 2. Interroger le catalogue avec les requêtes de `catalog-queries.json`. MSCatalogLTS ne sert qu'à la recherche et à la résolution des liens. Le téléchargement est fait par l'outil, pour maîtriser la reprise, le dossier temporaire et le contrôle d'intégrité.
 3. Comparer avec le manifeste. Un élément déjà présent avec le même hash n'est pas retéléchargé.
 4. Télécharger dans `depot/.tmp/` avec BITS (`Start-BitsTransfer`, reprise possible), et un repli sur `HttpClient` en flux si BITS n'est pas disponible.
-5. Vérifier la signature Microsoft quand elle est exploitable et calculer le SHA-256 (R-10).
+5. Vérifier l'authenticité, en ligne, au téléchargement, et calculer le SHA-256 (R-10). Critères Authenticode pour les fichiers signés (.msu, .exe, .cab) : `Status` = `Valid`, signataire de l'organisation Microsoft Corporation, chaîne jusqu'à une racine Microsoft (relevé : Microsoft Root Certificate Authority 2010). Un certificat expiré mais horodaté reste valide ; aucun contrôle sur la date d'expiration du certificat. Pour une source Office, le SHA-256 de chaque fichier est enregistré dans le manifeste ; ses fichiers `.dat` ne portent pas de signature Authenticode (ils sont couverts par des catalogues `.dat.cat` signés) et l'ODT les valide lui-même pendant `/download`.
 6. Pour une cumulative Windows ou .NET, lire dans le .msu le nom et la version du paquet (fichier `update.mum` du .cab, extrait avec `expand.exe`) et les inscrire dans le manifeste (7.2).
 7. Déplacer le fichier à sa place définitive et ajouter l'élément au manifeste.
 
@@ -472,7 +473,8 @@ Règles de prérequis :
 
 ### 8.4 Exécution des étapes Windows
 
-- Installation des paquets par DISM en ligne, sans redémarrage automatique, avec un journal DISM par étape. Le choix entre `dism.exe` et `Add-WindowsPackage` est fait en R-14.
+- Installation des paquets par DISM en ligne, sans redémarrage automatique, avec un journal DISM par étape. Le choix entre `dism.exe` et `Add-WindowsPackage` est fait en R-14. Pas de délai maximal sur DISM.
+- Juste avant chaque étape, revérification du SHA-256 des seuls fichiers utilisés par l'étape, par rapport au manifeste. Côté client, pas de contrôle Authenticode : l'authenticité a été établie au téléchargement (R-10).
 - Codes retour : 0 réussite, 3010 redémarrage nécessaire, « non applicable » (0x800f081e) traité comme `NotApplicable` et non comme une erreur, le reste en erreur avec le code dans le journal et le rapport.
 - Plateforme Defender : exécution de `updateplatform.<arch>fre_….exe`, puis attente du retour de Defender en mode `Normal`, bornée à 120 s. En cas de dépassement, avertissement dans le journal, et les définitions sont tentées quand même. Réussite constatée par `AMProductVersion`, pas par le code retour.
 - Defender : exécution de mpam-fe.exe, puis lecture de la nouvelle version pour confirmer. Le code retour ne suffit pas : mpam-fe.exe peut renvoyer 0 sans rien appliquer (R-06).
@@ -492,6 +494,8 @@ Règles de prérequis :
 Mécanisme (R-08) :
 
 - Mise à jour d'un Office existant : uniquement `setup.exe /configure` relancé, avec `<Add SourcePath="…" AllowCdnFallback="FALSE">`, les produits et les langues déjà installés. `OfficeC2RClient.exe` n'est pas utilisé (options non documentées, modification du registre du client). En cas d'échec, l'étape passe en erreur avec le code retour de l'ODT dans le rapport.
+- Intégrité de la source avant l'ODT : avant tout `setup.exe /configure`, revérification du SHA-256 de tous les fichiers de la source utilisée, par rapport au manifeste. Au moindre écart, l'étape passe en erreur, l'ODT n'est pas lancé, et les fichiers fautifs sont listés dans le rapport. Mesuré en R-10 : hors ligne, l'ODT face à un fichier de source corrompu n'échoue pas, il attend le retour du réseau.
+- Garde-fou de durée : `setup.exe` est arrêté au-delà de `client.odtTimeoutMinutes` (30 min par défaut, 6.1). L'étape passe alors en erreur avec le motif « délai dépassé », les journaux de l'ODT sont conservés, et Office est détecté de nouveau par la version de `WINWORD.EXE` (8.3).
 - Retrait et installation : un seul XML avec `<Remove All="TRUE" />` et `<Add>`, validé sur runner.
 - Langues : le contrôle de 8.3 se fait avant de lancer l'ODT. Mesuré sur runner : un Office installé en fr-fr et en-us mis à jour depuis une source fr-fr seule fait échouer l'ODT (code 17002), avec ou sans `Language ID="MatchInstalled"`, après qu'il a déjà mis à jour le client Click-to-Run.
 
@@ -569,7 +573,8 @@ Règles de comportement :
 ## 11. Sécurité et intégrité
 
 - Téléchargements limités aux domaines Microsoft autorisés.
-- SHA-256 calculé au téléchargement, stocké dans le manifeste et revérifié avant chaque installation. Signature Authenticode Microsoft contrôlée sur les fichiers où elle est exploitable (R-10).
+- Authenticité vérifiée côté dépôt, en ligne, au téléchargement : `Status` = `Valid`, signataire de l'organisation Microsoft Corporation, chaîne jusqu'à une racine Microsoft ; un certificat expiré mais horodaté reste valide, sans contrôle de date d'expiration (7.1, R-10).
+- SHA-256 calculé au téléchargement et stocké dans le manifeste, y compris pour chaque fichier d'une source Office. Côté client : revérification du SHA-256 seulement, sur les fichiers utilisés, juste avant l'étape ; toute la source Office avant `setup.exe /configure` (8.4, 8.5).
 - Clé de produit : mémoire et XML temporaire uniquement.
 - Aucune élévation persistante : la tâche planifiée disparaît en fin de session.
 - Écriture atomique du manifeste et de `state.json`.
@@ -638,3 +643,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.9 (4 octobre 2026) : portée de `allowedDomains` précisée (téléchargements faits par OffPatch, pas le trafic propre de l'ODT) (6.1). Suite de R-07 et R-13.
 - 1.10 (5 octobre 2026) : langues par source Office, Current en fr-fr + en-us, LTSC en fr-fr (6.1) ; comparaison des langues installées avec celles de la source avant de lancer l'ODT, `NotApplicable` « langue absente de la source » (8.3, 8.5) ; tableau 8.5 : autre produit Click-to-Run sur un canal du dépôt conservé et mis à jour par défaut ; mise à jour par `setup.exe /configure` seulement, échec en erreur avec le code retour, `OfficeC2RClient.exe` écarté ; retrait par `<Remove All="TRUE" />` + `<Add>` (8.5) ; retrait toujours explicite dans le récapitulatif (8.6). Suite de R-08.
 - 1.11 (5 octobre 2026) : version d'Office installée lue sur `WINWORD.EXE` (repli `EXCEL.EXE`, puis `POWERPNT.EXE`) dans le dossier `InstallationPath`, `VersionToReport` en diagnostic, écart signalé et Office « À installer » (8.3) ; tableau 8.5 : option de retrait et d'installation du profil dans les deux cas d'autre produit Click-to-Run, canal absent du dépôt en `NotApplicable` « canal absent du dépôt ». Suite de R-08 et R-09.
+- 1.12 (5 octobre 2026) : critères Authenticode au téléchargement (`Valid`, organisation Microsoft Corporation, racine Microsoft, certificat expiré mais horodaté accepté) et SHA-256 de chaque fichier d'une source Office (7.1, 11) ; côté client, SHA-256 seul, juste avant l'étape (8.4, 11) ; source Office entière revérifiée avant `setup.exe /configure`, étape en erreur et ODT non lancé au moindre écart ; garde-fou de 30 min sur l'ODT (`odtTimeoutMinutes`), « délai dépassé », nouvelle détection d'Office ; pas de délai sur DISM (6.1, 8.4, 8.5). Suite de R-10.
