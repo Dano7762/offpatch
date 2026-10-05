@@ -15,7 +15,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [x] R-07 ODT et sources Office
 - [x] R-08 Office déjà présent
 - [x] R-09 Détection des cumulatives installées
-- [ ] R-10 Contrôle d'intégrité
+- [x] R-10 Contrôle d'intégrité
 - [ ] R-11 MSCatalogLTS
 - [ ] R-12 Volumes
 - [ ] R-13 Domaines de téléchargement
@@ -136,3 +136,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-04 | 0 | R-08 sur runner ARM64 (5 scénarios réussis) : `<Remove All>` + `<Add>` dans le même XML validé, mise à jour hors ligne par `/configure` (192 s) et par `OfficeC2RClient` + `UpdateUrl` temporaire (105 s), la source Current met à jour un O365HomePremRetail ; applications du Store intactes ; cahier des charges 1.9 (portée de `allowedDomains`) ; R-07 ARM64 « non concluant » | Langues (retrait, Office multilingue) à vérifier ; proposition pour le tableau 8.5 à trancher par David |
 | 2026-10-05 | 0 | R-08 tranché : retrait de en-us confirmé par le registre Click-to-Run ; Office bilingue mis à jour depuis une source fr-fr seule → 17002 (avec ou sans `MatchInstalled`), client Click-to-Run mis à jour mais pas les applications, `VersionToReport` trompeur, Office utilisable ; source Current fr-fr 3 605 Mo, fr-fr + en-us 3 955 Mo ; cahier des charges 1.10 (langues par source, contrôle des langues avant l'ODT, tableau 8.5, `/configure` seul, retrait explicite) ; CLAUDE.md : édition par l'outil natif | R-09 (proposer la version de `WINWORD.EXE` comme contrôle de la détection Office) |
 | 2026-10-05 | 0 | R-09 tranché : détection des cumulatives par build et UBR (DISM et `Get-HotFix` en diagnostic) ; .msu Windows 10 KB5129236 : `Package_for_RollupFix` 19041.7727.1.0 = UBR attendu, SSU du mois embarqué ; .msu Windows 11 illisible par `expand.exe`, l'UBR du titre fait foi | Décision de David sur la détection Office par la version de `WINWORD.EXE` ; suite : R-10 |
+| 2026-10-05 | 0 | Cahier des charges 1.11 (version d'Office par `WINWORD.EXE`, tableau 8.5) et 1.12 (intégrité, garde-fou de 30 min sur l'ODT) ; README ; R-10 tranché sur runner ARM64 : tous les fichiers signés `Valid` vers Microsoft Root CA 2010 (plateforme Defender signée « Microsoft Windows Publisher »), SSU 2023 expiré mais horodaté valide, contrôle hors ligne sans blocage (62,8 s pour 4,4 Go), `.dat` Office non signés mais couverts par des `.dat.cat`, source corrompue : l'ODT attend le réseau sans échouer (> 20 min) | R-11 |

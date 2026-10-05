@@ -355,12 +355,25 @@ Question : `Get-AuthenticodeSignature` sous PowerShell 5.1 donne-t-il un résult
 
 Impact : étape de vérification après téléchargement.
 
-- Statut : À vérifier
+- Statut : Tranché (décisions de David du 2026-10-05 ; cahier des charges 1.12)
 - Piste ARM64 (2026-10-04, workflow `r02-arm64`, https://github.com/Dano7762/offpatch/actions/runs/37199356179) : mêmes résultats pour les deux .msu ARM64 (`Valid`, SHA-1 conforme au nom).
 - Piste (2026-10-04, workflow `depot-x64`, https://github.com/Dano7762/offpatch/actions/runs/37199155132, runner `windows-2025`, Windows PowerShell 5.1.26100) : pour les deux .msu de KB5129195 x64, `Get-AuthenticodeSignature` renvoie `Valid`, type `Authenticode`, signataire `CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US`. Le SHA-1 calculé est égal à l'empreinte de 40 caractères en fin de nom de fichier (`windows11.0-kb5129195-x64_<sha1>.msu`). Reste à voir : .cab, mpam-fe.exe, machine sans accès réseau (vérification de révocation), ARM64.
-- Sources :
+- Sources (2026-10-05) :
+  - https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.security/get-authenticodesignature?view=powershell-5.1 : un fichier signé à la fois par catalogue Windows et par signature intégrée est jugé sur la signature de catalogue ; aucune précision sur le contenu de l'état `Valid`.
+  - Workflow `r10-integrity` sur `windows-11-arm`, scénarios Signatures et OfficeSource : https://github.com/Dano7762/offpatch/actions/runs/37302515562 (premier passage : contrôle hors ligne limité au premier fichier, source corrompue bloquée jusqu'à l'annulation du job à 120 min) et https://github.com/Dano7762/offpatch/actions/runs/37331201436 (passage complet, délai de 20 min sur l'installation corrompue).
+  - R-01 à R-07 pour les SHA-1 dans les noms de fichiers et les premiers relevés Authenticode.
 - Conclusion :
-- Décision :
+  - **Fichiers signés du dépôt** (SSU 2023, enablement package, .NET, cumulatives Windows 10 et Windows 11, plateforme Defender, mpam-fe.exe, ODT) : tous `Valid`, type `Authenticode`, chaîne jusqu'à **Microsoft Root Certificate Authority 2010**, horodatage « Microsoft Time-Stamp Service ». Signataire `CN=Microsoft Corporation, O=Microsoft Corporation, …` pour tous, **sauf la plateforme Defender** : `CN=Microsoft Windows Publisher, O=Microsoft Corporation, …` (émetteur Windows Production PCA 2023). Émetteurs intermédiaires : Microsoft Code Signing PCA 2010 (SSU 2023), Microsoft Windows Code Signing PCA 2024 (les autres). Le critère « signataire Microsoft Corporation » se vérifie donc sur l'organisation (`O=Microsoft Corporation`), pas sur le nom commun.
+  - **Certificat expiré mais horodaté** : le SSU KB5031539 (2023) a une chaîne en `NotTimeValid` et reste `Valid` grâce à l'horodatage.
+  - **Hors ligne** (cache d'URL vidé par `certutil -urlcache * delete`, sorties de powershell.exe bloquées au pare-feu, réseau injoignable vérifié depuis le processus de contrôle) : les 8 fichiers restent `Valid`, **aucun appel ne bloque**. Durées : 0 à 1,7 s pour les petits fichiers, 10,8 s pour la cumulative Windows 10 (0,9 Go), 62,8 s pour la cumulative Windows 11 ARM64 (4,4 Go) : c'est le calcul de l'empreinte, pas une attente réseau.
+  - **Source Office** : les `.cab` (`v64.cab`, `i640.cab`, `s640.cab`, `a640_exp.cab`, cab de langue…) et les catalogues `.dat.cat` sont signés (`Valid`, Microsoft Corporation) ; les gros fichiers `stream.*.dat` **ne portent pas de signature Authenticode** (`UnknownError`, type `None`) : ils sont couverts par les catalogues `.dat.cat`, que `Get-AuthenticodeSignature` n'utilise pas tant qu'ils ne sont pas installés dans le système. L'ODT valide lui-même les fichiers (journal : `FileSignatureErrorDetection::Validate`, `CatalogFiles::GetCatalogName`).
+  - **Source corrompue** (un octet inversé au milieu de `stream.x64.x-none.dat`, 2,8 Go ; CDN bloqué ; `AllowCdnFallback="FALSE"`) : l'ODT détecte le problème (tâche de flux `TASKSTATE_FAILED` dans `RepomanPipeline::Download`) mais **n'échoue pas** : Click-to-Run s'abonne aux événements « NETWORKON » et « TIMER » et attend le retour du réseau. `setup.exe` tournait toujours au bout de 20 min (deuxième passage), et de 120 min (premier passage, job annulé). Après l'arrêt de `setup.exe` : client Click-to-Run présent (`VersionToReport` 16.0.20430.20140) mais **aucun produit déclaré**.
+- Décision (David, 2026-10-05 ; cahier des charges 1.12, 6.1, 7.1, 8.4, 8.5, 11) :
+  - Authenticité vérifiée **côté dépôt, en ligne, au téléchargement** : `Status` = `Valid`, signataire de l'organisation Microsoft Corporation, chaîne vers une racine Microsoft. Un certificat expiré mais horodaté reste valide ; aucun contrôle sur la date d'expiration.
+  - **Côté client** : SHA-256 du manifeste uniquement, sur les seuls fichiers utilisés par le plan, juste avant l'étape. Le contrôle Authenticode hors ligne fonctionne sans blocage s'il fallait le réactiver en option (compter environ une minute par cumulative Windows 11).
+  - **Source Office** : SHA-256 de chaque fichier enregistré dans le manifeste au téléchargement (l'ODT a validé les fichiers à ce moment-là) ; revérification de toute la source utilisée avant tout `setup.exe /configure` ; au moindre écart, étape en erreur, ODT non lancé, fichiers fautifs listés dans le rapport.
+  - **Garde-fou ODT** : délai maximal de 30 min (`client.odtTimeoutMinutes`), arrêt de `setup.exe`, étape en erreur « délai dépassé », journaux de l'ODT conservés, nouvelle détection d'Office par la version de `WINWORD.EXE`. Pas de délai sur DISM.
+  - Le SHA-1 inscrit dans le nom des fichiers du catalogue reste un contrôle supplémentaire au téléchargement (R-01, R-03).
 
 ## R-11 MSCatalogLTS
 
