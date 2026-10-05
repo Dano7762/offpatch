@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.10 du 5 octobre 2026.
+Version 1.11 du 5 octobre 2026.
 
 ## 1. Contexte
 
@@ -445,7 +445,7 @@ Méthodes de détection, à confirmer en R-09. La famille (Windows 10 ou 11) se 
 - .NET : à jour si la liste des paquets DISM contient un paquet de même nom que `package.name`, à l'état `Installed`, de version supérieure ou égale à `package.version` ; à installer sinon. Sous Windows 10, le fichier est choisi d'après la valeur `Release` de `HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full` (`netRelease`). `Get-HotFix` ne sert qu'au diagnostic : une cumulative plus récente fait disparaître le KB du dépôt de sa liste (R-05).
 - Plateforme Defender : mêmes règles d'applicabilité que les définitions ci-dessous ; à jour si `AMProductVersion` est supérieure ou égale à la version du fichier du dépôt (`FileVersion`), à installer sinon (R-06).
 - Defender : applicable si `Get-MpComputerStatus` répond et que `AMRunningMode` indique un Defender actif (`Normal`) ou passif (`Passive Mode`, `EDR Block Mode`). Si Defender est désactivé (antivirus tiers, service arrêté) ou si `Get-MpComputerStatus` échoue, l'étape est non applicable avec son motif dans le rapport, jamais en erreur. Sinon, à jour si `AntivirusSignatureVersion` est supérieure ou égale à la version de mpam-fe.exe (`FileVersion`), à installer dans le cas contraire (R-06).
-- Office : registre ClickToRun (produits installés, version, canal, langues déclarées sous `ProductReleaseIDs`). Avant toute mise à jour ou installation sur un Office existant, les langues installées sont comparées à celles de la source du canal : s'il en manque une, l'étape est `NotApplicable` avec le motif « langue absente de la source », et l'ODT n'est pas lancé (8.5, R-08).
+- Office : registre ClickToRun (produits installés, canal, langues déclarées sous `ProductReleaseIDs`). La version installée est la version de fichier de `WINWORD.EXE`, à défaut `EXCEL.EXE`, puis `POWERPNT.EXE`, dans le dossier tiré de `InstallationPath` (registre Click-to-Run). `VersionToReport` ne sert qu'au diagnostic : il peut annoncer une version que les applications n'ont pas après un échec de l'ODT (R-08). En cas d'écart entre les deux, avertissement dans le rapport, et Office est « À installer ». Avant toute mise à jour ou installation sur un Office existant, les langues installées sont comparées à celles de la source du canal : s'il en manque une, l'étape est `NotApplicable` avec le motif « langue absente de la source », et l'ODT n'est pas lancé (8.5, R-08).
 
 Le plan est la liste ordonnée des étapes, avec les points de redémarrage. Ordre par défaut :
 
@@ -482,8 +482,8 @@ Règles de prérequis :
 | Situation détectée | Action |
 |---|---|
 | Aucun Office Click-to-Run | Installation du profil choisi depuis la source locale |
-| Autre produit Click-to-Run sur un canal présent dans le dépôt (par exemple Microsoft 365 Famille préinstallé, canal Current) | Par défaut : conservé et mis à jour depuis la source locale. Le retrait suivi de l'installation du profil choisi reste un choix explicite dans le récapitulatif (8.6) |
-| Autre produit Click-to-Run sur un canal absent du dépôt | Conservé tel quel, signalé dans le rapport, sauf retrait choisi explicitement dans le récapitulatif |
+| Autre produit Click-to-Run sur un canal présent dans le dépôt (par exemple Microsoft 365 Famille préinstallé, canal Current) | Par défaut : conservé et mis à jour depuis la source locale. Option dans le récapitulatif (8.6) : le retirer et installer le profil choisi |
+| Autre produit Click-to-Run sur un canal absent du dépôt | Par défaut : conservé tel quel, `NotApplicable` avec le motif « canal absent du dépôt » dans le rapport. Option dans le récapitulatif (8.6) : le retirer et installer le profil choisi |
 | Même produit déjà installé, version plus ancienne que la source | Mise à jour depuis la source locale |
 | Même produit, version égale ou plus récente | À jour |
 | Langue installée absente de la source du canal | `NotApplicable`, motif « langue absente de la source » ; l'ODT n'est pas lancé |
@@ -637,3 +637,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.8 (4 octobre 2026) : tableau 3.3 : product IDs confirmés (mentions « à vérifier » levées), une seule source Current pour les quatre profils en boîte, colonne de prise en charge sous Windows 10 22H2 (aucun profil pris en charge, d'après les configurations requises Microsoft) ; champ `supportedOn` des profils (6.3) ; avertissement non bloquant en contrôle préalable (8.2), rappel dans l'écran récapitulatif (8.6) et dans le rapport (8.8). Suite de R-07.
 - 1.9 (4 octobre 2026) : portée de `allowedDomains` précisée (téléchargements faits par OffPatch, pas le trafic propre de l'ODT) (6.1). Suite de R-07 et R-13.
 - 1.10 (5 octobre 2026) : langues par source Office, Current en fr-fr + en-us, LTSC en fr-fr (6.1) ; comparaison des langues installées avec celles de la source avant de lancer l'ODT, `NotApplicable` « langue absente de la source » (8.3, 8.5) ; tableau 8.5 : autre produit Click-to-Run sur un canal du dépôt conservé et mis à jour par défaut ; mise à jour par `setup.exe /configure` seulement, échec en erreur avec le code retour, `OfficeC2RClient.exe` écarté ; retrait par `<Remove All="TRUE" />` + `<Add>` (8.5) ; retrait toujours explicite dans le récapitulatif (8.6). Suite de R-08.
+- 1.11 (5 octobre 2026) : version d'Office installée lue sur `WINWORD.EXE` (repli `EXCEL.EXE`, puis `POWERPNT.EXE`) dans le dossier `InstallationPath`, `VersionToReport` en diagnostic, écart signalé et Office « À installer » (8.3) ; tableau 8.5 : option de retrait et d'installation du profil dans les deux cas d'autre produit Click-to-Run, canal absent du dépôt en `NotApplicable` « canal absent du dépôt ». Suite de R-08 et R-09.

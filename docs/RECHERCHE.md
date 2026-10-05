@@ -324,7 +324,7 @@ Question : quelle méthode est la plus fiable entre la comparaison build et UBR,
 
 Impact : champ `resultingBuild`, états `UpToDate` et `Pending`.
 
-- Statut : Tranché (proposition sur la détection Office à valider par David)
+- Statut : Tranché
 - Pistes (2026-10-04, runner `windows-11-arm`, https://github.com/Dano7762/offpatch/actions/runs/37199152736) :
   - Sur Windows 11 25H2, la valeur de registre `ProductName` (`HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion`) vaut « Windows 10 Enterprise ». C'est un comportement connu de Windows 11, pas une anomalie du runner.
   - Règle (décision de David du 2026-10-04, cahier des charges 1.3, 8.2 et 8.3) : Windows 10 et Windows 11 se distinguent par `CurrentBuild` (22000 et plus = Windows 11), jamais par `ProductName`. Le libellé affiché vient de `Win32_OperatingSystem.Caption`. Mis en œuvre dans `app/module/OffPatch/Private/Get-OpWindowsIdentity.ps1`, test Pester `tests/Unit/Get-OpWindowsIdentity.Tests.ps1` (registre simulé « Windows 10 Pro » + build 26200 → Windows 11).
@@ -347,7 +347,7 @@ Impact : champ `resultingBuild`, états `UpToDate` et `Pending`.
 - Décision :
   - Cumulatives Windows : détection par build et UBR, conformément au cahier des charges 8.3 (`baseBuilds`, `resultingUbr`) ; aucune modification nécessaire.
   - Contre-vérification Windows 10 : lire `Package_for_RollupFix` dans `update.mum` et comparer son troisième nombre à `resultingUbr` ; en cas de divergence, avertissement et la valeur du .msu fait foi (cahier des charges 7.2). Pas de contre-vérification pour Windows 11.
-  - **Proposition à valider par David** (cahier des charges 8.3, ligne Office) : juger la version installée d'Office sur la version de fichier d'une application du produit (par exemple `WINWORD.EXE`, ou `EXCEL.EXE` pour un produit sans Word), et garder `VersionToReport` comme valeur de diagnostic ; en cas d'écart entre les deux, avertissement dans le rapport. Sans cela, un Office resté à l'ancienne version après un échec serait déclaré à jour.
+  - **Office** (décision de David du 2026-10-05, cahier des charges 1.11, 8.3) : version installée = version de fichier de `WINWORD.EXE`, à défaut `EXCEL.EXE`, puis `POWERPNT.EXE`, dans le dossier `InstallationPath` du registre Click-to-Run ; `VersionToReport` en diagnostic seulement ; un écart entre les deux est signalé et rend Office « À installer ».
 
 ## R-10 Contrôle d'intégrité
 
