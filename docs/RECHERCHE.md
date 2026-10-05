@@ -381,10 +381,25 @@ Question : licence (redistribution dans `lib/`), version à figer, fonctionnemen
 
 Impact : dépendance de la face Dépôt.
 
-- Statut : À vérifier
-- Sources :
-- Conclusion :
+- Statut : Tranché sur l'analyse ; retrait de MSCatalogLTS du cahier des charges proposé, en attente de l'accord de David
+- Sources (consultées le 2026-10-05) :
+  - PowerShell Gallery, `Find-Module MSCatalogLTS` : version 2.1.0.2 publiée le 2026-05-13, auteur Marco-online, https://github.com/Marco-online/MSCatalogLTS. Module récupéré par `Save-Module` dans `scratch/modules` (non suivi par git), examiné et exécuté en lecture seule sur la machine de développement.
+  - https://github.com/Marco-online/MSCatalogLTS : licence MIT (fichier LICENSE, « Copyright (c) 2024 Marco-online ») ; dépôt actif (dernier push le 2026-09-19), non archivé, 0 issue ouverte, 51 étoiles.
+  - Notre implémentation : recherche de R-01 (`scratch/r01-catalog-search.ps1`), `tests/runner/Save-CatalogEntryFile.ps1`, et ses usages sur runners (R-02, R-03, R-04, R-05, R-10, workflow `catalog-cross`).
+- Conclusion (comparaison sur les quatre critères demandés par David) :
+
+  | Critère | MSCatalogLTS 2.1.0.2 | Notre implémentation |
+  |---|---|---|
+  | Fiabilité constatée | Avec notre requête documentée de R-01 (`2026-09 Cumulative Update for Windows 11, version 25H2`), **0 résultat** : le module réécrit la recherche (« Cumulative Update » retiré, reste mis entre guillemets : `"2026-09 for Windows 11, version 25H2"`) par des heuristiques internes (`Get-MSCatalogUpdate.ps1`, ligne 211 et suivantes). Par numéro de KB, résultats corrects (6 pour KB5129195). Jamais exécuté sur runner. | Sur les runners (x64 et ARM64), une seule défaillance de recherche (premier passage de `r02-arm64`), non reproduite en 15 essais croisés (`catalog-cross`), couverte depuis par trois tentatives espacées ; toutes les autres recherches et résolutions de liens ont réussi (R-02, R-03, R-04, R-05, R-07, R-10). Même requête : 16 lignes en 0,5 s. |
+  | PowerShell 5.1 et ARM64 | `PowerShellVersion = '5.1.0.0'` ; charge une DLL tierce **non signée**, HtmlAgilityPack 1.12.4 (Net45 et netstandard2.0, code managé, a priori portable sur ARM64, non testé). | PowerShell 5.1 pur (`Invoke-WebRequest`, expressions régulières), éprouvé sur `windows-2025` et `windows-11-arm`. |
+  | Licence et maintenance | MIT, redistribuable dans `lib/` avec la licence ; un seul mainteneur ; comportement de recherche modifié au fil des versions (heuristiques). | Pas de dépendance ; maintenance par nous seuls, sur une structure de page simple (lignes `<tr id="<guid>_R<n>">`, liens `.url = '…'` de `DownloadDialog.aspx`). |
+  | Volume de code | 1 538 lignes de PowerShell (dont environ 980 pour `Get-MSCatalogUpdate`) + DLL HtmlAgilityPack. | 88 lignes pour les deux fonctions d'analyse (`ConvertFrom-OpCatalogSearchPage`, `ConvertFrom-OpCatalogDownloadDialog`), plus les requêtes, déjà établies en R-01. |
+
+  - Point commun : MSCatalogLTS repose exactement sur les mêmes pages et requêtes que nous (`Search.aspx`, `DownloadDialog.aspx` en POST, lecture des `.url = '…'`) ; il n'apporte pas de protection supplémentaire contre un changement du site. Il gère la pagination par `&p=N` (option `-AllPages`), que nous pouvons reprendre si besoin : nous évitons aujourd'hui la page pleine par une requête par version (R-01).
+  - **Plan B si le site change** : fixtures de pages réelles (`tests/Fixtures/catalog/`, capturées le 2026-10-05 par `Save-CatalogFixture.ps1` : recherche par KB, page pleine de 25 lignes, page sans résultat, fenêtre de téléchargement) testées par `tests/Unit/CatalogParsing.Tests.ps1`, et contrat en ligne `tests/Live/Catalog.Live.Tests.ps1` (tag `Live`), lancé par une étape dédiée de `ci.yml` à chaque push : une casse du site fait échouer la CI sur une étape nommée « Contrat avec le Microsoft Update Catalog (en ligne) ». Les fonctions d'analyse lèvent une erreur explicite sur une page non reconnue au lieu de renvoyer une liste vide.
 - Décision :
+  - Fixtures et contrat en ligne en place (décision de David du 2026-10-05).
+  - **Recommandation, à valider par David** : notre implémentation suffit ; retirer MSCatalogLTS du cahier des charges (section 5 : `lib/MSCatalogLTS/<version>/` ; 7.1, étape 2 : « MSCatalogLTS ne sert qu'à la recherche et à la résolution des liens »), de `CLAUDE.md` (dépendance embarquée dans `lib/`) et du backlog de la phase 2 (« MSCatalogLTS embarqué dans `lib/` »). Raisons : notre requête documentée n'y donne aucun résultat, il ajoute une DLL non signée et 1 538 lignes que nous ne maîtrisons pas, sans protéger mieux contre un changement du site.
 
 ## R-12 Volumes
 

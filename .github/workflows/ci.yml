@@ -41,5 +41,16 @@ jobs:
           $config = New-PesterConfiguration
           $config.Run.Path = './tests'
           $config.Run.Exit = $true
+          $config.Filter.ExcludeTag = 'Live'
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
+
+      - name: Contrat avec le Microsoft Update Catalog (en ligne)
+        run: |
+          Import-Module Pester -RequiredVersion 5.9.1
+          $config = New-PesterConfiguration
+          $config.Run.Path = './tests/Live'
+          $config.Run.Exit = $true
+          $config.Filter.Tag = 'Live'
           $config.Output.Verbosity = 'Detailed'
           Invoke-Pester -Configuration $config
