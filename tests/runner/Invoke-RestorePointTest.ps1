@@ -18,7 +18,8 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [Parameter(Mandatory)][string]$OutputDirectory
+    [Parameter(Mandatory)][string]$OutputDirectory,
+    [ValidateSet('Enabled', 'Disabled')][string]$Scenario = 'Enabled'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -77,6 +78,18 @@ try {
     }
     $lines.Add('- vssadmin avant : ' + ((& vssadmin.exe list shadowstorage 2>&1 | Out-String) -replace '\s+', ' ').Trim())
     $lines.Add('')
+
+    if ($Scenario -eq 'Disabled') {
+        # Protection désactivée d'abord (runner jetable) : que fait Checkpoint-Computer, et que voit-on ?
+        if ($PSCmdlet.ShouldProcess('C:', 'Disable-ComputerRestore puis Checkpoint-Computer')) {
+            Disable-ComputerRestore -Drive "$env:SystemDrive\"
+            $lines.Add('- Protection du système désactivée sur C: (runner jetable)')
+            $lines.Add('- Registre SystemRestore après désactivation : ' + (@((Get-ItemProperty -Path $srKey -ErrorAction SilentlyContinue).PSObject.Properties | Where-Object { $_.Name -notmatch '^PS' } | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', '))
+            Invoke-Checkpoint -Label 'protection-desactivee'
+            $lines.Add('- Points après : ' + ((Get-RestorePointList) -join ' ; '))
+        }
+        return
+    }
 
     if ($PSCmdlet.ShouldProcess('C:', 'Checkpoint-Computer, protection telle quelle')) { Invoke-Checkpoint -Label 'protection-initiale' }
 

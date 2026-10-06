@@ -4,6 +4,11 @@ name: restore-point
 
 on:
   workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Enabled (protection telle quelle) ou Disabled (protection désactivée avant l''essai)'
+        required: false
+        default: 'Enabled'
 
 permissions:
   contents: read
@@ -19,7 +24,9 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Essai point de restauration
-        run: ./tests/runner/Invoke-RestorePointTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\rp-out"
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+        run: ./tests/runner/Invoke-RestorePointTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\rp-out" -Scenario $env:SCENARIO
 
       - name: Relevés
         if: always()
