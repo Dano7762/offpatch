@@ -10,15 +10,23 @@
         bavard ne se bloque pas sur un tampon plein. FilePath doit être un chemin complet (par exemple
         %SystemRoot%\System32\dism.exe, 8.4). Les arguments sont passés tels quels (ArgumentList, une chaîne par
         argument, mise entre guillemets si elle contient un espace ou un guillemet).
-        TimeoutSeconds à 0 : pas de délai maximal (DISM, 8.4). Délai dépassé : le processus et ses processus enfants
-        sont arrêtés (taskkill /T /F), TimedOut vaut vrai et ExitCode est nul.
+        Délai obligatoire, sans valeur par défaut : -TimeoutSeconds <n>, ou -NoTimeout pour « aucune limite »
+        (DISM, 8.4). Un appel sans l'un ni l'autre est refusé. Délai dépassé : le processus et ses processus enfants
+        sont arrêtés (%SystemRoot%\System32\taskkill.exe /T /F), TimedOut vaut vrai et ExitCode est nul.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([pscustomobject])]
     param(
-        [Parameter(Mandatory)][string]$FilePath,
+        [Parameter(Mandatory, ParameterSetName = 'Timeout')]
+        [Parameter(Mandatory, ParameterSetName = 'NoTimeout')]
+        [string]$FilePath,
+        [Parameter(ParameterSetName = 'Timeout')]
+        [Parameter(ParameterSetName = 'NoTimeout')]
         [string[]]$ArgumentList = @(),
-        [ValidateRange(0, 86400)][int]$TimeoutSeconds = 0,
+        [Parameter(Mandatory, ParameterSetName = 'Timeout')][ValidateRange(1, 86400)][int]$TimeoutSeconds,
+        [Parameter(Mandatory, ParameterSetName = 'NoTimeout')][switch]$NoTimeout,
+        [Parameter(ParameterSetName = 'Timeout')]
+        [Parameter(ParameterSetName = 'NoTimeout')]
         [string]$WorkingDirectory
     )
 
@@ -45,7 +53,7 @@
         $stdout = $process.StandardOutput.ReadToEndAsync()
         $stderr = $process.StandardError.ReadToEndAsync()
         $timedOut = $false
-        if ($TimeoutSeconds -gt 0) {
+        if (-not $NoTimeout) {
             if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
                 $timedOut = $true
                 # Arrêt de toute l'arborescence : un processus enfant garderait les sorties ouvertes
