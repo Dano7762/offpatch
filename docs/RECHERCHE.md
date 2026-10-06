@@ -20,6 +20,7 @@ Ce que les runners GitHub ne permettent pas de vérifier (décision de David du 
   4. un seul redémarrage ;
   5. relevé de `CurrentBuild`, `UBR` et `DisplayVersion`, et de la liste DISM.
   En attendant, l'enablement package reste installé après le redémarrage de la cumulative.
+- Pause de Windows Update depuis Paramètres sous Windows 11 Famille (R-15) : pause posée à la main jusqu'au lendemain, effet pendant une session OffPatch connectée, reprise d'elle-même à la date choisie.
 
 Statuts possibles : À vérifier, En cours, Tranché, Bloqué.
 
@@ -561,7 +562,27 @@ Question : quelle méthode documentée permet de suspendre Windows Update le tem
 
 Impact : option `pauseWindowsUpdateDuringSession`.
 
-- Statut : À vérifier
-- Sources :
+- Statut : Mesuré ; règle proposée, en attente de l'accord de David (cahier des charges 6.1, 8.2, 8.4)
+- Critère prioritaire (David, 2026-10-06) : aucune trace durable si OffPatch s'arrête en pleine session (plantage, coupure, PC rendu avant la fin). Type de démarrage « Désactivé » pour `wuauserv` écarté du design quel que soit le résultat.
+- Sources (consultées le 2026-10-06) :
+  - https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iautomaticupdates-pause : « IAutomaticUpdates::Pause is no longer supported. Starting with Windows 10 calls to Pause always return S_OK, but do nothing. » (même mention pour `Resume`). Aucune interface de programmation documentée pour suspendre Windows Update sur Windows 10 et 11.
+  - https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-update (`PauseQualityUpdatesStartTime`, `PauseQualityUpdates`) et https://learn.microsoft.com/en-us/windows/deployment/update/waas-configure-wufb : pause par stratégie (`Software\Policies\Microsoft\Windows\WindowsUpdate`), éditions Pro, Enterprise, Education et IoT Enterprise seulement (pas Famille), durée fixe de 35 jours à partir d'une date de début, levée en effaçant la valeur.
+  - https://support.microsoft.com/en-us/windows/manage-updates-in-windows-643e9ea7-3cf6-7da6-a25c-95d4f7f099fe (« Pause updates in Windows », Windows 10 et 11) : pause depuis Paramètres > Windows Update, date de fin au choix jusqu'à 35 jours, à la journée près ; les mises à jour en cours sont annulées ; à la fin de la pause, recherche et installation reprennent d'elles-mêmes. Le réglage n'est documenté que par l'interface : aucune méthode programmatique officielle (les valeurs de registre derrière la page ne sont pas documentées).
+  - https://learn.microsoft.com/en-us/troubleshoot/windows-client/installing-updates-features-roles/additional-resources-for-windows-update : `net stop wuauserv` fait partie de la procédure documentée de réinitialisation de Windows Update (arrêt temporaire, sans changement du type de démarrage).
+  - Essai sur runner `windows-11-arm`, Windows 11 Entreprise 25H2 26200.9457, https://github.com/Dano7762/offpatch/actions/runs/37462614183 (`r15-windowsupdate.yml`, relevé toutes les 15 s) :
+    - état initial : `wuauserv` Running/Manual, `UsoSvc` Running/Auto, `WaaSMedicSvc` Running/Manual, `TrustedInstaller` Stopped/Manual ;
+    - **arrêt simple de `wuauserv`** (type inchangé) : **redémarré tout seul au bout de 4 min 49 s** (05:21:59 → 05:26:48), puis arrêté de lui-même 10 min plus tard ; type de démarrage jamais modifié ;
+    - type « Désactivé » (pour mémoire, écarté) : tenu 15 min sans être rétabli pendant l'observation ;
+    - DISM `/Add-Package` de l'enablement package avec `wuauserv` arrêté : **3010**, normal ; DISM passe par `TrustedInstaller`, qui passe en Running/Auto pendant le redémarrage en attente ;
+    - rétablissement du type et de l'état d'origine : conforme.
 - Conclusion :
+  - (a) **Arrêt simple** de `wuauserv` : aucune trace durable (type de démarrage inchangé, rien à rétablir après un plantage ou un redémarrage), mais l'effet ne dure que quelques minutes (4 min 49 s mesurées) : le service est relancé à la demande (Update Orchestrator). Il ne suspend donc pas Windows Update pour une session ; il peut seulement réduire le risque juste avant une étape DISM. DISM n'en dépend pas.
+  - (b) **Pause « Paramètres »** : fonctionne sous Famille d'après la page de support et expire d'elle-même, mais aucune méthode programmatique documentée ; durée minimale à la journée (une date de fin), pas « fin de session + marge ». La pause par stratégie, seule méthode programmatique documentée, exclut Famille et dure 35 jours tant qu'on ne l'efface pas : un plantage la laisserait en place jusqu'à 35 jours, ce qui viole le critère.
+  - **Aucune méthode documentée qui expire d'elle-même à l'échelle d'une session n'est validée** ; selon la règle de David, `pauseWindowsUpdateDuringSession` passe à `false` par défaut.
+- Proposition de règle (à valider par David avant toute modification du cahier des charges) :
+  1. `pauseWindowsUpdateDuringSession` : défaut **`false`**. Si `true` : avant chaque étape Windows ou .NET, arrêt simple de `wuauserv` (`Stop-Service`, sans toucher au type de démarrage), noté dans le journal ; rien d'autre (ni stratégie, ni registre de la page Paramètres, ni type « Désactivé »). Aucun rétablissement n'est nécessaire, puisque rien n'est modifié durablement ; le rapport indique que l'effet est de quelques minutes.
+  2. Contrôle préalable (8.2), dans tous les cas : PC connecté à Internet → avertissement qui **recommande de couper le réseau** (câble, Wi-Fi) pendant la session, seul moyen sûr d'empêcher Windows Update de travailler en parallèle ; rappel dans le récapitulatif du mode automatique.
+  3. Au lancement : si l'état d'une session interrompue (`state.json`) indique une suspension non rétablie, la rétablir avant toute autre action et le noter dans le journal. Avec la règle 1, l'état ne contient aucune suspension à rétablir ; la règle reste en place pour toute méthode future qui modifierait un réglage.
+  4. Le résultat des étapes ne dépend pas de la suspension : le jugement en deux temps de 8.4 (R-14) constate ce qui est réellement installé, même si Windows Update a travaillé en parallèle.
+- À valider sur intervention réelle (ajouté en tête de ce fichier) : comportement de la pause « Paramètres » sous Windows 11 Famille (pause posée à la main par le technicien jusqu'au lendemain, effet sur une session OffPatch, reprise d'elle-même à la date choisie).
 - Décision :
