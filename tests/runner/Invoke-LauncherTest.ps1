@@ -62,9 +62,10 @@ function Invoke-Launcher([string]$Cmd, [string]$Path, [string]$Arguments, [hasht
 
 $substFolder = Join-Path $env:RUNNER_TEMP 'racine-lecteur'
 $accentFolder = 'C:\Mises à jour Windows et Office'
-$cmds = @(@('64 bits', (Join-Path $env:SystemRoot 'System32\cmd.exe')))
+$cmds = New-Object System.Collections.Generic.List[object]
+$cmds.Add([pscustomobject]@{ Label = '64 bits'; Path = (Join-Path $env:SystemRoot 'System32\cmd.exe'); Tag = '64' })
 $cmd32 = Join-Path $env:SystemRoot 'SysWOW64\cmd.exe'
-if (Test-Path $cmd32) { $cmds += , @('32 bits', $cmd32) }
+if (Test-Path $cmd32) { $cmds.Add([pscustomobject]@{ Label = '32 bits'; Path = $cmd32; Tag = '32' }) }
 $expectedArgs = @('-Resume', 'deux mots', 'été')
 
 try {
@@ -80,8 +81,8 @@ try {
         $expectedScript = $folder + 'app\OffPatch.ps1'
         foreach ($c in $cmds) {
             # Lancement réel, branche directe (session déjà élevée)
-            $out = Join-Path $OutputDirectory ("reel-{0}-{1}.json" -f $place[0].Length, $c[0].Substring(0, 2))
-            $code = Invoke-Launcher -Cmd $c[1] -Path $copy -Arguments '-Resume "deux mots" été' -Environment @{ OFFPATCH_TEST_OUT = $out }
+            $out = Join-Path $OutputDirectory ("reel-{0}-{1}.json" -f $place[0].Length, $c.Tag)
+            $code = Invoke-Launcher -Cmd $c.Path -Path $copy -Arguments '-Resume "deux mots" été' -Environment @{ OFFPATCH_TEST_OUT = $out }
             $ok = $false
             $detail = "code $code"
             if (Test-Path $out) {
@@ -90,22 +91,22 @@ try {
                 $detail = "code $code ; script $($r.Path) ; arguments $(@($r.Args) -join ' / ') ; 64 bits $($r.Is64BitProcess)"
             }
             if (-not $ok) { $failures++ }
-            $lines.Add("| $($place[0]) | $($c[0]) | directe (réelle) | $(if ($ok) { 'conforme' } else { 'ÉCHEC' }) | $detail |")
+            $lines.Add("| $($place[0]) | $($c.Label) | directe (réelle) | $(if ($ok) { 'conforme' } else { 'ÉCHEC' }) | $detail |")
 
             # Branche d'élévation en mode d'essai : commande construite
-            $dry = Join-Path $OutputDirectory ("elevation-{0}-{1}.txt" -f $place[0].Length, $c[0].Substring(0, 2))
-            $code = Invoke-Launcher -Cmd $c[1] -Path $copy -Arguments '-Resume "deux mots"' -Environment @{ OFFPATCH_LAUNCHER_DRYRUN = $dry; OFFPATCH_LAUNCHER_FORCE = 'elevate' }
+            $dry = Join-Path $OutputDirectory ("elevation-{0}-{1}.txt" -f $place[0].Length, $c.Tag)
+            $code = Invoke-Launcher -Cmd $c.Path -Path $copy -Arguments '-Resume "deux mots"' -Environment @{ OFFPATCH_LAUNCHER_DRYRUN = $dry; OFFPATCH_LAUNCHER_FORCE = 'elevate' }
             $ok = $false
             $detail = "code $code"
             if (Test-Path $dry) {
                 $l = @(Get-Content -Path $dry -Encoding UTF8)
                 $expectedPs = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-                if ($c[0] -eq '32 bits') { $expectedPs = Join-Path $env:SystemRoot 'Sysnative\WindowsPowerShell\v1.0\powershell.exe' }
+                if ($c.Tag -eq '32') { $expectedPs = Join-Path $env:SystemRoot 'Sysnative\WindowsPowerShell\v1.0\powershell.exe' }
                 $ok = ($l[0] -eq $expectedPs) -and ($l[1] -eq ('-NoProfile -ExecutionPolicy Bypass -File "' + $expectedScript + '" -Resume "deux mots"'))
                 $detail = "code $code ; $($l[0]) $($l[1])"
             }
             if (-not $ok) { $failures++ }
-            $lines.Add("| $($place[0]) | $($c[0]) | élévation (essai) | $(if ($ok) { 'conforme' } else { 'ÉCHEC' }) | $($detail -replace '\|', '/') |")
+            $lines.Add("| $($place[0]) | $($c.Label) | élévation (essai) | $(if ($ok) { 'conforme' } else { 'ÉCHEC' }) | $($detail -replace '\|', '/') |")
         }
     }
 } finally {
