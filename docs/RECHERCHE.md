@@ -22,6 +22,7 @@ Ce que les runners GitHub ne permettent pas de vérifier (décision de David du 
   En attendant, l'enablement package reste installé après le redémarrage de la cumulative.
 - Pause de Windows Update depuis Paramètres sous Windows 11 Famille (R-15) : pause posée à la main jusqu'au lendemain, effet pendant une session OffPatch connectée, reprise d'elle-même à la date choisie.
 - Point de restauration avant session (cahier des charges 8.2, critère d'acceptation en 13) : sur un PC où la protection du système est active d'origine, les deux indicateurs (`SPP\Clients`, `Win32_ShadowStorage`) concordent et le point est créé ; sur un PC où elle est inactive, aucun des deux et aucun appel à `Checkpoint-Computer`. À défaut de validation, l'option est livrée désactivée par défaut.
+- Lanceur `Lancer-OffPatch.cmd` depuis une vraie clé USB, outil à la racine du lecteur, dans une session **non élevée** : demande UAC acceptée (OffPatch démarre avec ses arguments), puis refusée (message « élévation refusée ou impossible »). Les runners GitHub ne le vérifient pas : compte déjà administrateur et UAC désactivé, et un lecteur créé par `subst` n'existe pas dans la session élevée par l'UAC (essai `launcher.yml`, branche directe seulement).
 - Session OffPatch sur un PC connecté pendant que Windows Update installe lui-même : code renvoyé par DISM (1618 / 0x80070652 attendu, non vérifié) et effet de la nouvelle tentative après 5 minutes (R-14).
 
 Statuts possibles : À vérifier, En cours, Tranché, Bloqué.

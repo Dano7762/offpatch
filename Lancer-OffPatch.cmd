@@ -11,7 +11,14 @@ rem d'environnement, sans guillemets imbriques. Les accents et espaces du chemin
 rem Essais seulement : OFFPATCH_LAUNCHER_DRYRUN = chemin d'un fichier ; la commande d'elevation y est
 rem ecrite au lieu d'etre lancee. OFFPATCH_LAUNCHER_FORCE = elevate ou direct (pris en compte seulement
 rem avec OFFPATCH_LAUNCHER_DRYRUN) force la branche, quel que soit le niveau reel des droits.
+rem Ces deux variables sont ignorees hors d'un contexte de test : OFFPATCH_PESTER defini (tests Pester)
+rem ou GITHUB_ACTIONS=true (runner GitHub).
 setlocal
+set "OFFPATCH_TESTCTX="
+if defined OFFPATCH_PESTER set "OFFPATCH_TESTCTX=1"
+if /i "%GITHUB_ACTIONS%"=="true" set "OFFPATCH_TESTCTX=1"
+if not defined OFFPATCH_TESTCTX set "OFFPATCH_LAUNCHER_DRYRUN="
+if not defined OFFPATCH_TESTCTX set "OFFPATCH_LAUNCHER_FORCE="
 set "OFFPATCH_PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 if defined PROCESSOR_ARCHITEW6432 set "OFFPATCH_PS=%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
 set "OFFPATCH_SCRIPT=%~dp0app\OffPatch.ps1"

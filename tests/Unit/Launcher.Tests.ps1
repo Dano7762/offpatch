@@ -24,12 +24,19 @@ $record = [ordered]@{ Path = $PSCommandPath; Args = @($args); Is64BitProcess = [
     }
 
     # Lance le .cmd par cmd.exe /c, avec une ligne de commande écrite à la main (règles de guillemets de cmd).
-    function Invoke-Launcher([string]$Cmd, [string]$Path, [string]$Arguments, [hashtable]$Environment) {
+    # Contexte de test : OFFPATCH_PESTER posé sauf si NoTestContext ; GITHUB_ACTIONS retiré dans ce cas (CI).
+    function Invoke-Launcher([string]$Cmd, [string]$Path, [string]$Arguments, [hashtable]$Environment, [switch]$NoTestContext) {
         $info = New-Object System.Diagnostics.ProcessStartInfo
         $info.FileName = $Cmd
         $info.Arguments = '/c ""' + $Path + '" ' + $Arguments + '"'
         $info.UseShellExecute = $false
         $info.CreateNoWindow = $true
+        if ($NoTestContext) {
+            $info.EnvironmentVariables.Remove('OFFPATCH_PESTER')
+            $info.EnvironmentVariables.Remove('GITHUB_ACTIONS')
+        } else {
+            $info.EnvironmentVariables['OFFPATCH_PESTER'] = '1'
+        }
         foreach ($k in $Environment.Keys) { $info.EnvironmentVariables[$k] = $Environment[$k] }
         $p = [System.Diagnostics.Process]::Start($info)
         if (-not $p.WaitForExit(60000)) { $p.Kill(); throw 'lanceur bloqué' }
@@ -89,5 +96,49 @@ Describe 'Lancer-OffPatch.cmd' {
         $text = Get-Content -Path $launcher -Raw
         $text | Should -Match 'if defined OFFPATCH_LAUNCHER_DRYRUN if /i "%OFFPATCH_LAUNCHER_FORCE%"=="elevate"'
         $text | Should -Match 'if defined OFFPATCH_LAUNCHER_DRYRUN if /i "%OFFPATCH_LAUNCHER_FORCE%"=="direct"'
+    }
+}
+
+Describe 'Lancer-OffPatch.cmd, mode d''essai réservé au contexte de test' {
+    BeforeAll {
+        # Faux powershell.exe sous un faux SystemRoot : il note sa ligne de commande et sort en 0 (« administrateur »).
+        # Rien n'est jamais élevé : aucune demande UAC, même sur une session non administrateur.
+        $fakeRoot = Join-Path $TestDrive 'FauxSystemRoot'
+        $fakePsFolder = Join-Path $fakeRoot 'System32\WindowsPowerShell\v1.0'
+        New-Item -ItemType Directory -Force -Path $fakePsFolder | Out-Null
+        $source = @'
+public static class FakePowerShell {
+    public static int Main() {
+        string log = System.Environment.GetEnvironmentVariable("OFFPATCH_FAKE_LOG");
+        System.IO.File.AppendAllText(log, System.Environment.CommandLine + System.Environment.NewLine, System.Text.Encoding.UTF8);
+        return 0;
+    }
+}
+'@
+        Add-Type -TypeDefinition $source -OutputType ConsoleApplication -OutputAssembly (Join-Path $fakePsFolder 'powershell.exe')
+        $copy = Get-LauncherCopy -Folder (Join-Path $TestDrive 'contexte')
+    }
+
+    It 'la variable d''essai seule ne suffit pas : ni fichier d''essai, ni branche forcée' {
+        $log = Join-Path $TestDrive 'sans-contexte.log'
+        $dry = Join-Path $TestDrive 'sans-contexte-dry.txt'
+        Invoke-Launcher -Cmd $cmd64 -Path $copy -Arguments '-Resume' -NoTestContext -Environment @{
+            SystemRoot = $fakeRoot; OFFPATCH_FAKE_LOG = $log; OFFPATCH_LAUNCHER_DRYRUN = $dry; OFFPATCH_LAUNCHER_FORCE = 'elevate'
+        } | Should -Be 0
+        Test-Path $dry | Should -BeFalse
+        $calls = @(Get-Content -Path $log -Encoding UTF8)
+        $calls.Count | Should -Be 2
+        $calls[0] | Should -Match 'IsInRole'
+        $calls[1] | Should -Match '-File ".*\\app\\OffPatch\.ps1" -Resume'
+        $calls[1] | Should -Not -Match 'RunAs'
+    }
+
+    It 'avec le contexte de test, la branche forcée est prise' {
+        $log = Join-Path $TestDrive 'avec-contexte.log'
+        Invoke-Launcher -Cmd $cmd64 -Path $copy -Arguments '-Resume' -Environment @{
+            SystemRoot = $fakeRoot; OFFPATCH_FAKE_LOG = $log; OFFPATCH_LAUNCHER_DRYRUN = (Join-Path $TestDrive 'avec-contexte-dry.txt'); OFFPATCH_LAUNCHER_FORCE = 'elevate'
+        } | Should -Be 0
+        $calls = @(Get-Content -Path $log -Encoding UTF8)
+        $calls[-1] | Should -Match 'Start-Process -FilePath \$env:OFFPATCH_PS -ArgumentList \$a -Verb RunAs'
     }
 }

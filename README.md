@@ -25,6 +25,10 @@ Chaque fichier est contrôlé au téléchargement (signature Authenticode Micros
 - Aucune activation en dehors des mécanismes Microsoft officiels ; aucune clé de produit écrite sur disque ni dans un journal.
 - Les données qui changent avec Microsoft (titres du catalogue, product IDs, liens) vivent dans la configuration, pas dans le code.
 
+## Installation depuis GitHub
+
+Si vous téléchargez l'archive zip du dépôt, débloquez-la **avant** de l'extraire : clic droit sur le fichier zip, Propriétés, cocher « Débloquer », OK. Sinon Windows marque chaque fichier extrait comme provenant d'Internet et affiche un avertissement au lancement, avant même que `Lancer-OffPatch.cmd` puisse retirer cette marque.
+
 ## Documentation
 
 - [Cahier des charges](docs/CAHIER-DES-CHARGES.md) : référence fonctionnelle et technique.
