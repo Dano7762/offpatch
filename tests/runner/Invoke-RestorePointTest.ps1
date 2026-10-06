@@ -45,6 +45,20 @@ function Get-RestorePointList {
     }
 }
 
+function Get-ProtectionProbe {
+    # Trois indicateurs de l'état de la protection du système, aucun n'étant documenté comme référence.
+    $wmi = 'indisponible'
+    try {
+        $cfg = Get-CimInstance -Namespace 'root/default' -ClassName SystemRestoreConfig -ErrorAction Stop
+        $wmi = (@($cfg.PSObject.Properties | Where-Object { $_.Name -notmatch '^(PS|Cim)' -and $null -ne $_.Value } | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', ')
+    } catch { $wmi = "erreur : $($_.Exception.Message)" }
+    $spp = 'absente'
+    $sppKey = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SPP\Clients' -ErrorAction SilentlyContinue
+    if ($sppKey) { $spp = (@($sppKey.PSObject.Properties | Where-Object { $_.Name -notmatch '^PS' } | ForEach-Object { "$($_.Name)=$(@($_.Value) -join ';')" }) -join ', ') }
+    $vss = ((& vssadmin.exe list shadowstorage 2>&1 | Out-String) -replace '\s+', ' ' -replace '^.*Corp\. ', '').Trim()
+    "WMI SystemRestoreConfig : $wmi | SPP\Clients : $spp | vssadmin : $vss"
+}
+
 function Invoke-Checkpoint {
     param([string]$Label)
     $before = Get-FreeGiB
@@ -82,16 +96,20 @@ try {
     if ($Scenario -eq 'Disabled') {
         # Protection désactivée d'abord (runner jetable) : que fait Checkpoint-Computer, et que voit-on ?
         if ($PSCmdlet.ShouldProcess('C:', 'Disable-ComputerRestore puis Checkpoint-Computer')) {
+            $lines.Add('- État au départ : ' + (Get-ProtectionProbe))
             Disable-ComputerRestore -Drive "$env:SystemDrive\"
             $lines.Add('- Protection du système désactivée sur C: (runner jetable)')
-            $lines.Add('- Registre SystemRestore après désactivation : ' + (@((Get-ItemProperty -Path $srKey -ErrorAction SilentlyContinue).PSObject.Properties | Where-Object { $_.Name -notmatch '^PS' } | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', '))
+            $lines.Add('- État après désactivation : ' + (Get-ProtectionProbe))
             Invoke-Checkpoint -Label 'protection-desactivee'
+            $lines.Add('- État après Checkpoint-Computer : ' + (Get-ProtectionProbe))
             $lines.Add('- Points après : ' + ((Get-RestorePointList) -join ' ; '))
         }
         return
     }
 
+    $lines.Add('- État au départ : ' + (Get-ProtectionProbe))
     if ($PSCmdlet.ShouldProcess('C:', 'Checkpoint-Computer, protection telle quelle')) { Invoke-Checkpoint -Label 'protection-initiale' }
+    $lines.Add('- État après le premier Checkpoint-Computer : ' + (Get-ProtectionProbe))
 
     if ($PSCmdlet.ShouldProcess('C:', 'Enable-ComputerRestore puis Checkpoint-Computer')) {
         Enable-ComputerRestore -Drive "$env:SystemDrive\"
