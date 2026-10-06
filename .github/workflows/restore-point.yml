@@ -1,0 +1,31 @@
+# Bilan de phase 0 : point de restauration avant session (durée, espace, limite de 24 heures).
+# Déclenchement manuel uniquement. Modifie le système du runner (protection du système, point de restauration).
+name: restore-point
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  restore-point:
+    runs-on: windows-11-arm
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai point de restauration
+        run: ./tests/runner/Invoke-RestorePointTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\rp-out"
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: restore-point
+          path: ${{ runner.temp }}/rp-out
+          retention-days: 30
+          if-no-files-found: warn
