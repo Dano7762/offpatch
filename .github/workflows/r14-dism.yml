@@ -1,0 +1,31 @@
+# R-14 : codes retour de dism.exe et comportement d'Add-WindowsPackage sur des cas limites (petits paquets,
+# aucune cumulative). Déclenchement manuel uniquement. Modifie le système du runner (DISM en ligne), sans redémarrage.
+name: r14-dism
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  r14:
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai R-14
+        run: ./tests/runner/Invoke-R14DismTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\r14-out"
+
+      - name: Journaux DISM et relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: r14-dism
+          path: ${{ runner.temp }}/r14-out
+          retention-days: 30
+          if-no-files-found: warn
