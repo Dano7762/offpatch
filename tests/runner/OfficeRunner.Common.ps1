@@ -156,7 +156,8 @@ function Get-OdtConfigurationXml {
         [switch]$NoCdnFallback,
         [switch]$RemoveAll,
         [switch]$Display,
-        [string]$ProductKey
+        [string]$ProductKey,
+        [string]$LogPath
     )
     $sb = New-Object System.Text.StringBuilder
     [void]$sb.AppendLine('<Configuration>')
@@ -177,6 +178,7 @@ function Get-OdtConfigurationXml {
     if ($Display) {
         [void]$sb.AppendLine('  <Display Level="None" AcceptEULA="TRUE" />')
     }
+    if ($LogPath) { [void]$sb.AppendLine('  <Logging Level="Standard" Path="' + $LogPath + '" />') }
     [void]$sb.Append('</Configuration>')
     $sb.ToString()
 }
