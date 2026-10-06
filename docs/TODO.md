@@ -27,7 +27,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 
 ## Phase 1 : socle
 
-- [ ] Arborescence, `.gitignore`, `offpatch.root`, `PSScriptAnalyzerSettings.psd1`
+- [x] Arborescence, `.gitignore`, `offpatch.root`, `PSScriptAnalyzerSettings.psd1`
 - [ ] Module `OffPatch` : manifeste `.psd1`, chargement automatique de `Public/` et `Private/`
 - [ ] `Get-OpRoot` et fonctions de chemins (racine, dépôt, ProgramData)
 - [ ] `Write-OpLog` : niveaux, fichier de session, file de messages pour l'interface
@@ -149,3 +149,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-06 | 0 | R-15 tranché, cahier des charges 1.18 : option de suspension retirée, mode Avion recommandé et rappel en fin de session ; essai de deux DISM simultanés (le second attend, pas d'erreur), nouvelle tentative après 5 min sur 1618 / 0x80070652 ; contrôle en ligne local en échec passager du catalogue, repassé ensuite | Bilan de phase 0 |
 | 2026-10-06 | 0 | Politique de nouvelles tentatives (`Invoke-OpWebRequest`, `Invoke-OpHeadRequest`), `Get-OpCatalogDownloadLink`, contrat en ligne sur le code de production avec diagnostic et relance unique ; tests avant push hors `Live` ; `Invoke-OpProcess` au backlog ; bilan de phase 0 : R-02 et R-04 ouverts non bloquants, `catalog-queries.json` et `office/profiles.json` créés et contrôlés, tests de cohérence de `config/`, matrice de traçabilité (cahier des charges 1.19), `docs/BILAN-PHASE-0.md` | Décisions de David sur les points A à D du bilan, puis phase 1 |
 | 2026-10-06 | 0 | Bilan de phase 0 clos, cahier des charges 1.20 : format de `catalog-queries.json` (`latestMonth` sur le préfixe `AAAA-MM`), `downloadPages` lu par le contrat en ligne, P7 à P10, corrections ; point de restauration mesuré (`restore-point.yml`) : `Checkpoint-Computer` active lui-même la protection, état lu avant l'appel (`SPP\Clients`, indicateur non documenté), avertissement sans erreur dans les 24 h | Phase 1 |
+| 2026-10-06 | 1 | Arborescence de la section 5 (`Public/`, `gui/Dialogs/`, `tools/odt/`), `offpatch.root` (JSON : produit, identifiant d'installation), tests de structure et d'exclusions git | Module `OffPatch` : manifeste et chargement |
