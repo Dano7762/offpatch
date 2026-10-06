@@ -1,0 +1,46 @@
+# Recentrage sur les mises à jour (R-08) : canal d'un Office installé lu dans le registre Click-to-Run, et licence
+# conservée par une mise à jour /configure depuis la source locale. Un runner Windows 11 ARM64 jetable par cas.
+# Déclenchement manuel uniquement. Modifie le système du runner (installation d'Office). Aucune clé de produit.
+name: office-update-scope
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scope:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { scenario: Channel, product: Home2024Retail, channel: Current }
+          - { scenario: Channel, product: ProPlus2024Volume, channel: PerpetualVL2024 }
+          - { scenario: Channel, product: ProPlus2021Volume, channel: PerpetualVL2021 }
+          - { scenario: Channel, product: HomeStudent2019Retail, channel: Current }
+          - { scenario: Channel, product: ProPlus2019Volume, channel: PerpetualVL2019 }
+          - { scenario: License, product: ProPlus2024Volume, channel: PerpetualVL2024 }
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai ${{ matrix.scenario }} ${{ matrix.product }}
+        env:
+          SCOPE_SCENARIO: ${{ matrix.scenario }}
+          SCOPE_PRODUCT: ${{ matrix.product }}
+          SCOPE_CHANNEL: ${{ matrix.channel }}
+        run: ./tests/runner/Invoke-OfficeUpdateScopeTest.ps1 -Scenario $env:SCOPE_SCENARIO -ProductId $env:SCOPE_PRODUCT -Channel $env:SCOPE_CHANNEL -OutputDirectory "$env:RUNNER_TEMP\scope-out"
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: scope-${{ matrix.scenario }}-${{ matrix.product }}
+          path: ${{ runner.temp }}/scope-out
+          retention-days: 30
+          if-no-files-found: warn
