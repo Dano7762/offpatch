@@ -1,0 +1,35 @@
+# Lancer-OffPatch.cmd : racine d'un lecteur (subst), chemin accentué, cmd 64 et 32 bits, session élevée, sur x64 et
+# ARM64. Déclenchement manuel uniquement. Modifie le système du runner (lecteur subst, dossier à la racine de C:).
+name: launcher
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  launcher:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai du lanceur
+        run: ./tests/runner/Invoke-LauncherTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\launcher-out"
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: launcher-${{ matrix.os }}
+          path: ${{ runner.temp }}/launcher-out
+          retention-days: 30
+          if-no-files-found: warn
