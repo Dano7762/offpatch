@@ -381,7 +381,7 @@ Question : licence (redistribution dans `lib/`), version à figer, fonctionnemen
 
 Impact : dépendance de la face Dépôt.
 
-- Statut : Tranché sur l'analyse ; retrait de MSCatalogLTS du cahier des charges proposé, en attente de l'accord de David
+- Statut : Tranché (2026-10-05) : MSCatalogLTS retiré, recherche par les fonctions du module avec pagination
 - Sources (consultées le 2026-10-05) :
   - PowerShell Gallery, `Find-Module MSCatalogLTS` : version 2.1.0.2 publiée le 2026-05-13, auteur Marco-online, https://github.com/Marco-online/MSCatalogLTS. Module récupéré par `Save-Module` dans `scratch/modules` (non suivi par git), examiné et exécuté en lecture seule sur la machine de développement.
   - https://github.com/Marco-online/MSCatalogLTS : licence MIT (fichier LICENSE, « Copyright (c) 2024 Marco-online ») ; dépôt actif (dernier push le 2026-09-19), non archivé, 0 issue ouverte, 51 étoiles.
@@ -396,10 +396,13 @@ Impact : dépendance de la face Dépôt.
   | Volume de code | 1 538 lignes de PowerShell (dont environ 980 pour `Get-MSCatalogUpdate`) + DLL HtmlAgilityPack. | 88 lignes pour les deux fonctions d'analyse (`ConvertFrom-OpCatalogSearchPage`, `ConvertFrom-OpCatalogDownloadDialog`), plus les requêtes, déjà établies en R-01. |
 
   - Point commun : MSCatalogLTS repose exactement sur les mêmes pages et requêtes que nous (`Search.aspx`, `DownloadDialog.aspx` en POST, lecture des `.url = '…'`) ; il n'apporte pas de protection supplémentaire contre un changement du site. Il gère la pagination par `&p=N` (option `-AllPages`), que nous pouvons reprendre si besoin : nous évitons aujourd'hui la page pleine par une requête par version (R-01).
-  - **Plan B si le site change** : fixtures de pages réelles (`tests/Fixtures/catalog/`, capturées le 2026-10-05 par `Save-CatalogFixture.ps1` : recherche par KB, page pleine de 25 lignes, page sans résultat, fenêtre de téléchargement) testées par `tests/Unit/CatalogParsing.Tests.ps1`, et contrat en ligne `tests/Live/Catalog.Live.Tests.ps1` (tag `Live`), lancé par une étape dédiée de `ci.yml` à chaque push : une casse du site fait échouer la CI sur une étape nommée « Contrat avec le Microsoft Update Catalog (en ligne) ». Les fonctions d'analyse lèvent une erreur explicite sur une page non reconnue au lieu de renvoyer une liste vide.
-- Décision :
-  - Fixtures et contrat en ligne en place (décision de David du 2026-10-05).
-  - **Recommandation, à valider par David** : notre implémentation suffit ; retirer MSCatalogLTS du cahier des charges (section 5 : `lib/MSCatalogLTS/<version>/` ; 7.1, étape 2 : « MSCatalogLTS ne sert qu'à la recherche et à la résolution des liens »), de `CLAUDE.md` (dépendance embarquée dans `lib/`) et du backlog de la phase 2 (« MSCatalogLTS embarqué dans `lib/` »). Raisons : notre requête documentée n'y donne aucun résultat, il ajoute une DLL non signée et 1 538 lignes que nous ne maîtrisons pas, sans protéger mieux contre un changement du site.
+  - **Plan B si le site change** : fixtures de pages réelles (`tests/Fixtures/catalog/`, capturées le 2026-10-05 par `Save-CatalogFixture.ps1` : recherche par KB, première et dernière page d'une recherche de 4 pages, page sans résultat, fenêtre de téléchargement) testées par `tests/Unit/CatalogParsing.Tests.ps1`, et contrat en ligne `tests/Live/Catalog.Live.Tests.ps1` (tag `Live`). Les fonctions d'analyse lèvent une erreur explicite sur une page non reconnue au lieu de renvoyer une liste vide.
+  - Pagination (relevée sur le site le 2026-10-05) : le script de la page (`handlePageChange`) passe à la page suivante par le paramètre `p` de `Search.aspx`, index à partir de 0 (`&p=1` = page 2) ; le compteur `ctl00_catalogBody_searchDuration` affiche « 26 - 50 of 76 (page 2 of 4) » ; sur la dernière page, le lien « Next » disparaît ; un index au-delà de la dernière page renvoie une page sans ligne ni message « aucun résultat » (reconnue comme anormale par l'analyse). Recherche de 76 résultats ramenée en entier en 4 requêtes.
+- Décision (David, 2026-10-05) :
+  - MSCatalogLTS retiré du cahier des charges (5, 7.1, 7.4), de `CLAUDE.md` et du backlog de la phase 2.
+  - Pagination dans notre implémentation (`Find-OpCatalogUpdate`) : page suivante demandée tant que la page reçue est pleine (25 lignes) et que le compteur annonce une suite ; plafond de sécurité (10 pages par défaut), au-delà la recherche échoue plutôt que de renvoyer un résultat tronqué. L'avertissement « page pleine » disparaît (`IsFull` remplacé par `HasNextPage`). Testé sur les fixtures (première page pleine, dernière page, page unique, plafond).
+  - Contrat en ligne sorti de `ci.yml` (déterministe, fixtures seulement) vers `catalog-contract.yml`, planifié chaque mercredi à 6 h UTC et lançable à la demande ; il vérifie aussi la pagination réelle (nombre de lignes = total annoncé par le compteur).
+  - `depot-x64` (scripts `Save-CatalogEntryFile.ps1` et `Test-PinnedFile.ps1`) applique désormais les critères 7.1 par `Test-OpFileSignature` : racine de chaque fichier comparée à `integrity.trustedRootThumbprints` de `config/settings.json`, refus avec la racine et son empreinte, job en échec.
 
 ## R-12 Volumes
 
@@ -407,14 +410,41 @@ Question : taille réelle des fichiers par cible et par source Office. Un fichie
 
 Impact : refus du FAT32, README.
 
-- Statut : À vérifier
+- Statut : Tranché (2026-10-06)
 - Piste (2026-10-04, R-07, https://github.com/Dano7762/offpatch/actions/runs/37235902323) : source Office LTSC 2024 ProPlus 64 bits fr-fr, une version : 3 548 Mo (13 fichiers) ; deux versions côte à côte avant purge : 7 096 Mo.
 - Piste (2026-10-04, R-07, https://github.com/Dano7762/offpatch/actions/runs/37236240851) : source Current 64 bits fr-fr (Home2024Retail) : 3 914 Mo pour 16.0.20430.20092, 3 605 Mo pour 16.0.20430.20140 après purge ; 7 518 Mo avec les deux versions. Prévoir environ 4 Go par source et par langue, le double entre deux purges.
 - Piste (2026-10-04, R-06) : mpam-fe.exe x64 222 853 576 octets, ARM64 222 341 064 octets.
 - Piste (2026-10-04, R-02) : KB5129195 x64 fait 4 639 422 594 octets (plus de 4 Gio), ARM64 4 391 570 921 octets. Un seul fichier dépasse donc la limite du FAT32. Confirmé par le téléchargement réel du workflow `depot-x64` (https://github.com/Dano7762/offpatch/actions/runs/37199155132) : 4 639 422 594 octets pour la cible, 533 761 740 pour KB5043080, 5,2 Go par cible Windows 11 au total.
 - Sources :
+  - Tailles déjà mesurées ci-dessus (téléchargements réels sur runner).
+  - Microsoft Update Catalog, lecture seule, 2026-10-05 (taille affichée en Mio, `_originalSize` en octets, et en-têtes HEAD pour la répartition par fichier) : .NET Windows 11 KB5126052 x64 92,3 Mio, ARM64 110,6 Mio ; .NET Windows 10 KB5126146 deux fichiers, ndp481 81 247 370 octets et ndp48 81 842 924 octets ; cumulative Windows 10 KB5129236 896,3 Mio ; SSU KB5031539 15,4 Mio ; plateforme Defender KB4052623 4.18.26080.4 : amd64 39 243 776 octets, arm64 39 128 696 octets ; enablement package KB5121794 0,17 Mio par architecture.
+  - Runner `windows-11-arm`, 2026-10-05 (https://github.com/Dano7762/offpatch/actions/runs/37369422688 et 37371740048) : installation par DISM de la préversion cumulative KB5124010 (26200.9457 → 26200.9550 en attente, 4 449 385 386 octets + checkpoint KB5043080), espace libre de C: échantillonné toutes les 2 s pendant DISM (564 et 350 échantillons). Préversion choisie parce que l'image du runner a déjà la cumulative de septembre : seule une cumulative plus récente s'installe vraiment ; elle sert uniquement à la mesure, OffPatch ne retient jamais de préversion.
 - Conclusion :
+  - **Un seul fichier dépasse 4 Gio** : la cumulative Windows 11 (x64 4 639 422 594 octets, ARM64 4 391 570 921 octets en septembre 2026). Le FAT32 est exclu (7.4).
+  - **a. Dépôt complet** (unités : Gio et Mio, 1 Gio = 1024³ octets ; mois de septembre 2026) :
+
+    | Élément | win11-x64 | win11-arm64 | win10-x64 |
+    |---|---|---|---|
+    | Cumulative du mois | 4 424,5 Mio | 4 188,2 Mio | 896,3 Mio |
+    | .NET du mois | 92,3 Mio | 110,6 Mio | 155,5 Mio (deux fichiers) |
+    | **Par mois conservé** | **4 516,8 Mio** | **4 298,7 Mio** | **1 051,8 Mio** |
+    | Fixe (checkpoint KB5043080, épinglés) | 509,2 Mio | 582,6 Mio | 15,4 Mio (SSU) |
+
+    Defender, une version : mpam-fe.exe x64 212,5 Mio + ARM64 212,0 Mio, plateforme 37,4 + 37,3 Mio, soit 499,3 Mio. Office, une version par source : Current fr-fr + en-us 3 954,6 Mio, LTSC 2024 fr-fr 3 548 Mio, LTSC 2021 fr-fr non mesurée, comptée comme LTSC 2024 (3 548 Mio), soit 11 050,6 Mio. ODT 3,4 Mio.
+
+    | Rétention Windows | Dépôt entre deux mises à jour | Pic pendant une mise à jour |
+    |---|---|---|
+    | 2 mois partout (valeur 1.13) | 31,6 Gio | 52,6 Gio |
+    | 1 mois Windows 11, 2 mois Windows 10 (proposée) | 23,0 Gio | 43,9 Gio |
+
+    Le pic compte un mois Windows de plus pour chaque cible (le nouveau mois arrive avant la purge), deux versions de Defender et deux versions de chaque source Office (l'ODT ajoute la nouvelle version à côté de l'ancienne, R-07). C'est la place à prévoir sur le volume du dépôt (poste de préparation). Le support ne reçoit que le dépôt purgé : **64 Go recommandés pour un dépôt complet**. Un support de 32 Go (environ 29 Gio utiles) contient les 23 Gio actuels, mais avec trop peu de marge si les cumulatives grossissent ou si la rétention Windows 11 repasse à 2 mois (31,6 Gio). 32 Go suffisent pour un dépôt filtré, par exemple win11-x64 et la source Current (environ 9 Gio).
+  - **b. Espace consommé sur C: par une cumulative Windows 11** (ARM64, sans redémarrage) : pic de 10,60 Gio (120,23 → 109,63 Gio libres, run 37369422688) et de 10,37 Gio (run 37371740048). Consommation encore de 3,8 à 9,8 Gio à la fin de DISM, avant le redémarrage qui termine l'installation. Taille du magasin de composants au départ : 12,77 Go. Raisonnement retenu (David, 2026-10-06) : le runner ne peut pas redémarrer et la phase de redémarrage consomme elle aussi de l'espace, donc la mesure est **un minimum** ; on applique une marge de 50 % : `minFreeSpaceGB` = arrondi au-dessus de 10,60 × 1,5 = 15,9, soit **16** (au lieu de 20). Réserve : mesure faite sur ARM64 ; la cumulative x64 est 4 % plus grosse, ce que couvre la marge.
+  - Incident de mesure : `DISM /Cleanup-Image /AnalyzeComponentStore`, lancé après les installations avec un redémarrage en attente, n'a pas rendu la main en 4 h 30 (jobs arrêtés à la limite de 5 h, toutes les étapes DISM déjà terminées). L'analyse est désormais bornée à 10 min dans le script. Pour OffPatch : ne jamais lancer cette analyse quand un redémarrage est en attente.
+  - **c. Rétention par cible** : `retention.windowsMonths` devient un objet par cible. Défauts proposés : 1 pour `win11-x64` et `win11-arm64`, 2 pour `win10-x64`. Une cumulative contient tout le mois précédent : le mois précédent ne sert que de repli si la cumulative courante pose problème sur un PC. Pour Windows 11, ce repli coûte environ 4,4 Gio par cible, et une cumulative qui échoue se corrige en général par la suivante plutôt que par la précédente. Pour Windows 10, il coûte 1 Gio et reste utile (dernières cumulatives ESU, parc plus hétérogène). Le mois précédent reste disponible pendant toute la mise à jour, puisque la purge passe en dernier.
 - Décision :
+  - David (2026-10-06) : `minFreeSpaceGB` = pic mesuré × 1,5, arrondi au-dessus, soit 16.
+  - David (2026-10-05) : rétention `retention.windowsMonths` par cible. **Valeurs par défaut 1 / 1 / 2 : proposition de Claude**, reportée dans le cahier des charges 1.14 et `config/settings.json` pour que la configuration reste cohérente ; elle ne se change que dans la configuration si David préfère d'autres valeurs.
+  - Reporté dans le cahier des charges 1.14 (6.1, 7.1, 7.3, 7.4) et `config/settings.json` : support de 64 Go recommandé pour un dépôt complet, FAT32 refusé, espace libre du volume du dépôt contrôlé avant téléchargement.
 
 ## R-13 Domaines de téléchargement
 

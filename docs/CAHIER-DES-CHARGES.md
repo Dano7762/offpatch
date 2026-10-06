@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.13 du 5 octobre 2026.
+Version 1.14 du 6 octobre 2026.
 
 ## 1. Contexte
 
@@ -122,8 +122,6 @@ OffPatch/
 │       ├── profiles.json
 │       ├── download.xml.template
 │       └── install.xml.template
-├── lib/
-│   └── MSCatalogLTS/<version>/    Module figé et sa licence
 ├── tools/
 │   └── odt/                       setup.exe de l'ODT, récupéré par l'outil (hors git)
 ├── depot/                         Données téléchargées (hors git)
@@ -171,11 +169,11 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
     "clientEdition": "64"
   },
   "retention": {
-    "windowsMonths": 2,
+    "windowsMonths": { "win11-x64": 1, "win11-arm64": 1, "win10-x64": 2 },
     "officeVersions": 1
   },
   "client": {
-    "minFreeSpaceGB": 20,
+    "minFreeSpaceGB": 16,
     "maxAutoReboots": 5,
     "rebootCountdownSeconds": 30,
     "staleDepotWarningDays": 35,
@@ -198,7 +196,7 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
 }
 ```
 
-Les valeurs chiffrées sont des valeurs de départ. La liste `allowedDomains` sera complétée en phase 0 avec les domaines réellement atteints après redirection (R-13). Elle s'applique aux téléchargements faits par OffPatch lui-même (catalogue, mpam-fe.exe, plateforme Defender, éléments épinglés, ODT). Elle ne s'applique pas au trafic propre de l'ODT pendant `setup.exe /download`, qui contacte ses propres domaines (CDN Office, mais aussi par exemple `ecs.office.com` ou `mrodevicemgr.officeapps.live.com`) : OffPatch ne le contrôle pas, il se contente de le journaliser. L'interface modifie ce fichier quand je change les cibles ou les langues dans l'onglet Dépôt.
+Les valeurs chiffrées sont des valeurs de départ. `minFreeSpaceGB` (en Gio) vaut le pic d'espace consommé sur C: par l'installation d'une cumulative Windows 11 mesuré sur runner, sans redémarrage (10,6 Gio), multiplié par 1,5 et arrondi au-dessus : la mesure est un minimum, puisque la phase de redémarrage n'est pas comptée (R-12). La liste `allowedDomains` sera complétée en phase 0 avec les domaines réellement atteints après redirection (R-13). Elle s'applique aux téléchargements faits par OffPatch lui-même (catalogue, mpam-fe.exe, plateforme Defender, éléments épinglés, ODT). Elle ne s'applique pas au trafic propre de l'ODT pendant `setup.exe /download`, qui contacte ses propres domaines (CDN Office, mais aussi par exemple `ecs.office.com` ou `mrodevicemgr.officeapps.live.com`) : OffPatch ne le contrôle pas, il se contente de le journaliser. L'interface modifie ce fichier quand je change les cibles ou les langues dans l'onglet Dépôt.
 
 Les langues se règlent par source Office. Par défaut, la source `current` porte `fr-fr` et `en-us` : les Office en boîte ou Microsoft 365 préinstallés par les fabricants sont souvent bilingues, et une langue installée absente de la source empêche leur mise à jour (8.5, R-08). L'anglais ajoute environ 350 Mo à la source Current (3 955 Mo au lieu de 3 605 Mo, mesuré le 5 octobre 2026). Les sources `perpetualvl2024` et `perpetualvl2021` portent `fr-fr` seul.
 
@@ -302,8 +300,8 @@ Une entrée peut porter les champs de dépendance `prerequisites` et `runsAfter`
 Pour chaque cible cochée :
 
 1. Vérifier l'accès à Internet et aux domaines autorisés.
-2. Interroger le catalogue avec les requêtes de `catalog-queries.json`. MSCatalogLTS ne sert qu'à la recherche et à la résolution des liens. Le téléchargement est fait par l'outil, pour maîtriser la reprise, le dossier temporaire et le contrôle d'intégrité.
-3. Comparer avec le manifeste. Un élément déjà présent avec le même hash n'est pas retéléchargé.
+2. Interroger le catalogue avec les requêtes de `catalog-queries.json`, par les fonctions du module, sans dépendance tierce (R-11) : `Search.aspx`, page après page (paramètre `p`) tant que la page reçue est pleine et que le compteur du site annonce une suite, avec un plafond de pages au-delà duquel la recherche échoue plutôt que de renvoyer un résultat tronqué ; puis `DownloadDialog.aspx` pour résoudre les liens. Une page de structure inconnue lève une erreur explicite. Le téléchargement est fait par l'outil, pour maîtriser la reprise, le dossier temporaire et le contrôle d'intégrité.
+3. Comparer avec le manifeste. Un élément déjà présent avec le même hash n'est pas retéléchargé. Comparer ensuite la taille des nouveautés (taille annoncée par le catalogue, 4 Go par source Office qui change de version) à l'espace libre du volume du dépôt : la purge ne passe qu'en fin de mise à jour, l'ancien et le nouveau mois coexistent jusque-là (R-12). Espace insuffisant : arrêt avant tout téléchargement, avec l'espace manquant.
 4. Télécharger dans `depot/.tmp/` avec BITS (`Start-BitsTransfer`, reprise possible), et un repli sur `HttpClient` en flux si BITS n'est pas disponible.
 5. Vérifier l'authenticité, en ligne, au téléchargement, et calculer le SHA-256 (R-10). Critères Authenticode pour les fichiers signés (.msu, .exe, .cab) : `Status` = `Valid`, signataire de l'organisation Microsoft Corporation (`O=Microsoft Corporation`), chaîne jusqu'à une racine dont l'empreinte figure dans `integrity.trustedRootThumbprints` (6.1 ; au départ, Microsoft Root Certificate Authority 2010). Racine inconnue : téléchargement refusé, avec un message qui nomme la racine rencontrée et son empreinte. Un certificat expiré mais horodaté reste valide ; aucun contrôle sur la date d'expiration du certificat. Pour une source Office, le SHA-256 de chaque fichier est enregistré dans le manifeste ; ses fichiers `.dat` ne portent pas de signature Authenticode (ils sont couverts par des catalogues `.dat.cat` signés) et l'ODT les valide lui-même pendant `/download`.
 6. Pour une cumulative Windows ou .NET, lire dans le .msu le nom et la version du paquet (fichier `update.mum` du .cab, extrait avec `expand.exe`) et les inscrire dans le manifeste (7.2).
@@ -387,7 +385,7 @@ Les valeurs ci-dessus illustrent le format. Les chemins dans `files` sont relati
 
 ### 7.3 Purge
 
-- Cumulatives Windows et .NET : on garde les `retention.windowsMonths` plus récentes par cible (2 par défaut, la courante et la précédente comme solution de repli).
+- Cumulatives Windows et .NET : pour chaque cible, on garde les `retention.windowsMonths.<cible>` plus récentes (6.1). Chaque cible de `targets` doit avoir sa valeur, au moins 1 ; sinon la configuration est refusée. Valeurs par défaut (R-12) : 1 pour `win11-x64` et `win11-arm64`, 2 pour `win10-x64`. Une cumulative contient tout le mois précédent ; garder le mois précédent ne sert que de repli si la courante pose problème, et coûte environ 4,4 Go par cible Windows 11 contre 1 Go pour Windows 10. La purge passe après la vérification du mois nouveau : pendant la mise à jour, l'ancien mois reste disponible.
 - Defender (définitions et plateforme) : seulement la dernière version de chacune.
 - Éléments épinglés (6.4) : jamais purgés.
 - Office : seulement la dernière version par source, après avoir vérifié que l'index de la source (`v64.cab`) pointe bien sur elle (R-07).
@@ -400,9 +398,9 @@ Assistant accessible depuis l'onglet Dépôt :
 
 1. Choisir le lecteur de destination (clé ou disque externe).
 2. Choisir les cibles et les sources Office à embarquer, pour ne copier que l'utile.
-3. Contrôler le système de fichiers : NTFS ou exFAT. Le FAT32 est refusé, car certains fichiers peuvent dépasser 4 Go (R-12). Contrôler l'espace libre.
+3. Contrôler le système de fichiers : NTFS ou exFAT. Le FAT32 est refusé, car la cumulative Windows 11 x64 dépasse 4 Gio (4 639 422 594 octets en septembre 2026, R-12). Contrôler l'espace libre. Taille de support recommandée : 64 Go pour un dépôt complet (trois cibles Windows, trois sources Office, rétention par défaut : environ 23 Gio en octobre 2026 ; un support de 32 Go, soit environ 29 Gio utiles, laisse trop peu de marge pour la croissance des cumulatives) ; 32 Go suffisent pour un dépôt filtré, par exemple une cible Windows 11 et une source Office (environ 9 Gio).
 4. Si le support contient déjà OffPatch, rapatrier d'abord ses rapports dans `rapports/` du poste.
-5. Copier `app/`, `config/`, `lib/`, `tools/`, `offpatch.root`, `README.md` et les dossiers du dépôt retenus, avec robocopy en miroir dossier par dossier. Le dossier `rapports/` du support n'est jamais mis en miroir, pour ne pas effacer de rapports.
+5. Copier `app/`, `config/`, `tools/`, `offpatch.root`, `README.md` et les dossiers du dépôt retenus, avec robocopy en miroir dossier par dossier. Le dossier `rapports/` du support n'est jamais mis en miroir, pour ne pas effacer de rapports.
 6. Écrire sur le support un manifeste filtré qui ne contient que les éléments copiés.
 7. Vérifier la copie (tailles, puis hash des fichiers du manifeste) et afficher un bilan.
 
@@ -648,3 +646,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.11 (5 octobre 2026) : version d'Office installée lue sur `WINWORD.EXE` (repli `EXCEL.EXE`, puis `POWERPNT.EXE`) dans le dossier `InstallationPath`, `VersionToReport` en diagnostic, écart signalé et Office « À installer » (8.3) ; tableau 8.5 : option de retrait et d'installation du profil dans les deux cas d'autre produit Click-to-Run, canal absent du dépôt en `NotApplicable` « canal absent du dépôt ». Suite de R-08 et R-09.
 - 1.12 (5 octobre 2026) : critères Authenticode au téléchargement (`Valid`, organisation Microsoft Corporation, racine Microsoft, certificat expiré mais horodaté accepté) et SHA-256 de chaque fichier d'une source Office (7.1, 11) ; côté client, SHA-256 seul, juste avant l'étape (8.4, 11) ; source Office entière revérifiée avant `setup.exe /configure`, étape en erreur et ODT non lancé au moindre écart ; garde-fou de 30 min sur l'ODT (`odtTimeoutMinutes`), « délai dépassé », nouvelle détection d'Office ; pas de délai sur DISM (6.1, 8.4, 8.5). Suite de R-10.
 - 1.13 (5 octobre 2026) : racines de confiance par empreinte, `integrity.trustedRootThumbprints` (au départ Microsoft Root Certificate Authority 2010, `3B1EFD3A66EA28B16697394703A72CA340A05BD5`) ; signataire jugé sur l'organisation Microsoft Corporation ; racine inconnue : téléchargement refusé avec un message explicite (6.1, 7.1, 11). Suite de R-10.
+- 1.14 (6 octobre 2026) : MSCatalogLTS retiré, dossier `lib/` supprimé de l'arborescence et de la copie sur support ; recherche au catalogue par les fonctions du module, avec pagination (paramètre `p`) et plafond de pages au-delà duquel la recherche échoue (5, 7.1, 7.4) ; `retention.windowsMonths` par cible, défauts 1 pour Windows 11 et 2 pour Windows 10, chaque cible obligatoire (6.1, 7.3) ; `minFreeSpaceGB` ramené de 20 à 16, pic mesuré × 1,5 (6.1) ; espace libre du volume du dépôt contrôlé avant téléchargement (7.1) ; FAT32 refusé à cause de la cumulative Windows 11 x64 de plus de 4 Gio, support de 64 Go recommandé pour un dépôt complet (7.4). Suite de R-11 et R-12.

@@ -13,11 +13,11 @@
     "clientEdition": "64"
   },
   "retention": {
-    "windowsMonths": 2,
+    "windowsMonths": { "win11-x64": 1, "win11-arm64": 1, "win10-x64": 2 },
     "officeVersions": 1
   },
   "client": {
-    "minFreeSpaceGB": 20,
+    "minFreeSpaceGB": 16,
     "maxAutoReboots": 5,
     "rebootCountdownSeconds": 30,
     "staleDepotWarningDays": 35,

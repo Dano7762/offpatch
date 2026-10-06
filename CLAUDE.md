@@ -20,7 +20,7 @@ Réponds-moi en français.
 - Ne jamais exécuter sur la machine de développement une opération qui modifie le système : DISM en ligne, wusa, mpam-fe.exe, `setup.exe /configure`, création de tâche planifiée, écriture dans HKLM, redémarrage. Ces chemins de code se testent avec des mocks Pester.
 - Les tests réels passent par GitHub Actions, sur le dépôt privé `Dano7762/offpatch`, dans ces limites strictes :
   - les opérations qui modifient le système ne sont autorisées que dans des jobs sur runners hébergés par GitHub (jetables) ; jamais sur un runner auto-hébergé, jamais sur ma machine ;
-  - les workflows lourds (téléchargement de cumulatives, installation) se déclenchent uniquement à la main (`workflow_dispatch`) ; seul `ci.yml` (analyse statique et tests) tourne à chaque push ;
+  - les workflows lourds (téléchargement de cumulatives, installation) se déclenchent uniquement à la main (`workflow_dispatch`) ; seul `ci.yml` (analyse statique et tests, sans accès réseau) tourne à chaque push ; `catalog-contract.yml` (contrat en ligne avec le catalogue, lecture seule) tourne chaque mercredi et à la demande ;
   - aucun secret ni clé de produit dans les workflows, les scripts de `tests/runner/` ou les artefacts ;
   - avec `gh`, tu peux pousser sur ce dépôt, lancer des workflows, lire leurs journaux et récupérer leurs artefacts. Rien d'autre sur mon compte GitHub.
 - Ce que les runners ne permettent pas (redémarrage, mode auto, Windows 11 x64 client, Windows 10 ESU, support sans checkpoint) est validé sur intervention réelle, en commençant par l'action `Plan` en lecture seule.
@@ -38,7 +38,7 @@ Réponds-moi en français.
 - Tout le code livré tourne sous Windows PowerShell 5.1, sur x64 et ARM64. Le PC client sort d'installation : rien d'autre n'y est disponible.
 - Syntaxe interdite car absente de PowerShell 5.1 : opérateur ternaire, `??` et `??=`, `&&` et `||` entre commandes, `ForEach-Object -Parallel`, `Join-Path` avec plusieurs enfants (`-AdditionalChildPath`), `ConvertFrom-Json -AsHashtable`, `Get-Content -AsByteStream`.
 - Fichiers `.ps1`, `.psm1` et `.psd1` enregistrés en UTF-8 avec BOM. Sans BOM, PowerShell 5.1 les lit en ANSI et les libellés français sont cassés. Les `.json` et `.xaml` sont en UTF-8 et toujours lus avec `-Encoding UTF8`.
-- Aucune dépendance à installer sur le PC client. Les dépendances côté téléchargement (MSCatalogLTS) sont embarquées dans `lib/` avec une version figée et leur licence.
+- Aucune dépendance à installer sur le PC client, ni de module tiers côté téléchargement : le Microsoft Update Catalog est interrogé par les fonctions du module (R-11).
 - Les chemins sont toujours relatifs à la racine de l'outil, retrouvée grâce au fichier marqueur `offpatch.root`. Jamais de lettre de lecteur en dur : le support peut changer de lettre d'un PC à l'autre et même entre deux redémarrages.
 - `Set-StrictMode -Version Latest` dans le module, `-ErrorAction Stop` sur les appels qui peuvent échouer, erreurs traitées par `try/catch` et journalisées.
 - Le manifeste et les fichiers d'état s'écrivent de façon atomique (fichier temporaire puis renommage).
