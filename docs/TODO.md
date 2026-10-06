@@ -31,7 +31,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [x] Module `OffPatch` : manifeste `.psd1`, chargement automatique de `Public/` et `Private/`
 - [x] `Get-OpRoot` et fonctions de chemins (racine, dépôt, ProgramData)
 - [x] `Write-OpLog` : niveaux, fichier de session, file de messages pour l'interface
-- [ ] `Invoke-OpProcess` : fonction unique de lancement de processus sur `System.Diagnostics.Process` (jamais `Start-Process`, dont l'`ExitCode` revient vide sous PowerShell 5.1, R-14), utilisée par tous les exécuteurs (DISM, ODT, mpam-fe.exe, plateforme Defender) : code de sortie, sortie standard capturée, délai maximal facultatif ; tests Pester avec `cmd /c exit 0`, `exit 3010`, `exit 1618`, un délai dépassé et une sortie standard capturée
+- [x] `Invoke-OpProcess` : fonction unique de lancement de processus sur `System.Diagnostics.Process` (jamais `Start-Process`, dont l'`ExitCode` revient vide sous PowerShell 5.1, R-14), utilisée par tous les exécuteurs (DISM, ODT, mpam-fe.exe, plateforme Defender) : code de sortie, sortie standard capturée, délai maximal facultatif ; tests Pester avec `cmd /c exit 0`, `exit 3010`, `exit 1618`, un délai dépassé et une sortie standard capturée
 - [ ] Lecture et validation de `settings.json`, `catalog-queries.json`, `profiles.json`
 - [ ] Lecture, validation et écriture atomique du manifeste
 - [ ] `Lancer-OffPatch.cmd` : élévation, contournement de la stratégie d'exécution, `Unblock-File`
@@ -153,3 +153,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-06 | 1 | Module `OffPatch` : manifeste (PowerShell 5.1, Desktop, `FunctionsToExport` explicite), `OffPatch.psm1` (StrictMode, chargement de `Private/` puis `Public/`, export limité à `Public/`, erreur qui nomme le fichier fautif) ; tests sur une copie du module | `Get-OpRoot` et fonctions de chemins |
 | 2026-10-06 | 1 | `Get-OpRoot` (remontée jusqu'à `offpatch.root`, aucune lettre de lecteur mémorisée) et `Get-OpPath` (emplacements du support et de ProgramData, sans création de dossier), tests sur arborescences simulées | `Write-OpLog` |
 | 2026-10-06 | 1 | `Start-OpLog` (journal du dépôt ou de session, sous-dossier des journaux DISM et ODT) et `Write-OpLog` (format de la section 10, niveau minimal, file de messages pour l'interface, clé de produit masquée, jamais bloquant) | `Invoke-OpProcess` |
+| 2026-10-06 | 1 | `Invoke-OpProcess` sur `System.Diagnostics.Process` : code de sortie, sorties lues en parallèle, délai maximal facultatif avec arrêt de l'arborescence (`taskkill /T /F` : un processus enfant gardait les sorties ouvertes), `-WhatIf` ; tests 0, 3010, 1618, délai dépassé, sorties capturées, sortie volumineuse | Lecture et validation de la configuration |
