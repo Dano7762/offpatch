@@ -19,7 +19,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [x] R-11 MSCatalogLTS
 - [x] R-12 Volumes
 - [x] R-13 Domaines de téléchargement
-- [ ] R-14 Moteur d'installation des paquets
+- [x] R-14 Moteur d'installation des paquets
 - [ ] R-15 Suspendre Windows Update pendant une session
 - [ ] Bilan de phase : reporter dans le cahier des charges ce qui change (avec mon accord) et compléter `config/` avec les valeurs établies
   - [ ] Ajouter au cahier des charges une matrice de traçabilité (accord de David du 2026-10-04), une ligne par catégorie (`windows-lcu`, `windows-checkpoint`, `windows-ekb`, `windows-ssu`, `dotnet`, `defender-platform`, `defender`, `office-source`). Colonnes : cibles concernées, source (requête catalogue ou élément épinglé), règle de détection, dépendances (`prerequisites` / `runsAfter`), position dans le plan, scénarios de test qui la couvrent (P1 à P5, T1 à T8, workflows). Toute case vide est un point à traiter avant la phase 1.
@@ -144,3 +144,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-06 | 0 | R-13 tranché : 8 hôtes exacts dans `settings.json`, `Resolve-OpDownloadUrl` (redirections résolues une à une, http réécrit en https, refus avec la ligne à ajouter) et ses tests ; contrat hebdomadaire étendu aux liens réels du moment (18 liens conformes) ; cahier des charges 1.16 (6.1, 7.1, 11, limite de BITS) | R-14 |
 | 2026-10-06 | 0 | R-14 : documentation Microsoft dépouillée (`/PackagePath` et dossiers, checkpoints, `/LogPath`, `/NoRestart`, `Add-WindowsPackage`, codes CBS documentés) ; essai `r14-dism.yml` préparé (cas limites, `dism.exe` comparé à `Add-WindowsPackage`) | Bloqué : GitHub refuse de démarrer les jobs (paiement ou plafond de dépenses du compte) ; contrat du catalogue du jour non exécuté pour la même raison |
 | 2026-10-06 | 0 | Dépôt passé en public (licence MIT, README) ; `windows-11-arm` démarre sans refus ; contrat du catalogue réussi sur runner ; R-14 mesuré : un .msu non applicable renvoie 0 (0x800f081e seulement dans le journal DISM), 3010 pour l'enablement package, 0xCA00A009 pour un .msu altéré, 3 pour un chemin absent ; `dism.exe` préféré à `Add-WindowsPackage` ; README : désactivation des workflows planifiés après 60 jours | Accord de David sur la nouvelle règle de jugement d'une étape DISM (cahier des charges 8.4), puis R-15 |
+| 2026-10-06 | 0 | R-14 tranché, cahier des charges 1.17 : `dism.exe` par chemin complet, jugement en deux temps (liste DISM puis UBR après redémarrage), `NotApplicable` par le journal avec avertissement, contrôle bloquant du PowerShell 32 bits | R-15 |

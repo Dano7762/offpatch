@@ -509,7 +509,7 @@ Question : `dism.exe /Online /Add-Package` ou `Add-WindowsPackage -Online` ? Cod
 
 Impact : exécuteur des étapes Windows.
 
-- Statut : À vérifier
+- Statut : Tranché (2026-10-06)
 - Mesuré (2026-10-04, runner `windows-11-arm`, https://github.com/Dano7762/offpatch/actions/runs/37199356179) : `dism.exe /English /Online /Add-Package /PackagePath:<fichier .msu> /NoRestart /LogPath:<fichier>` renvoie 0 et « The operation completed successfully » pour une checkpoint ou une cumulative déjà installée. Le journal DISM contient des lignes `Error … CMitigationManager::CheckApplicability … 0x80070032` sans conséquence sur le résultat : l'exécuteur ne doit pas juger un succès sur la présence du mot « Error » dans le journal.
 - Piste (2026-10-04, R-02) : codes retour de DISM pour un .msu déjà installé (checkpoint ou cumulative) et pour une cumulative dont la checkpoint manque, à mesurer avec `r02-arm64.yml` (`docs/essais/R-02-checkpoint.md`). Le cas « checkpoint manquante » n'est pas reproductible sur un runner (image récente) : à valider sur intervention réelle. DISM cherche les checkpoints dans le dossier du `/PackagePath` et explore les sous-dossiers.
 - Mesuré (2026-10-05 et 2026-10-06, runner `windows-11-arm`, 26200.9457, runs https://github.com/Dano7762/offpatch/actions/runs/37369422688, 37371740048 et 37401620967), `dism.exe /English /Online /Add-Package /PackagePath:<.msu> /NoRestart /LogPath:<fichier>` :
@@ -550,7 +550,10 @@ Impact : exécuteur des étapes Windows.
   - Dossier de plusieurs .msu : seule la cible et ses checkpoints dans le dossier de `/PackagePath` (documentation Microsoft ; structure du dépôt par fichier, R-02).
   - W10UI (script tiers d'intégration hors ligne) : rien à en attendre pour une installation en ligne par DISM, et contraire au principe « aucune dépendance tierce » ; non retenu.
 - Proposition (à valider par David, cahier des charges 8.4) : remplacer la règle « 0x800f081e traité comme `NotApplicable` » par : code 0 ou 3010, puis contrôle par la détection de la catégorie ; si l'élément n'est pas devenu installé ou en attente et que le journal de l'étape contient `CBS HRESULT=0x800f081e`, état `NotApplicable` avec le motif ; s'il n'est ni installé ni en attente sans cette ligne, `Error` (« DISM a réussi sans installer le paquet ») ; tout autre code, `Error` avec le code. Exécuteur : `dism.exe /English /Online /Add-Package /PackagePath:<fichier> /NoRestart /LogPath:<journal de l'étape>`.
-- Décision :
+- Décision (David, 2026-10-06), cahier des charges 1.17 (8.1, 8.2, 8.4) :
+  - Règle proposée validée, avec vérification en deux temps : juste après DISM, paquet `Install Pending` ou `Installed` dans la liste DISM (cumulative par la version `<build>.<resultingUbr>`, enablement package par son KB, .NET par la version lue dans le .msu) ; après le redémarrage, UBR ≥ `resultingUbr`, sinon `Error` « non appliquée après redémarrage (retour arrière probable) ».
+  - `NotApplicable` détecté à l'exécution (ligne `CBS HRESULT=0x800f081e`) : étape `NotApplicable` et avertissement « jugé applicable par le planificateur », pour corriger la détection.
+  - Exécuteur : `%SystemRoot%\System32\dism.exe` par chemin complet ; contrôle préalable bloquant d'un processus PowerShell 32 bits sur un Windows 64 bits, `Lancer-OffPatch.cmd` lançant le PowerShell natif.
 
 ## R-15 Suspendre Windows Update pendant une session
 

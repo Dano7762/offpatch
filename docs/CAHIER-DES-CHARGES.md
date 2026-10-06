@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.16 du 6 octobre 2026.
+Version 1.17 du 6 octobre 2026.
 
 ## 1. Contexte
 
@@ -411,13 +411,14 @@ Assistant accessible depuis l'onglet Dépôt :
 
 ### 8.1 Lancement
 
-`Lancer-OffPatch.cmd` demande l'élévation, puis lance `powershell.exe -NoProfile -ExecutionPolicy Bypass -File app\OffPatch.ps1`. Au premier lancement depuis un support, l'outil retire la marque « fichier téléchargé » de ses propres fichiers (`Unblock-File`). Tout fonctionne quelle que soit la lettre du lecteur.
+`Lancer-OffPatch.cmd` demande l'élévation, puis lance le PowerShell natif du système, `powershell.exe -NoProfile -ExecutionPolicy Bypass -File app\OffPatch.ps1` (si le script de commande tourne lui-même en 32 bits sur un Windows 64 bits, par `%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe`). Au premier lancement depuis un support, l'outil retire la marque « fichier téléchargé » de ses propres fichiers (`Unblock-File`). Tout fonctionne quelle que soit la lettre du lecteur.
 
 ### 8.2 Contrôles préalables
 
 | Contrôle | Comportement |
 |---|---|
 | Droits administrateur | Bloquant |
+| Processus PowerShell 32 bits sur un Windows 64 bits (`[Environment]::Is64BitOperatingSystem` vrai et `[Environment]::Is64BitProcess` faux) | Bloquant : DISM et le registre seraient vus à travers la redirection 32 bits. `Lancer-OffPatch.cmd` doit lancer le PowerShell natif (8.1) |
 | Cible reconnue (système, version, build, architecture, édition) | Hors périmètre : bloquant, avec le motif. Windows 10 et Windows 11 se distinguent par `CurrentBuild` (22000 et plus = Windows 11), jamais par `ProductName`, qui vaut encore « Windows 10 … » sur Windows 11. Le libellé affiché vient de `Win32_OperatingSystem.Caption` (R-09) |
 | Windows 10 : ESU actif | Absent ou indétectable : avertissement. En mode auto, l'étape Windows est ignorée sauf si je la force dans le récapitulatif (R-04) |
 | Profil Office choisi pris en charge par Microsoft sur ce Windows (3.3, `supportedOn`) | Non pris en charge (par exemple tout profil sur Windows 10 22H2) : avertissement non bloquant, avec la source Microsoft ; rappel dans l'écran récapitulatif du mode auto (8.6) et dans le rapport (8.8) |
@@ -478,9 +479,15 @@ Règles de prérequis :
 
 ### 8.4 Exécution des étapes Windows
 
-- Installation des paquets par DISM en ligne, sans redémarrage automatique, avec un journal DISM par étape. Le choix entre `dism.exe` et `Add-WindowsPackage` est fait en R-14. Pas de délai maximal sur DISM.
+- Installation des paquets par DISM en ligne, sans redémarrage automatique, avec un journal DISM par étape : `%SystemRoot%\System32\dism.exe`, appelé par son chemin complet, avec `/English /Online /Add-Package /PackagePath:<fichier> /NoRestart /LogPath:<journal de l'étape>` (R-14 ; `Add-WindowsPackage` écarté). Pas de délai maximal sur DISM.
 - Juste avant chaque étape, revérification du SHA-256 des seuls fichiers utilisés par l'étape, par rapport au manifeste. Côté client, pas de contrôle Authenticode : l'authenticité a été établie au téléchargement (R-10).
-- Codes retour : 0 réussite, 3010 redémarrage nécessaire, « non applicable » (0x800f081e) traité comme `NotApplicable` et non comme une erreur, le reste en erreur avec le code dans le journal et le rapport.
+- Jugement d'une étape (R-14). Le code retour seul ne suffit pas : un paquet non applicable sort en 0, avec le même message qu'une installation réussie, et 0x800f081e n'apparaît que dans le journal DISM.
+  - Code autre que 0 ou 3010 : `Error`, avec le code dans le journal et le rapport (exemples mesurés : 3, chemin introuvable ; 0xCA00A009, .msu altéré).
+  - Code 0 ou 3010 : vérification en deux temps pour les cumulatives, l'enablement package et .NET.
+    1. Juste après DISM, liste DISM (`/Get-Packages`) : le paquet doit être à l'état `Install Pending` ou `Installed`. Repérage : cumulative par la version `<build>.<resultingUbr>` de `Package_for_RollupFix` (la build y vaut 26100 même sur 25H2 et 26H2, R-02) ; enablement package par son numéro de KB ; .NET par la version du paquet lue dans le .msu (7.2).
+    2. Après le redémarrage, pour les cumulatives et l'enablement package : UBR du PC supérieur ou égal à `resultingUbr` (pour l'enablement package, build égale à `resultingBuild`). Sinon : `Error` « non appliquée après redémarrage (retour arrière probable) ».
+  - Paquet ni `Install Pending` ni `Installed` après un code 0 ou 3010 : si le journal de l'étape contient `CBS HRESULT=0x800f081e`, état `NotApplicable` avec le motif, et avertissement dans le journal « jugé applicable par le planificateur » pour corriger la détection ; sans cette ligne, `Error` « DISM a réussi sans installer le paquet ».
+  - 3010 : redémarrage nécessaire, comme la clé `RebootPending` de CBS.
 - Plateforme Defender : exécution de `updateplatform.<arch>fre_….exe`, puis attente du retour de Defender en mode `Normal`, bornée à 120 s. En cas de dépassement, avertissement dans le journal, et les définitions sont tentées quand même. Réussite constatée par `AMProductVersion`, pas par le code retour.
 - Defender : exécution de mpam-fe.exe, puis lecture de la nouvelle version pour confirmer. Le code retour ne suffit pas : mpam-fe.exe peut renvoyer 0 sans rien appliquer (R-06).
 
@@ -654,3 +661,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.14 (6 octobre 2026) : MSCatalogLTS retiré, dossier `lib/` supprimé de l'arborescence et de la copie sur support ; recherche au catalogue par les fonctions du module, avec pagination (paramètre `p`) et plafond de pages au-delà duquel la recherche échoue (5, 7.1, 7.4) ; `retention.windowsMonths` par cible, défauts 1 pour Windows 11 et 2 pour Windows 10, chaque cible obligatoire (6.1, 7.3) ; `minFreeSpaceGB` ramené de 20 à 17, pic mesuré × 1,5 (6.1) ; espace libre du volume du dépôt contrôlé avant téléchargement (7.1) ; FAT32 refusé à cause de la cumulative Windows 11 x64 de plus de 4 Gio, support de 64 Go recommandé pour un dépôt complet (7.4). Suite de R-11 et R-12.
 - 1.15 (6 octobre 2026) : `minUbr` contrôlé par OffPatch seul, DISM acceptant l'enablement package sous le prérequis (8.3) ; cas de test de planification P6, enablement package « Ignorée (prérequis) » sans cumulative qui atteigne `minUbr` (12). L'enablement package reste installé après le redémarrage de la cumulative. Suite de R-03.
 - 1.16 (6 octobre 2026) : `allowedDomains` remplacé par les 8 noms d'hôte mesurés (retrait de `catalog.update.microsoft.com`, `download.windowsupdate.com` et `officecdn.microsoft.com`) ; règle du nom d'hôte exact, `https` seulement, lien `http` réécrit en `https` sur le même hôte, message de refus avec la ligne à ajouter (6.1) ; chaîne de redirections résolue et contrôlée avant le téléchargement de l'URL finale (7.1) ; limite de BITS et défense en profondeur, Authenticode restant la garantie principale (11). Suite de R-13.
+- 1.17 (6 octobre 2026) : exécuteur Windows par `%SystemRoot%\System32\dism.exe` (chemin complet, `/English /Online /Add-Package /NoRestart /LogPath`), `Add-WindowsPackage` écarté ; jugement d'une étape en deux temps (liste DISM juste après, UBR ou build après le redémarrage, sinon « non appliquée après redémarrage (retour arrière probable) ») ; `NotApplicable` reconnu par la ligne `CBS HRESULT=0x800f081e` du journal, avec avertissement « jugé applicable par le planificateur » (8.4) ; contrôle préalable bloquant d'un PowerShell 32 bits sur Windows 64 bits (8.2), lancement du PowerShell natif (8.1). Suite de R-14.
