@@ -35,7 +35,7 @@ Chaque fichier est contrôlé au téléchargement (signature Authenticode Micros
 ## Tests
 
 - `ci.yml` : PSScriptAnalyzer et Pester 5 sous Windows PowerShell 5.1, à chaque push, sans accès réseau (pages du catalogue enregistrées dans `tests/Fixtures`).
-- `catalog-contract.yml` : chaque mercredi, vérifie que les pages actuelles du Microsoft Update Catalog sont toujours reconnues et que les liens de téléchargement du moment restent sur les domaines autorisés.
+- `catalog-contract.yml` : chaque mercredi, vérifie que les pages actuelles du Microsoft Update Catalog sont toujours reconnues et que les liens de téléchargement du moment restent sur les domaines autorisés. Sur un dépôt public, GitHub désactive les workflows planifiés après 60 jours sans activité dans le dépôt : il faut alors réactiver `catalog-contract.yml` dans l'onglet Actions.
 - Les essais qui modifient le système (DISM, Defender, installation d'Office) tournent uniquement sur des runners GitHub hébergés et jetables, en déclenchement manuel. Ce que les runners ne permettent pas (redémarrages, Windows 10, Windows 11 x64 client) est validé sur intervention réelle.
 
 ## Licence
