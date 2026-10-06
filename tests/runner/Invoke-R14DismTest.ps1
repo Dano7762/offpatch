@@ -36,7 +36,7 @@ if ($env:GITHUB_ACTIONS -ne 'true') {
 }
 
 $toolRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-foreach ($name in 'ConvertFrom-OpCatalogSearchPage', 'ConvertFrom-OpCatalogDownloadDialog', 'Find-OpCatalogUpdate') {
+foreach ($name in 'ConvertFrom-OpCatalogSearchPage', 'ConvertFrom-OpCatalogDownloadDialog', 'Invoke-OpWebRequest', 'Find-OpCatalogUpdate') {
     . (Join-Path $toolRoot "app\module\OffPatch\Private\$name.ps1")
 }
 $cbsKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'

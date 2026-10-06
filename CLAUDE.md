@@ -60,8 +60,11 @@ Réponds-moi en français.
 Le terminal de Claude Code peut être Git Bash : passer par `powershell.exe`.
 
 ```bash
-# Tests unitaires
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Pester -Path ./tests -Output Detailed"
+# Tests unitaires (sans le contrat en ligne, comme ci.yml)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '$c = New-PesterConfiguration; $c.Run.Path = "./tests"; $c.Filter.ExcludeTag = "Live"; $c.Output.Verbosity = "Detailed"; Invoke-Pester -Configuration $c'
+
+# Contrat en ligne avec le catalogue (lecture seule), lancé à part
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '$c = New-PesterConfiguration; $c.Run.Path = "./tests/Live"; $c.Filter.Tag = "Live"; $c.Output.Verbosity = "Detailed"; Invoke-Pester -Configuration $c'
 
 # Analyse statique
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Invoke-ScriptAnalyzer -Path ./app -Recurse -Settings ./PSScriptAnalyzerSettings.psd1"
@@ -73,7 +76,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./app/OffPatch-Cli.ps1 -
 
 Pester 5 et PSScriptAnalyzer sont des outils de développement. L'outil livré ne doit jamais en dépendre.
 
-Avant chaque push, sans exception : tests Pester et PSScriptAnalyzer en local, sans erreur. La CI ne remplace pas cette vérification.
+Avant chaque push, sans exception : tests Pester (hors tag `Live`, comme `ci.yml`) et PSScriptAnalyzer en local, sans erreur. La CI ne remplace pas cette vérification. Jamais de push avec un test en échec. Le contrat en ligne (tag `Live`) se lance à part et ne conditionne pas le push.
 
 Les fichiers se modifient avec l'outil d'édition natif, pas avec des scripts Python générés. Si un script est indispensable, il va dans `scratch/`. Relire les lignes modifiées avant chaque push.
 

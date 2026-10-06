@@ -31,6 +31,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [ ] Module `OffPatch` : manifeste `.psd1`, chargement automatique de `Public/` et `Private/`
 - [ ] `Get-OpRoot` et fonctions de chemins (racine, dépôt, ProgramData)
 - [ ] `Write-OpLog` : niveaux, fichier de session, file de messages pour l'interface
+- [ ] `Invoke-OpProcess` : fonction unique de lancement de processus sur `System.Diagnostics.Process` (jamais `Start-Process`, dont l'`ExitCode` revient vide sous PowerShell 5.1, R-14), utilisée par tous les exécuteurs (DISM, ODT, mpam-fe.exe, plateforme Defender) : code de sortie, sortie standard capturée, délai maximal facultatif ; tests Pester avec `cmd /c exit 0`, `exit 3010`, `exit 1618`, un délai dépassé et une sortie standard capturée
 - [ ] Lecture et validation de `settings.json`, `catalog-queries.json`, `profiles.json`
 - [ ] Lecture, validation et écriture atomique du manifeste
 - [ ] `Lancer-OffPatch.cmd` : élévation, contournement de la stratégie d'exécution, `Unblock-File`

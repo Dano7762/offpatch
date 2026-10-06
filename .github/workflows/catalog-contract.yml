@@ -2,6 +2,8 @@
 # toujours les pages actuelles du site ? Et (R-13) les liens réels du moment (catalogue, mpam-fe.exe, ODT,
 # éléments épinglés), redirections comprises, restent-ils dans allowedDomains ? Échec sinon.
 # Lecture seule : pages et requêtes HEAD, aucun téléchargement de fichier.
+# Une seule relance automatique des tests, 2 minutes après un premier échec, avant de conclure à un échec.
+# Les messages d'échec (code HTTP, URL, extrait de la page) sont déposés en artefact.
 # Chaque mercredi (lendemain du Patch Tuesday les semaines concernées) et à la demande.
 name: catalog-contract
 
@@ -16,10 +18,12 @@ permissions:
 jobs:
   contrat:
     runs-on: windows-2025
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         shell: powershell
+    env:
+      OFFPATCH_DIAGNOSTIC_DIR: ${{ runner.temp }}/contrat-diagnostic
     steps:
       - uses: actions/checkout@v5
 
@@ -28,7 +32,9 @@ jobs:
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module -Name Pester -RequiredVersion 5.9.1 -Scope CurrentUser -Force -SkipPublisherCheck
 
-      - name: Contrat avec le Microsoft Update Catalog (en ligne)
+      - name: Contrat avec le Microsoft Update Catalog (premier passage)
+        id: premier
+        continue-on-error: true
         run: |
           Import-Module Pester -RequiredVersion 5.9.1
           $config = New-PesterConfiguration
@@ -37,3 +43,24 @@ jobs:
           $config.Filter.Tag = 'Live'
           $config.Output.Verbosity = 'Detailed'
           Invoke-Pester -Configuration $config
+
+      - name: Contrat avec le Microsoft Update Catalog (relance unique)
+        if: steps.premier.outcome == 'failure'
+        run: |
+          Start-Sleep -Seconds 120
+          Import-Module Pester -RequiredVersion 5.9.1
+          $config = New-PesterConfiguration
+          $config.Run.Path = './tests/Live'
+          $config.Run.Exit = $true
+          $config.Filter.Tag = 'Live'
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
+
+      - name: Diagnostic des échecs
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: catalog-contract-diagnostic
+          path: ${{ runner.temp }}/contrat-diagnostic
+          retention-days: 30
+          if-no-files-found: ignore

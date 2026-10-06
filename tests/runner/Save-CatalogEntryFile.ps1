@@ -36,7 +36,7 @@ $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $module = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'app\module\OffPatch\Private'
-foreach ($name in 'ConvertFrom-OpCatalogSearchPage', 'ConvertFrom-OpCatalogDownloadDialog', 'Find-OpCatalogUpdate', 'Test-OpFileSignature') {
+foreach ($name in 'ConvertFrom-OpCatalogSearchPage', 'ConvertFrom-OpCatalogDownloadDialog', 'Invoke-OpWebRequest', 'Find-OpCatalogUpdate', 'Test-OpFileSignature') {
     . (Join-Path $module "$name.ps1")
 }
 $settingsPath = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'config\settings.json'

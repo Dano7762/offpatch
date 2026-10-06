@@ -8,6 +8,7 @@ BeforeAll {
     . (Join-Path $root 'app\module\OffPatch\Private\ConvertFrom-OpCatalogSearchPage.ps1')
     . (Join-Path $root 'app\module\OffPatch\Private\ConvertFrom-OpCatalogDownloadDialog.ps1')
     . (Join-Path $root 'app\module\OffPatch\Private\Find-OpCatalogUpdate.ps1')
+    . (Join-Path $root 'app\module\OffPatch\Private\Invoke-OpWebRequest.ps1')
     $fixtures = Join-Path $root 'tests\Fixtures\catalog'
     function Read-Fixture([string]$Name) { [System.IO.File]::ReadAllText((Join-Path $fixtures $Name)) }
 }
