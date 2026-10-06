@@ -53,7 +53,7 @@ Describe 'Microsoft Update Catalog en ligne' -Tag 'Live' {
 
 # R-13 : liens réels du moment, redirections comprises, résolus par Resolve-OpDownloadUrl sans rien télécharger
 # (requêtes HEAD). Un hôte absent de allowedDomains fait échouer le test avec la ligne à ajouter.
-# Les liens de mpam-fe.exe et de la page de l'ODT sont écrits ici en attendant leur place dans config/ (phase 2).
+# Les liens de mpam-fe.exe et de la page de l'ODT sont lus dans settings.json (downloadPages).
 Describe 'Hôtes des téléchargements du moment' -Tag 'Live' {
     It 'chaque lien et chaque redirection restent dans allowedDomains' {
         try {
@@ -73,8 +73,8 @@ Describe 'Hôtes des téléchargements du moment' -Tag 'Live' {
                 foreach ($f in Get-OpCatalogDownloadLink -UpdateId $entry.UpdateId) { $urls.Add($f.Url) }
             }
             foreach ($p in $pinned) { $urls.Add($p.url) }
-            foreach ($arch in 'x64', 'arm64') { $urls.Add("https://go.microsoft.com/fwlink/?LinkID=121721&arch=$arch") }
-            $odtPage = 'https://www.microsoft.com/en-us/download/details.aspx?id=49117'
+            foreach ($link in $settings.downloadPages.defenderDefinitions.PSObject.Properties) { $urls.Add($link.Value) }
+            $odtPage = $settings.downloadPages.officeDeploymentToolPage
             Resolve-OpDownloadUrl -Url 'https://www.catalog.update.microsoft.com/Search.aspx?q=KB4052623' -AllowedDomain $settings.allowedDomains | Out-Null
             $page = Invoke-OpWebRequest -Uri $odtPage
             $odt = [regex]::Matches($page, 'https://download\.microsoft\.com/[^"\\ ]+officedeploymenttool[^"\\ ]+\.exe') | ForEach-Object { $_.Value } | Select-Object -First 1

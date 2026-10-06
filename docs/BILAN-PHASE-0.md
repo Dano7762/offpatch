@@ -55,6 +55,14 @@ Note de David du 6 octobre 2026, examinée sans être inscrite au cahier des cha
   - la création prend du temps et de la place sur C: (non mesuré).
 - Proposition, pour décision au moment de la phase 4 ou 5 : option `createRestorePointBeforeSession`, désactivée par défaut ; si activée et que la protection du système est active sur C:, création d'un point avant la première étape ; si elle est désactivée, ou si un point de moins de 24 heures existe, avertissement dans le journal et le rapport (avec la date du point existant), sans bloquer la session. Mesure de la durée et de l'espace consommé à faire sur runner `windows-11-arm` avant d'inscrire l'option.
 
-## 5. Suite
+## 5. Décisions de David (6 octobre 2026) et suite
 
-Après les décisions A à D : cahier des charges mis à jour en une version, puis début de la phase 1 (socle : arborescence, module, chemins, journal, `Invoke-OpProcess`, lecture et validation de la configuration).
+- A validé, avec une correction : la sélection .NET (`latestMonth`) et le repli par date de Windows 10 trient sur le préfixe `AAAA-MM` du titre ; la date du catalogue ne sert qu'à départager deux entrées du même mois, avec un avertissement dans le journal.
+- B validé : `downloadPages` dans `settings.json`, lu par le contrat en ligne.
+- C validé, plus P10 : Office présent sur un canal absent du dépôt → conservé, `NotApplicable`, « canal absent du dépôt ».
+- D validé.
+- Point de restauration : actif par défaut, créé seulement si la protection du système est déjà active (jamais activée par OffPatch), sinon avertissement ; vérification par `Get-ComputerRestorePoint` ; point existant de moins de 24 heures cité au rapport. Mesures sur runner `windows-11-arm` (`restore-point.yml`, runs 37472754230, 37473634618, 37474481392) :
+  - création en 16 à 21 s, 4 à 14 Mo de clichés utilisés, 512 Mo réservés, plafond de 10 Go ;
+  - second appel dans les 24 heures : simple avertissement, aucun point, aucune erreur ;
+  - **`Checkpoint-Computer` active lui-même la protection** sur un C: où elle est inactive (volume ajouté sous `SPP\Clients`, 512 Mo réservés) : l'état doit donc être lu avant l'appel. Indicateur retenu, mesuré mais non documenté : présence du volume système sous `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SPP\Clients`. À confirmer sur intervention réelle.
+- Cahier des charges 1.20. Suite : phase 1.

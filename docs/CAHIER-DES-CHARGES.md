@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.19 du 6 octobre 2026.
+Version 1.20 du 6 octobre 2026.
 
 ## 1. Contexte
 
@@ -177,13 +177,21 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
     "maxAutoReboots": 5,
     "rebootCountdownSeconds": 30,
     "staleDepotWarningDays": 35,
-    "odtTimeoutMinutes": 30
+    "odtTimeoutMinutes": 30,
+    "createRestorePointBeforeSession": true
   },
   "logging": {
     "level": "INFO"
   },
   "integrity": {
     "trustedRootThumbprints": ["3B1EFD3A66EA28B16697394703A72CA340A05BD5"]
+  },
+  "downloadPages": {
+    "defenderDefinitions": {
+      "x64": "https://go.microsoft.com/fwlink/?LinkID=121721&arch=x64",
+      "arm64": "https://go.microsoft.com/fwlink/?LinkID=121721&arch=arm64"
+    },
+    "officeDeploymentToolPage": "https://www.microsoft.com/en-us/download/details.aspx?id=49117"
   },
   "allowedDomains": [
     "www.catalog.update.microsoft.com",
@@ -198,29 +206,48 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
 }
 ```
 
+`downloadPages` regroupe les liens Microsoft hors catalogue : définitions Defender par architecture (redirection vers `definitionupdates.microsoft.com`, R-06) et page de l'Office Deployment Tool, d'où l'outil tire le lien versionné du fichier (`download.microsoft.com`, R-07). Les hôtes atteints restent soumis à `allowedDomains` ; le contrat en ligne hebdomadaire lit ces liens ici.
+
 Les valeurs chiffrées sont des valeurs de départ. `minFreeSpaceGB` (en Gio) vaut le pic d'espace consommé sur C: par l'installation d'une cumulative Windows 11 mesuré sur runner, sans redémarrage (10,7 Gio, le plus fort de trois essais), multiplié par 1,5 et arrondi au-dessus : la mesure est un minimum, puisque la phase de redémarrage n'est pas comptée (R-12). La liste `allowedDomains` contient les noms d'hôte réellement atteints, redirections comprises, mesurés en R-13. Règle : nom d'hôte exact, sans joker ni suffixe, `https` seulement. Un lien `http` renvoyé par une source (catalogue, redirection) est réécrit en `https` sur le même hôte ; rien n'est jamais téléchargé en `http`. Un hôte absent de la liste fait refuser le téléchargement, avec un message qui donne l'hôte, l'URL complète et la ligne exacte à ajouter à `allowedDomains`. Elle s'applique aux téléchargements faits par OffPatch lui-même (catalogue, mpam-fe.exe, plateforme Defender, éléments épinglés, ODT). Elle ne s'applique pas au trafic propre de l'ODT pendant `setup.exe /download`, qui contacte ses propres domaines (CDN Office, mais aussi par exemple `ecs.office.com` ou `mrodevicemgr.officeapps.live.com`) : OffPatch ne le contrôle pas, il se contente de le journaliser. L'interface modifie ce fichier quand je change les cibles ou les langues dans l'onglet Dépôt.
 
 Les langues se règlent par source Office. Par défaut, la source `current` porte `fr-fr` et `en-us` : les Office en boîte ou Microsoft 365 préinstallés par les fabricants sont souvent bilingues, et une langue installée absente de la source empêche leur mise à jour (8.5, R-08). L'anglais ajoute environ 350 Mo à la source Current (3 955 Mo au lieu de 3 605 Mo, mesuré le 5 octobre 2026). Les sources `perpetualvl2024` et `perpetualvl2021` portent `fr-fr` seul.
 
 ### 6.2 `config/catalog-queries.json`
 
-Pour chaque cible et chaque catégorie : la recherche à envoyer au catalogue, un motif d'inclusion et un motif d'exclusion sur le titre, la règle de sélection. Le motif d'exclusion écarte au minimum les préversions, les mises à jour dynamiques, les hotpatchs, les éditions Server et les mauvaises architectures.
-
-Exemple de forme (les chaînes réelles sont établies en R-01) :
+Pour chaque cible et chaque catégorie : les recherches à envoyer au catalogue, un motif d'inclusion et un motif d'exclusion sur le titre, la règle de sélection. Le motif d'exclusion écarte au minimum les préversions, les mises à jour dynamiques, les hotpatchs, les éditions Server et les mauvaises architectures. Les chaînes réelles, établies en R-01, R-05 et R-06, sont dans le fichier du dépôt ; extrait :
 
 ```json
 {
-  "win11-x64": [
-    {
-      "category": "windows-lcu",
-      "search": "Cumulative Update Windows 11 x64",
-      "includeTitlePattern": "Cumulative Update for Windows 11.*x64-based",
-      "excludeTitlePattern": "Preview|Dynamic|Hotpatch|Server|\\.NET|arm64",
-      "pick": "latest"
-    }
-  ]
+  "schemaVersion": 1,
+  "monthsToSearch": 2,
+  "targets": {
+    "win11-x64": [
+      {
+        "category": "windows-lcu",
+        "searches": [
+          "{month} Cumulative Update for Windows 11, version 24H2",
+          "{month} Cumulative Update for Windows 11, version 25H2",
+          "{month} Cumulative Update for Windows 11, version 26H2"
+        ],
+        "includeTitlePattern": "^\\d{4}-\\d{2} Cumulative Update for Windows 11, version (24H2|25H2|26H2) for x64-based Systems \\(KB\\d+\\) \\(\\d+\\.\\d+\\)$",
+        "excludeTitlePattern": "Preview|Dynamic|Hotpatch|Server|\\.NET|26H1|arm64",
+        "pick": "highestUbr",
+        "prerequisites": ["windows-checkpoint"],
+        "runsAfter": []
+      }
+    ]
+  }
 }
 ```
+
+- `searches` : une recherche par version, le catalogue s'arrêtant à 25 lignes par page (R-01) ; les pages suivantes sont demandées par la pagination (7.1, R-11).
+- `{month}` est remplacé par le mois au format `AAAA-MM`, pour chacun des `monthsToSearch` derniers mois (2 : le mois courant et le précédent).
+- `pick`, règle de sélection parmi les titres retenus :
+  - `highestUbr` (cumulatives Windows 11) : regroupement par KB, puis KB dont l'UBR, dernier nombre du titre, est le plus élevé ; une seule copie des fichiers par architecture, quelle que soit la version citée dans le titre (R-01) ;
+  - `highestUbrFromReleaseInformation` (cumulative Windows 10) : même règle, l'UBR étant tiré de la correspondance KB → build de la page release-information ; si aucun KB candidat n'y figure, repli sur `latestMonth`, avec un avertissement (R-01) ;
+  - `latestMonth` (.NET) : tri sur le préfixe `AAAA-MM` du titre ; la date affichée par le catalogue ne sert qu'à départager deux entrées du même mois, avec un avertissement dans le journal (elle dépend de l'entrée : une entrée ajoutée plus tard pour une nouvelle version porte une date plus récente pour le même fichier, R-01) ;
+  - `highestVersion` (plateforme Defender) : version la plus élevée citée dans le titre.
+- `fileNamePattern` (facultatif) : choix du fichier d'une entrée qui en contient plusieurs, par exemple l'exécutable de la plateforme Defender pour l'architecture de la cible.
 
 Quand Microsoft change la formulation d'un titre, on corrige ce fichier sans toucher au code.
 
@@ -264,7 +291,7 @@ Une entrée peut porter les champs de dépendance `prerequisites` et `runsAfter`
 </Configuration>
 ```
 
-`AllowCdnFallback="FALSE"` garantit que l'installation n'utilise que la source locale. Les mises à jour ultérieures du PC client restent activées sur le canal normal de Microsoft. La compatibilité de `<Remove>` combiné à `<Add>` dans un même fichier est à vérifier (R-08).
+`AllowCdnFallback="FALSE"` garantit que l'installation n'utilise que la source locale. Les mises à jour ultérieures du PC client restent activées sur le canal normal de Microsoft. `<Remove All="TRUE" />` combiné à `<Add>` dans un même fichier fonctionne (vérifié en R-08).
 
 ### 6.4 `config/pinned-items.json`
 
@@ -425,8 +452,16 @@ Assistant accessible depuis l'onglet Dépôt :
 | Espace libre sur C: | Sous `minFreeSpaceGB` : bloquant |
 | Portable sur batterie | Avertissement, confirmation demandée avant le mode auto |
 | Âge du dépôt | Au-delà de `staleDepotWarningDays` : avertissement |
+| Point de restauration (`createRestorePointBeforeSession`, actif par défaut) | Juste avant la première étape. Si la protection du système est inactive sur C:, aucun point et avertissement : OffPatch ne l'active jamais, et `Checkpoint-Computer` l'active de lui-même si on l'appelle (mesuré, voir ci-dessous). Si elle est active : `Checkpoint-Computer`, puis vérification par `Get-ComputerRestorePoint` qu'un point existe vraiment. Si Windows en a créé un dans les 24 heures, aucun nouveau point (avertissement de `Checkpoint-Computer`, pas d'erreur) : le rapport cite ce point existant (description, date). Jamais bloquant |
 | PC connecté à un réseau | Avertissement : Windows Update peut travailler en parallèle. L'outil recommande d'activer le mode Avion pendant la session (il survit aux redémarrages) ; rappel dans l'écran récapitulatif du mode auto (8.6). OffPatch ne suspend pas Windows Update lui-même : aucune méthode documentée qui expire d'elle-même (R-15) |
 | Intégrité des fichiers nécessaires | Hash différent du manifeste : l'étape passe en erreur, les autres continuent |
+
+Point de restauration, mesures sur runner `windows-11-arm` (6 octobre 2026, bilan de phase 0) :
+
+- `Checkpoint-Computer` crée le point en 16 à 21 s ; clichés utilisés : 4 à 14 Mo, 512 Mo réservés, plafond de 10 Go (3 % du disque).
+- Un second appel dans les 24 heures ne crée rien et n'échoue pas : il émet seulement l'avertissement « A new system restore point cannot be created because one has already been created within the past 1440 minutes » ; seule la liste de `Get-ComputerRestorePoint` permet de le constater.
+- Sur un C: sans protection (aucune entrée pour le volume sous `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SPP\Clients`, aucun stockage de clichés), `Checkpoint-Computer` **active la protection** puis crée le point : le volume apparaît sous `SPP\Clients`, 512 Mo de clichés sont réservés. C'est une modification durable : l'appel n'est donc fait que si la protection est déjà active.
+- Indicateur de protection active retenu : présence du volume système dans les valeurs de `SPP\Clients`. Aucune méthode documentée par Microsoft n'a été trouvée ; cet indicateur est mesuré (absent avant activation, présent après), pas documenté. À confirmer sur intervention réelle sur un PC où la protection est active d'origine (`RECHERCHE.md`).
 
 ### 8.3 Détection et plan
 
@@ -441,7 +476,7 @@ Pour chaque élément du manifeste applicable au PC, l'outil calcule un état :
 | `SkippedPrerequisite` | Ignorée (prérequis) |
 | `Error` | Erreur |
 
-Méthodes de détection, à confirmer en R-09. La famille (Windows 10 ou 11) se lit sur `CurrentBuild`, jamais sur `ProductName` (8.2). Pour les cumulatives, la détection repose sur l'UBR ; la liste des paquets DISM ne sert qu'au diagnostic (son nom de paquet porte la build 26100 même sur une 25H2, et une checkpoint y figure à l'état « Staged », R-02) :
+Méthodes de détection, établies en R-09. La famille (Windows 10 ou 11) se lit sur `CurrentBuild`, jamais sur `ProductName` (8.2). Pour les cumulatives, la détection repose sur l'UBR ; la liste des paquets DISM ne sert qu'au diagnostic (son nom de paquet porte la build 26100 même sur une 25H2, et une checkpoint y figure à l'état « Staged », R-02) :
 
 - Cumulative Windows : non applicable si la build courante ne figure pas dans `baseBuilds`. Sinon, à jour si l'UBR courant est supérieur ou égal à `resultingUbr`, à installer dans le cas contraire.
 - Checkpoint : présente si la build courante est une build de base de la branche (26100, 26200 ou 26300) et que l'UBR courant est supérieur ou égal à l'UBR de la checkpoint (1742 pour KB5043080).
@@ -461,7 +496,7 @@ Le plan est la liste ordonnée des étapes, avec les points de redémarrage. Ord
 5. Office : installation ou mise à jour.
 6. Contrôle final : nouvelle détection et rapport.
 
-Si la phase 0 montre que certaines étapes peuvent s'enchaîner avant un seul redémarrage (R-02, R-03), le planificateur regroupe les redémarrages.
+Regroupement des redémarrages (R-02, R-03) : les checkpoints et la cumulative s'enchaînent dans la même étape, avant un seul redémarrage. L'enablement package reste installé après le redémarrage de la cumulative : son regroupement avec elle n'est pas prouvé (essai à mener sur intervention réelle, `RECHERCHE.md`).
 
 Règles de dépendance. Deux types, déclarés dans le manifeste (7.2) et dans `pinned-items.json` (6.4) :
 
@@ -543,6 +578,7 @@ En fin de session, ou en cas d'abandon, un rapport HTML autonome et imprimable e
 - Office installé (produit, version, canal, langues) et le mode d'activation attendu, avec la mention, s'il y a lieu, que Microsoft ne prend pas ce profil en charge sur ce Windows (et la source) ;
 - erreurs et avertissements ;
 - si le PC était hors ligne en fin de session : rappel de désactiver le mode Avion ou de rebrancher le réseau ;
+- point de restauration : point créé par OffPatch (description, date), ou point existant de moins de 24 heures cité à sa place, ou motif de l'absence (protection du système inactive, option désactivée) ;
 - version de l'outil et date du dépôt utilisé.
 
 Aucune clé de produit n'y figure.
@@ -594,7 +630,7 @@ Règles de comportement :
 
 ## 12. Tests
 
-Tests unitaires Pester, avec des mocks pour DISM, `Start-Process`, le registre, `Get-CimInstance`, BITS et le réseau. Les jeux de données de test (manifestes, sorties DISM, clés de registre simulées) sont dans `tests/Fixtures/`.
+Tests unitaires Pester, avec des mocks pour DISM, `Invoke-OpProcess` (fonction unique de lancement des processus, R-14), le registre, `Get-CimInstance`, BITS et le réseau. Les jeux de données de test (manifestes, sorties DISM, clés de registre simulées) sont dans `tests/Fixtures/`.
 
 Tests de planification (`tests/Unit/Planner/`) : chaque cas associe une fixture d'état du PC et une fixture de manifeste au plan attendu, étapes dans l'ordre avec leur état et leurs points de redémarrage :
 
@@ -606,10 +642,14 @@ Tests de planification (`tests/Unit/Planner/`) : chaque cas associe une fixture 
 | P4 | Windows 11 26H2 à jour | Aucune étape Windows ; enablement package non applicable |
 | P5 | Windows 10 22H2 sans les SSU récents (UBR < 3271) | SSU autonome, puis cumulative, redémarrage |
 | P6 | Windows 11 25H2, 26200.9457, aucune cumulative au dépôt qui porte l'UBR à 9550 ou plus | Enablement package « Ignorée (prérequis) », motif « UBR 9457 inférieur à `minUbr` 9550 » ; aucun appel à DISM pour lui |
+| P7 | Windows 11, Defender désactivé (antivirus tiers, `AMRunningMode` ni actif ni passif) | Plateforme et définitions Defender `NotApplicable` avec le motif, jamais en erreur ; le reste du plan inchangé |
+| P8 | Windows 10 22H2 avec .NET 4.8 (`Release` entre 528040 et 533319), puis le même avec .NET 4.8.1 (`Release` ≥ 533320) | Élément .NET de Windows 10 : fichier ndp48 dans le premier cas, ndp481 dans le second (`netRelease`, 7.2) |
+| P9 | Office installé en fr-fr et en-us, source `current` du dépôt en fr-fr seul | Office `NotApplicable`, motif « langue absente de la source » ; ODT non lancé |
+| P10 | Office présent sur un canal absent du dépôt | Office conservé, `NotApplicable`, motif « canal absent du dépôt » (8.5) |
 
 Tests réels, selon deux moyens :
 
-- **Runners GitHub hébergés** (dépôt privé, jetables), pour ce qu'ils couvrent : CI à chaque push (PSScriptAnalyzer et Pester sous Windows PowerShell 5.1), face Dépôt (recherche au catalogue, téléchargements, contrôles d'intégrité, `windows-2025`), Windows 11 ARM64 client sans redémarrage (`windows-11-arm`). Les workflows lourds se déclenchent à la main.
+- **Runners GitHub hébergés** (dépôt public `Dano7762/offpatch`, jetables), pour ce qu'ils couvrent : CI à chaque push (PSScriptAnalyzer et Pester sous Windows PowerShell 5.1, sans accès réseau), contrat en ligne avec le catalogue chaque mercredi (`catalog-contract.yml`), face Dépôt (recherche au catalogue, téléchargements, contrôles d'intégrité, `windows-2025`), Windows 11 ARM64 client sans redémarrage (`windows-11-arm`). Les workflows lourds se déclenchent à la main.
 - **Interventions réelles** pour le reste : tout ce qui demande un redémarrage, Windows 11 x64 client, Windows 10, un support physique. On commence toujours par l'action `Plan`, en lecture seule, avant toute installation.
 
 | Test | Situation de départ | Attendu | Où |
@@ -625,18 +665,18 @@ Tests réels, selon deux moyens :
 
 Les résultats sont notés dans le journal de `TODO.md`.
 
-Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case marquée **à traiter** est un point à régler avant la phase 1. Workflows cités : `depot-x64`, `r02-arm64`, `msu-inspect`, `r06-defender`, `r07-office`, `r07-install`, `r08-office`, `r10-integrity`, `r14-dism`, `catalog-contract`.
+Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case vide ou marquée « à traiter » serait un point à régler avant la phase 1 ; il n'en reste aucune depuis la version 1.20. Workflows cités : `depot-x64`, `r02-arm64`, `msu-inspect`, `r06-defender`, `r07-office`, `r07-install`, `r08-office`, `r10-integrity`, `r14-dism`, `catalog-contract`.
 
 | Catégorie | Cibles | Source | Détection (8.3) | Dépendances | Position dans le plan | Scénarios de test |
 |---|---|---|---|---|---|---|
-| `defender-platform` | Toutes | Catalogue, `catalog-queries.json` (KB4052623, Current Channel (Broad)) | Defender actif ou passif ; `AMProductVersion` ≥ `FileVersion` | Aucune (les définitions en dépendent par l'ordre) | Étape 1 | `r06-defender`, `r10-integrity`, `catalog-contract` ; T1, T6 ; planification : **à traiter** |
-| `defender` | Toutes | Lien Microsoft (go.microsoft.com, R-06) ; emplacement du lien dans `config/` : **à traiter** | Defender actif ou passif ; `AntivirusSignatureVersion` ≥ `FileVersion` ; désactivé : `NotApplicable` | `runsAfter` : `defender-platform` | Étape 1, après la plateforme | `r06-defender`, `r10-integrity`, `catalog-contract` ; T1, T6 ; planification : **à traiter** |
+| `defender-platform` | Toutes | Catalogue, `catalog-queries.json` (KB4052623, Current Channel (Broad)) | Defender actif ou passif ; `AMProductVersion` ≥ `FileVersion` | Aucune (les définitions en dépendent par l'ordre) | Étape 1 | `r06-defender`, `r10-integrity`, `catalog-contract` ; T1, T6 ; P7 |
+| `defender` | Toutes | Lien Microsoft (go.microsoft.com, R-06), `settings.json` (`downloadPages.defenderDefinitions`) | Defender actif ou passif ; `AntivirusSignatureVersion` ≥ `FileVersion` ; désactivé : `NotApplicable` | `runsAfter` : `defender-platform` | Étape 1, après la plateforme | `r06-defender`, `r10-integrity`, `catalog-contract` ; T1, T6 ; P7 |
 | `windows-ssu` | `win10-x64` | Élément épinglé (KB5031539) | Build 19045 et UBR < `applyBelowUbr` (3271) | Prérequis bloquant de `windows-lcu` sur image ancienne | Étape 2, avant la cumulative | P5 ; `depot-x64` (liens directs), `r14-dism` (non applicable sur Windows 11) ; T4 |
 | `windows-checkpoint` | `win11-x64`, `win11-arm64` | Catalogue, jointe à l'entrée de la cumulative (R-02) | Build de base de la branche et UBR ≥ UBR de la checkpoint (1742) | Prérequis bloquant de `windows-lcu` | Étape 2, avant la cumulative (même dossier pour DISM) | P1 ; `r02-arm64`, `depot-x64` ; T1, T2 ; R-02 ouvert |
 | `windows-lcu` | Toutes | Catalogue, `catalog-queries.json`, UBR le plus élevé (R-01) ; Windows 10 : release-information | Build dans `baseBuilds` et UBR ≥ `resultingUbr` ; après DISM : liste DISM, puis UBR après redémarrage (8.4) | `prerequisites` : `windows-checkpoint` (Windows 11), `windows-ssu` (Windows 10 ancien) | Étape 2, puis redémarrage | P1 à P5 ; `depot-x64`, `r02-arm64` ; T1 à T4 |
 | `windows-ekb` | Windows 11 24H2 et 25H2 | Élément épinglé (KB5121794) | Build dans `appliesToBaseBuilds`, option active ; après redémarrage : build `resultingBuild` | Prérequis `minUbr` (9550, contrôlé par OffPatch seul) ; `runsAfter` : `windows-lcu` | Étape 3, après le redémarrage de la cumulative | P1 à P4, P6 ; `r02-arm64` (R-03), `r14-dism` ; T2 ; regroupement à valider sur intervention réelle |
-| `dotnet` | Toutes | Catalogue, `catalog-queries.json` (R-05) | Version du paquet lue dans le .msu, comparée à la liste DISM ; Windows 10 : fichier choisi par `Release` | Aucune | Étape 4 | `msu-inspect`, `r14-dism` ; T1, T4 ; planification : **à traiter** |
-| `office-source` | Toutes | ODT `/download` ; page de l'ODT (www.microsoft.com) ; emplacement du lien dans `config/` : **à traiter** | Registre Click-to-Run, version de `WINWORD.EXE`, langues comparées à la source | Aucune ; langue absente : `NotApplicable` | Étape 5 | `r07-office`, `r07-install`, `r08-office`, `r10-integrity` ; T1, T2, T6 ; planification : **à traiter** |
+| `dotnet` | Toutes | Catalogue, `catalog-queries.json` (R-05) | Version du paquet lue dans le .msu, comparée à la liste DISM ; Windows 10 : fichier choisi par `Release` | Aucune | Étape 4 | `msu-inspect`, `r14-dism` ; T1, T4 ; P8 |
+| `office-source` | Toutes | ODT `/download` ; page de l'ODT, `settings.json` (`downloadPages.officeDeploymentToolPage`) | Registre Click-to-Run, version de `WINWORD.EXE`, langues comparées à la source | Aucune ; langue absente : `NotApplicable` | Étape 5 | `r07-office`, `r07-install`, `r08-office`, `r10-integrity` ; T1, T2, T6 ; P9, P10 |
 
 ## 13. Critères d'acceptation de la v1
 
@@ -679,3 +719,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.17 (6 octobre 2026) : exécuteur Windows par `%SystemRoot%\System32\dism.exe` (chemin complet, `/English /Online /Add-Package /NoRestart /LogPath`), `Add-WindowsPackage` écarté ; jugement d'une étape en deux temps (liste DISM juste après, UBR ou build après le redémarrage, sinon « non appliquée après redémarrage (retour arrière probable) ») ; `NotApplicable` reconnu par la ligne `CBS HRESULT=0x800f081e` du journal, avec avertissement « jugé applicable par le planificateur » (8.4) ; contrôle préalable bloquant d'un PowerShell 32 bits sur Windows 64 bits (8.2), lancement du PowerShell natif (8.1). Suite de R-14.
 - 1.18 (6 octobre 2026) : option `pauseWindowsUpdateDuringSession` retirée, avec le rétablissement de Windows Update en fin de session (6.1, 8.2, 8.6) ; PC connecté à un réseau : mode Avion recommandé, rappel dans le récapitulatif du mode auto (8.2, 8.6) ; PC hors ligne en fin de session : rappel de désactiver le mode Avion ou de rebrancher le réseau à l'écran de fin et dans le rapport (8.6, 8.8) ; DISM : code 1618 ou 0x80070652 (installation déjà en cours), attente de 5 minutes et une seule nouvelle tentative (8.4) ; suspension de Windows Update notée en évolution (14). Suite de R-15 et R-14.
 - 1.19 (6 octobre 2026) : matrice de traçabilité par catégorie (12), accord de David du 4 octobre 2026 ; les cases « à traiter » sont reprises dans `docs/BILAN-PHASE-0.md`. Bilan de phase 0.
+- 1.20 (6 octobre 2026) : décisions du bilan de phase 0. Format de `catalog-queries.json` (`searches`, `{month}`, `monthsToSearch`, règles `highestUbr`, `highestUbrFromReleaseInformation`, `latestMonth` triée sur le préfixe `AAAA-MM` du titre, la date du catalogue ne départageant que deux entrées du même mois avec un avertissement, `highestVersion`, `fileNamePattern`) (6.2) ; `downloadPages` dans `settings.json` (6.1) ; cas de planification P7 à P10 (12) ; matrice de traçabilité sans case à traiter (12) ; corrections : détection établie en R-09, regroupement des redémarrages (8.3), `<Remove>` + `<Add>` vérifié (6.3), `Invoke-OpProcess`, dépôt public et contrat hebdomadaire (12) ; point de restauration avant session, actif par défaut, créé seulement si la protection du système est déjà active, vérifié par `Get-ComputerRestorePoint`, point existant de moins de 24 heures cité au rapport, mesures sur runner (6.1, 8.2, 8.8).

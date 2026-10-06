@@ -21,6 +21,7 @@ Ce que les runners GitHub ne permettent pas de vérifier (décision de David du 
   5. relevé de `CurrentBuild`, `UBR` et `DisplayVersion`, et de la liste DISM.
   En attendant, l'enablement package reste installé après le redémarrage de la cumulative.
 - Pause de Windows Update depuis Paramètres sous Windows 11 Famille (R-15) : pause posée à la main jusqu'au lendemain, effet pendant une session OffPatch connectée, reprise d'elle-même à la date choisie.
+- Point de restauration avant session (cahier des charges 8.2) : sur un PC où la protection du système est active d'origine, présence du volume système sous `SPP\Clients` et création du point ; sur un PC où elle est inactive, absence de l'entrée et aucun appel à `Checkpoint-Computer`.
 - Session OffPatch sur un PC connecté pendant que Windows Update installe lui-même : code renvoyé par DISM (1618 / 0x80070652 attendu, non vérifié) et effet de la nouvelle tentative après 5 minutes (R-14).
 
 Statuts possibles : À vérifier, En cours, Tranché, Bloqué.

@@ -21,13 +21,21 @@
     "maxAutoReboots": 5,
     "rebootCountdownSeconds": 30,
     "staleDepotWarningDays": 35,
-    "odtTimeoutMinutes": 30
+    "odtTimeoutMinutes": 30,
+    "createRestorePointBeforeSession": true
   },
   "logging": {
     "level": "INFO"
   },
   "integrity": {
     "trustedRootThumbprints": ["3B1EFD3A66EA28B16697394703A72CA340A05BD5"]
+  },
+  "downloadPages": {
+    "defenderDefinitions": {
+      "x64": "https://go.microsoft.com/fwlink/?LinkID=121721&arch=x64",
+      "arm64": "https://go.microsoft.com/fwlink/?LinkID=121721&arch=arm64"
+    },
+    "officeDeploymentToolPage": "https://www.microsoft.com/en-us/download/details.aspx?id=49117"
   },
   "allowedDomains": [
     "www.catalog.update.microsoft.com",

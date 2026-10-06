@@ -23,6 +23,18 @@ Describe 'config/settings.json' {
         foreach ($d in $settings.allowedDomains) { $d | Should -Match '^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)+$' }
     }
 
+    It 'donne des liens downloadPages en https sur des hôtes autorisés, avec un lien de définitions par architecture de cible' {
+        $links = @($settings.downloadPages.defenderDefinitions.PSObject.Properties | ForEach-Object { $_.Value }) + $settings.downloadPages.officeDeploymentToolPage
+        foreach ($l in $links) {
+            ([uri]$l).Scheme | Should -Be 'https'
+            $settings.allowedDomains | Should -Contain ([uri]$l).Host
+        }
+        foreach ($t in $settings.targets) {
+            $arch = ($t -split '-')[1]
+            $settings.downloadPages.defenderDefinitions.PSObject.Properties[$arch] | Should -Not -BeNullOrEmpty -Because "la cible $t doit avoir son lien de définitions"
+        }
+    }
+
     It 'déclare au moins une empreinte de racine de 40 caractères hexadécimaux' {
         @($settings.integrity.trustedRootThumbprints).Count | Should -BeGreaterThan 0
         foreach ($t in $settings.integrity.trustedRootThumbprints) { $t | Should -Match '^[0-9A-F]{40}$' }
@@ -41,7 +53,7 @@ Describe 'config/catalog-queries.json' {
                 @($q.searches).Count | Should -BeGreaterThan 0
                 { [regex]::new($q.includeTitlePattern) } | Should -Not -Throw
                 { [regex]::new($q.excludeTitlePattern) } | Should -Not -Throw
-                $q.pick | Should -BeIn @('latest', 'highestUbr', 'highestUbrFromReleaseInformation', 'highestVersion')
+                $q.pick | Should -BeIn @('latestMonth', 'highestUbr', 'highestUbrFromReleaseInformation', 'highestVersion')
                 foreach ($d in @($q.prerequisites) + @($q.runsAfter)) { if ($d) { $categories | Should -Contain $d } }
             }
         }
