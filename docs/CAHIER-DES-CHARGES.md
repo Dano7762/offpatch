@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.21 du 6 octobre 2026.
+Version 1.22 du 6 octobre 2026.
 
 ## 1. Contexte
 
@@ -560,6 +560,12 @@ Mécanisme (R-08) :
 
 Le XML d'installation est généré dans `C:\ProgramData\OffPatch\temp\` avec le chemin absolu de la source, puis supprimé dès la fin de l'étape. Pour un profil LTSC, une clé MAK peut être saisie dans un champ masqué. Elle reste en mémoire, est injectée dans le XML temporaire, et le journal indique seulement « clé fournie : oui ». Pour un profil en boîte, le rapport rappelle que l'activation se fait avec le compte Microsoft du client.
 
+Clé de produit et journaux de l'ODT (R-08) :
+
+- Forme contrôlée avant l'ODT, qui accepte une clé invalide sans erreur (code 0, mesuré) : cinq groupes de cinq caractères dans l'alphabet `BCDFGHJKMPQRTVWXY2346789`, sans tenir compte de la casse. Forme invalide : saisie refusée, dans l'interface comme dans la CLI. Une clé de forme valide n'est pas vérifiée : le rapport indique « clé enregistrée, activation non vérifiée, à réaliser en ligne ».
+- L'ODT écrit la clé en clair dans son journal principal (ligne « ConfigFile::ParseAttribute: Value of PIDKEY: … », UTF-16). Il écrit ses journaux dans le TEMP de l'utilisateur, sous la forme `<NOMDUPC>-AAAAMMJJ-HHMM.log`, et ignore l'élément `<Logging Path>` du XML (mesuré : aucun fichier dans le dossier demandé).
+- Dès la fin de chaque étape Office, chaque journal de l'ODT créé ou modifié depuis le début de l'étape dans le TEMP de l'utilisateur est masqué sur place : relu dans son encodage d'origine (UTF-16 pour le journal principal), la clé saisie remplacée sous toutes ses formes (avec et sans tirets, sans tenir compte de la casse) ainsi que toute chaîne de forme de clé, puis réécrit dans le même encodage. Les journaux ainsi masqués sont ensuite copiés dans le sous-dossier de session (10), puis avec le rapport sur le support. Aucune copie n'a lieu avant le masquage.
+
 ### 8.6 Mode automatique
 
 Toutes les décisions sont prises avant le démarrage, sur un écran récapitulatif : étapes prévues, profil Office (avec le rappel, s'il y a lieu, que Microsoft ne prend pas ce profil en charge sur ce Windows, et la source), retrait d'un Office existant (jamais par défaut : un Office existant est conservé et mis à jour s'il est sur un canal du dépôt, son retrait est un choix explicite), clé éventuelle, forçage éventuel pour Windows 10, rappel du mode Avion si le PC est connecté à un réseau (8.2). Je valide une seule fois, puis plus aucune question n'est posée.
@@ -636,7 +642,7 @@ Règles de comportement :
 - Téléchargements limités aux noms d'hôte de `allowedDomains`, contrôlés sur toute la chaîne de redirections avant le téléchargement, en `https` seulement (6.1, 7.1). Limite : BITS suit lui-même une redirection qui surviendrait au moment du transfert, sans que l'outil puisse la contrôler. La garantie principale reste donc la signature Authenticode et l'empreinte de la racine, vérifiées sur chaque fichier reçu ; la liste des domaines est une défense en profondeur.
 - Authenticité vérifiée côté dépôt, en ligne, au téléchargement : `Status` = `Valid`, signataire de l'organisation Microsoft Corporation, chaîne jusqu'à une racine dont l'empreinte figure dans `integrity.trustedRootThumbprints` (racine inconnue : téléchargement refusé avec un message explicite) ; un certificat expiré mais horodaté reste valide, sans contrôle de date d'expiration (7.1, R-10).
 - SHA-256 calculé au téléchargement et stocké dans le manifeste, y compris pour chaque fichier d'une source Office. Côté client : revérification du SHA-256 seulement, sur les fichiers utilisés, juste avant l'étape ; toute la source Office avant `setup.exe /configure` (8.4, 8.5).
-- Clé de produit : mémoire et XML temporaire uniquement.
+- Clé de produit : mémoire et XML temporaire uniquement. Masquée dans tous les journaux : ceux d'OffPatch (`Write-OpLog`) et ceux de l'ODT, qui l'écrit en clair dans le TEMP de l'utilisateur ; ces derniers sont masqués sur place dans leur encodage d'origine, avant toute copie dans la session ou sur le support (8.5, R-08). Forme de la clé contrôlée avant l'ODT.
 - Aucune élévation persistante : la tâche planifiée disparaît en fin de session.
 - Écriture atomique du manifeste et de `state.json`.
 
@@ -734,3 +740,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.19 (6 octobre 2026) : matrice de traçabilité par catégorie (12), accord de David du 4 octobre 2026 ; les cases « à traiter » sont reprises dans `docs/BILAN-PHASE-0.md`. Bilan de phase 0.
 - 1.20 (6 octobre 2026) : décisions du bilan de phase 0. Format de `catalog-queries.json` (`searches`, `{month}`, `monthsToSearch`, règles `highestUbr`, `highestUbrFromReleaseInformation`, `latestMonth` triée sur le préfixe `AAAA-MM` du titre, la date du catalogue ne départageant que deux entrées du même mois avec un avertissement, `highestVersion`, `fileNamePattern`) (6.2) ; `downloadPages` dans `settings.json` (6.1) ; cas de planification P7 à P10 (12) ; matrice de traçabilité sans case à traiter (12) ; corrections : détection établie en R-09, regroupement des redémarrages (8.3), `<Remove>` + `<Add>` vérifié (6.3), `Invoke-OpProcess`, dépôt public et contrat hebdomadaire (12) ; point de restauration avant session, actif par défaut, créé seulement si la protection du système est déjà active, vérifié par `Get-ComputerRestorePoint`, point existant de moins de 24 heures cité au rapport, mesures sur runner (6.1, 8.2, 8.8).
 - 1.21 (6 octobre 2026) : point de restauration : second indicateur documenté `Win32_ShadowStorage`, protection jugée active seulement si `SPP\Clients` et `Win32_ShadowStorage` concordent, sinon aucun appel et avertissement ; relevé des deux indicateurs dans chaque état sur runner ; relecture après l'appel et mention « protection du système activée par Checkpoint-Computer, à vérifier » (8.2, 8.8) ; critère d'acceptation : indicateurs validés sur intervention réelle, sinon option livrée désactivée par défaut (13).
+- 1.22 (6 octobre 2026) : clé de produit : forme contrôlée avant l'ODT (alphabet `BCDFGHJKMPQRTVWXY2346789`, saisie refusée sinon dans l'interface et la CLI), rapport « clé enregistrée, activation non vérifiée, à réaliser en ligne » ; l'ODT écrit la clé en clair dans son journal principal (UTF-16, TEMP de l'utilisateur) et ignore `<Logging Path>` : journaux de l'ODT masqués sur place dans leur encodage d'origine dès la fin de l'étape, avant toute copie (8.5, 11). Suite de R-08.
