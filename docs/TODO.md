@@ -34,7 +34,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [x] `Invoke-OpProcess` : fonction unique de lancement de processus sur `System.Diagnostics.Process` (jamais `Start-Process`, dont l'`ExitCode` revient vide sous PowerShell 5.1, R-14), utilisée par tous les exécuteurs (DISM, ODT, mpam-fe.exe, plateforme Defender) : code de sortie, sortie standard capturée, délai maximal facultatif ; tests Pester avec `cmd /c exit 0`, `exit 3010`, `exit 1618`, un délai dépassé et une sortie standard capturée
 - [x] Lecture et validation de `settings.json`, `catalog-queries.json`, `profiles.json`
 - [x] Lecture, validation et écriture atomique du manifeste
-- [ ] `Lancer-OffPatch.cmd` : élévation, contournement de la stratégie d'exécution, `Unblock-File`
+- [x] `Lancer-OffPatch.cmd` : élévation, contournement de la stratégie d'exécution, `Unblock-File` (lancement non élevé depuis une vraie clé : à valider sur intervention réelle)
 - [ ] `OffPatch-Cli.ps1` : squelette avec le paramètre `-Action`
 - [ ] Tests Pester du socle
 
@@ -161,3 +161,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-06 | 1 | R-08, passage 4 : `<Logging Path="C:\OffPatchOdtLogs">` lu par l'ODT (journal) mais dossier vide, journaux toujours dans TEMP ; règle maintenue (masquage sur place dans TEMP, puis copie) | `Lancer-OffPatch.cmd`, `OffPatch-Cli.ps1` |
 | 2026-10-06 | 1 | Rapport : « journal ODT non masqué resté dans TEMP » avec le chemin (8.5, 8.8) ; essai `manifest-volume` (exFAT et NTFS) lancé ; `Lancer-OffPatch.cmd` en ASCII (PowerShell natif par Sysnative, élévation avec arguments conservés, mode d'essai sans UAC), testé en local (accents, cmd 32 bits, élévation simulée) ; `Unblock-OpToolFile` ; essai `launcher` (racine de lecteur par subst, x64 et ARM64) lancé | Résultats des essais, puis `OffPatch-Cli.ps1` |
 | 2026-10-06 | 1 | Lanceur : mode d'essai réservé au contexte de test (`OFFPATCH_PESTER` ou `GITHUB_ACTIONS=true`), prouvé par un faux `powershell.exe` sous un faux `SystemRoot` (aucune demande UAC) ; lancement non élevé depuis une vraie clé ajouté à « à valider sur intervention réelle » ; README : débloquer l'archive zip avant extraction ; manifeste sur exFAT et NTFS conforme | Résultat de l'essai `launcher`, puis `OffPatch-Cli.ps1` |
+| 2026-10-06 | 1 | Essai `launcher` conforme sur `windows-2025` et `windows-11-arm` : 16 cas (racine de lecteur R:\ par subst et chemin accentué ; cmd 64 et 32 bits ; branche directe réelle avec arguments accentués, PowerShell 64 bits ; commande d'élévation construite avec Sysnative depuis le cmd 32 bits, sans « \" » final) | `OffPatch-Cli.ps1` |
