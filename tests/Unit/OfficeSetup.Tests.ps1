@@ -63,6 +63,18 @@ Describe 'Invoke-OpOfficeSetup' {
         Test-Masked (Join-Path $s.Session "$env:COMPUTERNAME-20261006-0744.log") | Should -BeTrue
     }
 
+    It 'signale au rapport un journal resté non masqué dans TEMP, avec son chemin complet, sans le copier' {
+        $s = Get-OdtScene
+        Mock Invoke-OpProcess { [pscustomobject]@{ ExitCode = 0; TimedOut = $false; StdOut = ''; StdErr = ''; Seconds = 1 } }
+        Mock Protect-OpLogFile { throw 'fichier verrouillé' }
+        $r = Invoke-OpOfficeSetup -SetupPath $s.Setup -ConfigPath $s.Xml -TimeoutMinutes 30 -ProductKey $fakeKey -LogSearchDirectory $s.Temp -SessionLogDirectory $s.Session
+        $log = Join-Path $s.Temp "$env:COMPUTERNAME-20261006-0744.log"
+        @($r.OdtLogs)[0].ReportNote | Should -Be "journal ODT non masqué resté dans TEMP : $log"
+        @($r.OdtLogs)[0].Copied | Should -BeFalse
+        Test-Path (Join-Path $s.Session "$env:COMPUTERNAME-20261006-0744.log") | Should -BeFalse
+        Test-Path $s.Xml | Should -BeFalse
+    }
+
     It 'ne touche pas aux journaux antérieurs à l''étape et passe le délai à Invoke-OpProcess' {
         $s = Get-OdtScene
         Mock Invoke-OpProcess { [pscustomobject]@{ ExitCode = 0; TimedOut = $false; StdOut = ''; StdErr = ''; Seconds = 1 } }

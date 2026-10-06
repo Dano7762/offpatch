@@ -1,0 +1,31 @@
+# Écriture atomique du manifeste (Save-OpManifest) sur un volume exFAT et sur un volume NTFS (disques virtuels).
+# Déclenchement manuel uniquement. Modifie le système du runner (disques virtuels, détachés à la fin).
+name: manifest-volume
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  volume:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Manifeste sur exFAT et NTFS
+        run: ./tests/runner/Invoke-ManifestVolumeTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\manifest-volume-out"
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: manifest-volume
+          path: ${{ runner.temp }}/manifest-volume-out
+          retention-days: 30
+          if-no-files-found: warn
