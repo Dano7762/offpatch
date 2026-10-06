@@ -1,5 +1,10 @@
 {
   "schemaVersion": 1,
+  "endOfSupport": {
+    "productIdPattern": "2019(Retail|Volume)$",
+    "reason": "Office 2016/2019 : fin de support Microsoft (octobre 2025)",
+    "recommendation": "Passer à une version d'Office prise en charge par Microsoft."
+  },
   "sources": [
     {
       "id": "current",

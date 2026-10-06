@@ -108,6 +108,10 @@
     # office/sources.json : une source par canal, ses langues, les identifiants de canal lus dans le registre (8.3)
     $o = $Configuration.OfficeSources
     if ([int]$o.schemaVersion -ne 1) { $errors.Add("sources.json : schemaVersion $($o.schemaVersion) non pris en charge (attendu : 1).") }
+    if (-not (Test-Property $o 'endOfSupport') -or -not $o.endOfSupport.productIdPattern -or -not (Test-Regex $o.endOfSupport.productIdPattern)) {
+        $errors.Add('sources.json : endOfSupport.productIdPattern absent ou invalide (reconnaissance d''Office 2016/2019).')
+    }
+    elseif (-not $o.endOfSupport.reason -or -not $o.endOfSupport.recommendation) { $errors.Add('sources.json : endOfSupport.reason et endOfSupport.recommendation sont obligatoires.') }
     $sourceIds = @{}
     $channels = @{}
     $channelIds = @{}

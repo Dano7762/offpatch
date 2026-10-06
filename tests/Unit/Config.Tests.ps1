@@ -70,6 +70,7 @@ Describe 'Test-OpConfiguration' {
         @{ Attendu = 'un identifiant de canal attribué à deux sources'; Alter = { param($c) $c.OfficeSources.sources[1].installedChannelIds = @($c.OfficeSources.sources[0].installedChannelIds) }; Message = '*déjà attribué*' }
         @{ Attendu = 'une source sans identifiant de canal installé'; Alter = { param($c) $c.OfficeSources.sources[2].installedChannelIds = @() }; Message = '*installedChannelIds est vide*' }
         @{ Attendu = 'un dossier de source mal formé'; Alter = { param($c) $c.OfficeSources.sources[0].folder = 'C:\office' }; Message = '*folder doit être*' }
+        @{ Attendu = 'un motif de fin de support invalide'; Alter = { param($c) $c.OfficeSources.endOfSupport.productIdPattern = '(2019' }; Message = '*endOfSupport.productIdPattern*' }
     ) {
         param($Attendu, $Alter, $Message)
         $c = Get-FreshConfiguration
