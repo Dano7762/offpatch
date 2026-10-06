@@ -4,7 +4,7 @@ param()
 
 BeforeAll {
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    foreach ($name in 'Get-OpRoot', 'Get-OpPath', 'Start-OpLog', 'Write-OpLog') {
+    foreach ($name in 'Get-OpRoot', 'Get-OpPath', 'Start-OpLog', 'ConvertTo-OpMaskedText', 'Write-OpLog') {
         . (Join-Path $root "app\module\OffPatch\Private\$name.ps1")
     }
     $moment = [datetime]'2026-10-14T09:12:03'

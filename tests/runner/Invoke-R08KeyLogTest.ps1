@@ -20,7 +20,8 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [ValidatePattern('^[A-Z0-9]{5}(-[A-Z0-9]{5}){4}$')][string]$FakeKey = 'FAKE0-KEY00-OFFPA-TCH00-TEST1'
+    # Fausse clé de forme réaliste : alphabet des clés de produit (BCDFGHJKMPQRTVWXY2346789), cinq groupes de cinq.
+    [ValidatePattern('^[BCDFGHJKMPQRTVWXY2346789]{5}(-[BCDFGHJKMPQRTVWXY2346789]{5}){4}$')][string]$FakeKey = 'BCDFG-HJKMP-QRTVW-XY234-6789B'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

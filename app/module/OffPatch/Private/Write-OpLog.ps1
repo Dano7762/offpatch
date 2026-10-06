@@ -19,7 +19,7 @@
     )
 
     $order = @{ DEBUG = 0; INFO = 1; WARN = 2; ERROR = 3 }
-    $safe = [regex]::Replace($Message, '\b[A-Za-z0-9]{5}(-[A-Za-z0-9]{5}){4}\b', 'XXXXX-XXXXX-XXXXX-XXXXX-XXXXX')
+    $safe = ConvertTo-OpMaskedText -Text $Message
     $line = '{0:yyyy-MM-dd HH:mm:ss} [{1}] {2}' -f $Now, $Level, $safe
 
     $log = $null
