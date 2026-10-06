@@ -4,6 +4,11 @@ name: r14-dism
 
 on:
   workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Cases (cas limites) ou Concurrent (deux DISM simultanés)'
+        required: false
+        default: 'Cases'
 
 permissions:
   contents: read
@@ -19,7 +24,9 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Essai R-14
-        run: ./tests/runner/Invoke-R14DismTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\r14-out"
+        env:
+          SCENARIO: ${{ inputs.scenario }}
+        run: ./tests/runner/Invoke-R14DismTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\r14-out" -Scenario $env:SCENARIO
 
       - name: Journaux DISM et relevés
         if: always()

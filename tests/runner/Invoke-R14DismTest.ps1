@@ -15,13 +15,17 @@
     Chaque cas passe par dism.exe /English /Online /Add-Package, puis, pour comparaison, par Add-WindowsPackage
     -Online -NoRestart (objet renvoyé, RestartNeeded, ou exception et HResult). Rien n'est jugé : tout est relevé.
     Aucune analyse ni maintenance du magasin de composants (CLAUDE.md).
+    Scénario Concurrent : deux dism.exe /Add-Package lancés presque en même temps (cumulative .NET de la bonne
+    architecture, puis enablement package 5 s après) ; relève le code, la durée et le message du second, pour savoir
+    si DISM attend ou échoue quand une autre opération de maintenance est en cours.
 
 .EXAMPLE
     .\Invoke-R14DismTest.ps1 -OutputDirectory $env:RUNNER_TEMP\r14-out
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [Parameter(Mandatory)][string]$OutputDirectory
+    [Parameter(Mandatory)][string]$OutputDirectory,
+    [ValidateSet('Cases', 'Concurrent')][string]$Scenario = 'Cases'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -122,6 +126,25 @@ try {
     $middle = [int]($bytes.Length / 2)
     $bytes[$middle] = [byte](255 - $bytes[$middle])
     [System.IO.File]::WriteAllBytes($corrupt, $bytes)
+
+    if ($Scenario -eq 'Concurrent') {
+        $dism = Join-Path $env:SystemRoot 'System32\dism.exe'
+        $first = Start-Process -FilePath $dism -ArgumentList '/English', '/Online', '/Add-Package', "/PackagePath:$($net[$arch])", '/NoRestart', "/LogPath:$(Join-Path $OutputDirectory 'dism-concurrent-1.log')" -RedirectStandardOutput (Join-Path $OutputDirectory 'dism-concurrent-1-console.txt') -NoNewWindow -PassThru
+        Start-Sleep -Seconds 5
+        $started = Get-Date
+        $second = Start-Process -FilePath $dism -ArgumentList '/English', '/Online', '/Add-Package', "/PackagePath:$ekb", '/NoRestart', "/LogPath:$(Join-Path $OutputDirectory 'dism-concurrent-2.log')" -RedirectStandardOutput (Join-Path $OutputDirectory 'dism-concurrent-2-console.txt') -NoNewWindow -PassThru
+        $second.WaitForExit()
+        $secondSeconds = [math]::Round(((Get-Date) - $started).TotalSeconds)
+        $firstRunningAtEnd = -not $first.HasExited
+        $first.WaitForExit()
+        foreach ($p in @(@('premier (.NET)', $first, 1), @('second (enablement package)', $second, 2))) {
+            $console = @(Get-Content -Path (Join-Path $OutputDirectory "dism-concurrent-$($p[2])-console.txt") | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch '^\[[= ]*[\d.]*%?[= ]*\]$' -and $_ -notmatch '^(Deployment Image Servicing|Version:|Image Version:|HOTPATCHUTIL )' }) -join ' / '
+            $all.Add([pscustomobject]@{ Case = "concurrent-$($p[0])"; Tool = 'dism.exe'; Code = $p[1].ExitCode; Hex = ('0x{0:X8}' -f $p[1].ExitCode); RestartNeeded = $null; Seconds = $null; RebootPending = (Test-Path $cbsKey); Message = $console })
+        }
+        $lines.Add("- Second DISM lancé 5 s après le premier : terminé en $secondSeconds s ; premier DISM encore en cours à la fin du second : $firstRunningAtEnd")
+        $lines.Add('')
+        return
+    }
 
     foreach ($case in @(
             @("net-$arch", $net[$arch]),
