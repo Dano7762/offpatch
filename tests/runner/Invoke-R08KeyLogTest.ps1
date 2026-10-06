@@ -21,7 +21,9 @@
 param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     # Fausse clé de forme réaliste : alphabet des clés de produit (BCDFGHJKMPQRTVWXY2346789), cinq groupes de cinq.
-    [ValidatePattern('^[BCDFGHJKMPQRTVWXY2346789]{5}(-[BCDFGHJKMPQRTVWXY2346789]{5}){4}$')][string]$FakeKey = 'BCDFG-HJKMP-QRTVW-XY234-6789B'
+    [ValidatePattern('^[BCDFGHJKMPQRTVWXY2346789]{5}(-[BCDFGHJKMPQRTVWXY2346789]{5}){4}$')][string]$FakeKey = 'BCDFG-HJKMP-QRTVW-XY234-6789B',
+    # Dossier de <Logging Path>, créé avant l'appel ; par défaut sous RUNNER_TEMP.
+    [string]$LogDirectory
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -35,10 +37,12 @@ New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $work = Join-Path $env:RUNNER_TEMP 'r08-key-work'
 $configFolder = Join-Path $env:RUNNER_TEMP 'r08-key-config'
 $odtLogs = Join-Path $env:RUNNER_TEMP 'r08-key-session\odt'
+if ($LogDirectory) { $odtLogs = $LogDirectory }
 foreach ($f in $work, $configFolder, $odtLogs) { New-Item -ItemType Directory -Force -Path $f | Out-Null }
 $lines = New-Object System.Collections.Generic.List[string]
 $lines.Add("## R-08 : clé de produit dans les journaux de l'ODT ($env:PROCESSOR_ARCHITECTURE)")
 $lines.Add('')
+$lines.Add("- Dossier ``<Logging Path>`` : $odtLogs (existe avant l'appel : $(Test-Path $odtLogs -PathType Container))")
 
 $started = (Get-Date).AddMinutes(-1)
 try {

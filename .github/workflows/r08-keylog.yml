@@ -5,6 +5,11 @@ name: r08-keylog
 
 on:
   workflow_dispatch:
+    inputs:
+      log_directory:
+        description: 'Dossier de <Logging Path>, créé avant l''appel (vide : sous RUNNER_TEMP)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -20,7 +25,9 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Essai clé de produit et journaux ODT
-        run: ./tests/runner/Invoke-R08KeyLogTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\r08-key-out"
+        env:
+          LOG_DIRECTORY: ${{ inputs.log_directory }}
+        run: ./tests/runner/Invoke-R08KeyLogTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\r08-key-out" -LogDirectory $env:LOG_DIRECTORY
 
       - name: Relevés
         if: always()
