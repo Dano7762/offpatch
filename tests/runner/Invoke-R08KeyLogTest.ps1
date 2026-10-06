@@ -89,9 +89,15 @@ try {
     $lines.Add('')
     $lines.Add("- Lignes d'occurrence : $hits, dont $copiedHits dans les fichiers copiés par OffPatch")
     $files | Select-Object FullName, Length, LastWriteTime | Export-Csv -Path (Join-Path $OutputDirectory 'fichiers-examines.csv') -NoTypeInformation -Encoding UTF8
+    # Pièces jointes (fausse clé, sans valeur) : XML utilisé, journaux du dossier <Logging Path>, journaux de l'ODT
+    # écrits dans TEMP (nom <machine>-AAAAMMJJ-HHMM.log).
     $odtCopy = Join-Path $OutputDirectory 'journaux-odt'
     New-Item -ItemType Directory -Force -Path $odtCopy | Out-Null
+    Copy-Item -Path (Join-Path $configFolder 'install.xml') -Destination $odtCopy -ErrorAction SilentlyContinue
     foreach ($f in $odtFiles) { Copy-Item -Path $f.FullName -Destination $odtCopy -ErrorAction SilentlyContinue }
+    $tempOdt = @($files | Where-Object { $_.DirectoryName -eq (Get-Item $env:TEMP).FullName -and $_.Name -match '^[^\\]+-\d{8}-\d{4}\.log$' })
+    $lines.Add("- Journaux de l'ODT dans TEMP : $(@($tempOdt | ForEach-Object { $_.Name }) -join ', ')")
+    foreach ($f in $tempOdt) { Copy-Item -Path $f.FullName -Destination $odtCopy -ErrorAction SilentlyContinue }
 } catch {
     $lines.Add("- ERREUR : $($_.Exception.Message)")
     throw
