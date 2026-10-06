@@ -1,0 +1,38 @@
+# R-15 : suspendre Windows Update le temps d'une session (arrêt et désactivation de wuauserv), DISM pendant
+# la suspension, rétablissement. Déclenchement manuel uniquement. Modifie le système du runner, sans redémarrage.
+name: r15-windowsupdate
+
+on:
+  workflow_dispatch:
+    inputs:
+      observe_minutes:
+        description: 'Durée d''observation de chaque phase, en minutes'
+        required: false
+        default: '15'
+
+permissions:
+  contents: read
+
+jobs:
+  r15:
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai R-15
+        env:
+          OBSERVE_MINUTES: ${{ inputs.observe_minutes }}
+        run: ./tests/runner/Invoke-R15WindowsUpdateTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\r15-out" -ObserveMinutes ([int]$env:OBSERVE_MINUTES)
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: r15-windowsupdate
+          path: ${{ runner.temp }}/r15-out
+          retention-days: 30
+          if-no-files-found: warn
