@@ -5,12 +5,13 @@
 
 .DESCRIPTION
     Script réservé aux runners GitHub hébergés (jetables). Il modifie le système (installation d'Office) : ne jamais
-    l'exécuter ailleurs. Aucune clé de produit n'est écrite dans ce script ni dans le workflow (CLAUDE.md).
+    l'exécuter ailleurs. Seule clé présente : la GVLK publique de Microsoft (scénario License), exception de CLAUDE.md ;
+    aucune clé dans le workflow ni dans les artefacts (OSPP.VBS n'affiche que les 5 derniers caractères).
     Scénario Channel : installe ProductId sur le canal Channel depuis le CDN, puis relève, sous
       HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration, CDNBaseUrl, UpdateChannel, UpdateChannelChanged,
       AudienceId, AudienceData, ProductReleaseIds, Platform et VersionToReport.
-    Scénario License : installe ProPlus2024Volume dans une version ancienne depuis le CDN (sans PIDKEY : l'ODT
-      installe la clé de licence en volume par défaut), relève l'état de licence avec les outils Office
+    Scénario License : installe ProPlus2024Volume dans une version ancienne depuis le CDN avec la GVLK publiée par
+      Microsoft (TestProductKey, exception de CLAUDE.md), relève l'état de licence avec les outils Office
       (cscript OSPP.VBS /dstatus : nom de licence, 5 derniers caractères de la clé), télécharge la source locale du
       canal, bloque le CDN, met à jour par setup.exe /configure depuis la source locale, puis relève à nouveau.
 
@@ -23,6 +24,10 @@ param(
     [string]$ProductId = 'ProPlus2024Volume',
     [string]$Channel = 'PerpetualVL2024',
     [string]$OlderVersion = '16.0.17932.20976',
+    # Scénario License : clé publique de test (GVLK) publiée par Microsoft pour Office LTSC Professionnel Plus 2024,
+    # https://learn.microsoft.com/en-us/office/volume-license-activation/gvlks (relevée le 2026-10-06). Elle n'active
+    # rien sans serveur KMS. Exception explicite de CLAUDE.md : script d'essai uniquement, jamais dans OffPatch.
+    [string]$TestProductKey = 'XJ2XN-FW8RK-P4HMP-DKDBV-GCVGB',
     [Parameter(Mandatory)][string]$OutputDirectory
 )
 Set-StrictMode -Version Latest
@@ -79,8 +84,9 @@ try {
             $lines.Add("## Licence conservée par une mise à jour /configure : $ProductId, canal $Channel ($env:PROCESSOR_ARCHITECTURE)")
             $lines.Add('')
             if ($PSCmdlet.ShouldProcess($ProductId, 'Installation ancienne, puis mise à jour depuis la source locale')) {
-                $r = Invoke-OdtSetup -Setup $setup -Mode 'configure' -Xml (Get-OdtConfigurationXml -Channel $Channel -ProductId $ProductId -Version $OlderVersion -Display) -ConfigPath (Join-Path $OutputDirectory '01-install-ancienne.xml') -TimeoutMinutes 60
-                $lines.Add(('- Installation de {0} depuis le CDN : code {1}, {2} s' -f $OlderVersion, $r.ExitCode, $r.Seconds))
+                # XML d'installation hors du dossier de sortie : il contient la GVLK (clé publique, mais rien n'en sort).
+                $r = Invoke-OdtSetup -Setup $setup -Mode 'configure' -Xml (Get-OdtConfigurationXml -Channel $Channel -ProductId $ProductId -Version $OlderVersion -ProductKey $TestProductKey -Display) -ConfigPath (Join-Path $work '01-install-ancienne.xml') -TimeoutMinutes 60
+                $lines.Add(('- Installation de {0} depuis le CDN avec la GVLK publiée par Microsoft : code {1}, {2} s' -f $OlderVersion, $r.ExitCode, $r.Seconds))
                 $before = Get-ClickToRunState
                 $lines.Add("- Version avant : $($before.Version)")
                 $lines.Add('')
