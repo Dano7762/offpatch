@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.20 du 6 octobre 2026.
+Version 1.21 du 6 octobre 2026.
 
 ## 1. Contexte
 
@@ -452,7 +452,7 @@ Assistant accessible depuis l'onglet Dépôt :
 | Espace libre sur C: | Sous `minFreeSpaceGB` : bloquant |
 | Portable sur batterie | Avertissement, confirmation demandée avant le mode auto |
 | Âge du dépôt | Au-delà de `staleDepotWarningDays` : avertissement |
-| Point de restauration (`createRestorePointBeforeSession`, actif par défaut) | Juste avant la première étape. Si la protection du système est inactive sur C:, aucun point et avertissement : OffPatch ne l'active jamais, et `Checkpoint-Computer` l'active de lui-même si on l'appelle (mesuré, voir ci-dessous). Si elle est active : `Checkpoint-Computer`, puis vérification par `Get-ComputerRestorePoint` qu'un point existe vraiment. Si Windows en a créé un dans les 24 heures, aucun nouveau point (avertissement de `Checkpoint-Computer`, pas d'erreur) : le rapport cite ce point existant (description, date). Jamais bloquant |
+| Point de restauration (`createRestorePointBeforeSession`, actif par défaut) | Juste avant la première étape. Protection du système jugée active seulement si les deux indicateurs ci-dessous concordent (volume système sous `SPP\Clients` et réservation `Win32_ShadowStorage` pour ce volume). Inactive ou désaccord entre les deux : aucun appel à `Checkpoint-Computer`, avertissement : OffPatch n'active jamais la protection, et `Checkpoint-Computer` l'active de lui-même si on l'appelle (mesuré, voir ci-dessous). Active : `Checkpoint-Computer`, puis vérification par `Get-ComputerRestorePoint` qu'un point existe vraiment. Si Windows en a créé un dans les 24 heures, aucun nouveau point (avertissement de `Checkpoint-Computer`, pas d'erreur) : le rapport cite ce point existant (description, date). Après l'appel, les indicateurs sont relus : s'ils montrent une protection activée alors qu'elle ne l'était pas avant, le rapport l'indique explicitement (« protection du système activée par Checkpoint-Computer, à vérifier »). Jamais bloquant |
 | PC connecté à un réseau | Avertissement : Windows Update peut travailler en parallèle. L'outil recommande d'activer le mode Avion pendant la session (il survit aux redémarrages) ; rappel dans l'écran récapitulatif du mode auto (8.6). OffPatch ne suspend pas Windows Update lui-même : aucune méthode documentée qui expire d'elle-même (R-15) |
 | Intégrité des fichiers nécessaires | Hash différent du manifeste : l'étape passe en erreur, les autres continuent |
 
@@ -461,7 +461,19 @@ Point de restauration, mesures sur runner `windows-11-arm` (6 octobre 2026, bila
 - `Checkpoint-Computer` crée le point en 16 à 21 s ; clichés utilisés : 4 à 14 Mo, 512 Mo réservés, plafond de 10 Go (3 % du disque).
 - Un second appel dans les 24 heures ne crée rien et n'échoue pas : il émet seulement l'avertissement « A new system restore point cannot be created because one has already been created within the past 1440 minutes » ; seule la liste de `Get-ComputerRestorePoint` permet de le constater.
 - Sur un C: sans protection (aucune entrée pour le volume sous `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SPP\Clients`, aucun stockage de clichés), `Checkpoint-Computer` **active la protection** puis crée le point : le volume apparaît sous `SPP\Clients`, 512 Mo de clichés sont réservés. C'est une modification durable : l'appel n'est donc fait que si la protection est déjà active.
-- Indicateur de protection active retenu : présence du volume système dans les valeurs de `SPP\Clients`. Aucune méthode documentée par Microsoft n'a été trouvée ; cet indicateur est mesuré (absent avant activation, présent après), pas documenté. À confirmer sur intervention réelle sur un PC où la protection est active d'origine (`RECHERCHE.md`).
+- Deux indicateurs, qui doivent concorder :
+  - présence du volume système dans les valeurs de `SPP\Clients` : mesuré, non documenté ;
+  - réservation de clichés pour le volume système dans la classe WMI documentée `Win32_ShadowStorage` (https://learn.microsoft.com/en-us/previous-versions/windows/desktop/vsswmi/win32-shadowstorage : association entre un volume dont on fait des clichés et le volume qui reçoit les données différentielles).
+- Relevé des deux indicateurs dans chaque état (run https://github.com/Dano7762/offpatch/actions/runs/37476821152) :
+
+  | État | `SPP\Clients` | `Win32_ShadowStorage` | Verdict |
+  |---|---|---|---|
+  | Protection inactive (image du runner) | non | non | inactive |
+  | Protection activée, aucun point encore | oui | non | désaccord : inactive |
+  | Protection active, un point créé | oui | oui (512 Mo alloués) | active |
+  | Protection désactivée ensuite | non | oui (la réservation reste) | désaccord : inactive |
+
+  `Win32_ShadowStorage` seul jugerait active une protection qui vient d'être désactivée ; `SPP\Clients` seul jugerait active une protection qui n'a encore aucun point : d'où la concordance exigée. À confirmer sur intervention réelle sur un PC où la protection est active d'origine (`RECHERCHE.md`, critère d'acceptation, section 13).
 
 ### 8.3 Détection et plan
 
@@ -578,7 +590,7 @@ En fin de session, ou en cas d'abandon, un rapport HTML autonome et imprimable e
 - Office installé (produit, version, canal, langues) et le mode d'activation attendu, avec la mention, s'il y a lieu, que Microsoft ne prend pas ce profil en charge sur ce Windows (et la source) ;
 - erreurs et avertissements ;
 - si le PC était hors ligne en fin de session : rappel de désactiver le mode Avion ou de rebrancher le réseau ;
-- point de restauration : point créé par OffPatch (description, date), ou point existant de moins de 24 heures cité à sa place, ou motif de l'absence (protection du système inactive, option désactivée) ;
+- point de restauration : point créé par OffPatch (description, date), ou point existant de moins de 24 heures cité à sa place, ou motif de l'absence (protection du système inactive, indicateurs en désaccord, option désactivée) ; le cas échéant, « protection du système activée par Checkpoint-Computer, à vérifier » ;
 - version de l'outil et date du dépôt utilisé.
 
 Aucune clé de produit n'y figure.
@@ -683,6 +695,7 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - Mise à jour du dépôt en un clic, avec le résumé des nouveautés.
 - Préparation d'un support filtré, sans perte des rapports déjà présents.
 - Tests T1 à T8 réussis.
+- Indicateurs de protection du système (8.2 : `SPP\Clients` et `Win32_ShadowStorage`) validés sur intervention réelle, sur un PC où la protection est active d'origine et sur un PC où elle est inactive ; à défaut, `createRestorePointBeforeSession` livré désactivé par défaut.
 - Aucun gel de l'interface pendant les traitements longs.
 - Journal et rapport produits pour chaque session, y compris en cas d'échec.
 - PSScriptAnalyzer sans erreur, tests Pester au vert.
@@ -720,3 +733,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.18 (6 octobre 2026) : option `pauseWindowsUpdateDuringSession` retirée, avec le rétablissement de Windows Update en fin de session (6.1, 8.2, 8.6) ; PC connecté à un réseau : mode Avion recommandé, rappel dans le récapitulatif du mode auto (8.2, 8.6) ; PC hors ligne en fin de session : rappel de désactiver le mode Avion ou de rebrancher le réseau à l'écran de fin et dans le rapport (8.6, 8.8) ; DISM : code 1618 ou 0x80070652 (installation déjà en cours), attente de 5 minutes et une seule nouvelle tentative (8.4) ; suspension de Windows Update notée en évolution (14). Suite de R-15 et R-14.
 - 1.19 (6 octobre 2026) : matrice de traçabilité par catégorie (12), accord de David du 4 octobre 2026 ; les cases « à traiter » sont reprises dans `docs/BILAN-PHASE-0.md`. Bilan de phase 0.
 - 1.20 (6 octobre 2026) : décisions du bilan de phase 0. Format de `catalog-queries.json` (`searches`, `{month}`, `monthsToSearch`, règles `highestUbr`, `highestUbrFromReleaseInformation`, `latestMonth` triée sur le préfixe `AAAA-MM` du titre, la date du catalogue ne départageant que deux entrées du même mois avec un avertissement, `highestVersion`, `fileNamePattern`) (6.2) ; `downloadPages` dans `settings.json` (6.1) ; cas de planification P7 à P10 (12) ; matrice de traçabilité sans case à traiter (12) ; corrections : détection établie en R-09, regroupement des redémarrages (8.3), `<Remove>` + `<Add>` vérifié (6.3), `Invoke-OpProcess`, dépôt public et contrat hebdomadaire (12) ; point de restauration avant session, actif par défaut, créé seulement si la protection du système est déjà active, vérifié par `Get-ComputerRestorePoint`, point existant de moins de 24 heures cité au rapport, mesures sur runner (6.1, 8.2, 8.8).
+- 1.21 (6 octobre 2026) : point de restauration : second indicateur documenté `Win32_ShadowStorage`, protection jugée active seulement si `SPP\Clients` et `Win32_ShadowStorage` concordent, sinon aucun appel et avertissement ; relevé des deux indicateurs dans chaque état sur runner ; relecture après l'appel et mention « protection du système activée par Checkpoint-Computer, à vérifier » (8.2, 8.8) ; critère d'acceptation : indicateurs validés sur intervention réelle, sinon option livrée désactivée par défaut (13).
