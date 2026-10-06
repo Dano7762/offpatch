@@ -5,6 +5,11 @@ name: office-update-scope
 
 on:
   workflow_dispatch:
+    inputs:
+      cases:
+        description: 'Cas à lancer (liste JSON de {scenario, product, channel})'
+        required: false
+        default: '[{"scenario":"License","product":"ProPlus2024Volume","channel":"PerpetualVL2024"},{"scenario":"Update2019","product":"HomeStudent2019Retail","channel":"Current"}]'
 
 permissions:
   contents: read
@@ -14,13 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { scenario: Channel, product: Home2024Retail, channel: Current }
-          - { scenario: Channel, product: ProPlus2024Volume, channel: PerpetualVL2024 }
-          - { scenario: Channel, product: ProPlus2021Volume, channel: PerpetualVL2021 }
-          - { scenario: Channel, product: HomeStudent2019Retail, channel: Current }
-          - { scenario: Channel, product: ProPlus2019Volume, channel: PerpetualVL2019 }
-          - { scenario: License, product: ProPlus2024Volume, channel: PerpetualVL2024 }
+        include: ${{ fromJSON(inputs.cases) }}
     runs-on: windows-11-arm
     timeout-minutes: 120
     defaults:

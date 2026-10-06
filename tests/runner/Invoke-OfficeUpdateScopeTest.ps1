@@ -19,7 +19,7 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [Parameter(Mandatory)][ValidateSet('Channel', 'License')][string]$Scenario,
+    [Parameter(Mandatory)][ValidateSet('Channel', 'License', 'Update2019')][string]$Scenario,
     [string]$ProductId = 'ProPlus2024Volume',
     [string]$Channel = 'PerpetualVL2024',
     [string]$OlderVersion = '16.0.17932.20976',
@@ -47,10 +47,17 @@ function Get-C2RChannelValue {
 }
 
 function Get-OfficeLicense {
-    $ospp = Join-Path $env:ProgramFiles 'Microsoft Office\Office16\OSPP.VBS'
-    if (-not (Test-Path $ospp)) { return @("OSPP.VBS absent ($ospp)") }
-    $out = & cscript.exe //Nologo $ospp /dstatus 2>&1
-    @($out | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^(LICENSE NAME|LICENSE DESCRIPTION|LICENSE STATUS|Last 5 characters of installed product key|ERROR CODE|PRODUCT ID|SKU ID)' })
+    param([string]$Label)
+    $candidates = @((Join-Path $env:ProgramFiles 'Microsoft Office\Office16\OSPP.VBS'), (Join-Path ${env:ProgramFiles(x86)} 'Microsoft Office\Office16\OSPP.VBS'))
+    $ospp = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+    if (-not $ospp) { return @("OSPP.VBS absent ($($candidates -join ' ; '))") }
+    $cscript = Join-Path $env:SystemRoot 'System32\cscript.exe'
+    $out = @(& $cscript //Nologo $ospp /dstatus 2>&1 | ForEach-Object { "$_" })
+    # Sortie brute conservée en artefact (pas de clé : OSPP n'affiche que les 5 derniers caractères).
+    $out | Set-Content -Path (Join-Path $OutputDirectory "ospp-$Label.txt") -Encoding UTF8
+    $lines = @($out | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '(?i)LICENSE NAME|LICENSE STATUS|Last 5 characters|ERROR|PRODUCT ID|SKU ID' })
+    if ($lines.Count -eq 0) { $lines = @("aucune ligne reconnue ($($out.Count) lignes, voir ospp-$Label.txt) : $($ospp)") }
+    $lines
 }
 
 try {
@@ -79,7 +86,7 @@ try {
                 $lines.Add('')
                 $lines.Add('Licence avant (OSPP.VBS /dstatus) :')
                 $lines.Add('')
-                foreach ($l in Get-OfficeLicense) { $lines.Add("- $l") }
+                foreach ($l in Get-OfficeLicense -Label 'avant') { $lines.Add("- $l") }
                 $lines.Add('')
 
                 $source = Join-Path $work 'source'
@@ -94,7 +101,31 @@ try {
                 $lines.Add('')
                 $lines.Add('Licence après (OSPP.VBS /dstatus) :')
                 $lines.Add('')
-                foreach ($l in Get-OfficeLicense) { $lines.Add("- $l") }
+                foreach ($l in Get-OfficeLicense -Label 'apres') { $lines.Add("- $l") }
+            }
+        }
+        'Update2019' {
+            # Office 2019 en boîte : canal Current mais build propre ; que donne une mise à jour depuis la source Current ?
+            $lines.Add("## Office 2019 en boîte mis à jour depuis la source Current : $ProductId ($env:PROCESSOR_ARCHITECTURE)")
+            $lines.Add('')
+            if ($PSCmdlet.ShouldProcess($ProductId, 'Installation depuis le CDN, puis mise à jour depuis la source Current')) {
+                $r = Invoke-OdtSetup -Setup $setup -Mode 'configure' -Xml (Get-OdtConfigurationXml -Channel 'Current' -ProductId $ProductId -Display) -ConfigPath (Join-Path $OutputDirectory '01-install.xml') -TimeoutMinutes 60
+                $lines.Add(('- Installation de {0} depuis le CDN : code {1}, {2} s ; version {3}' -f $ProductId, $r.ExitCode, $r.Seconds, (Get-ClickToRunState).Version))
+                $source = Join-Path $work 'source'
+                New-Item -ItemType Directory -Force -Path $source | Out-Null
+                $d = Invoke-OdtSetup -Setup $setup -Mode 'download' -Xml (Get-OdtConfigurationXml -SourcePath $source -Channel 'Current' -ProductId 'Home2024Retail') -ConfigPath (Join-Path $OutputDirectory '02-download.xml') -TimeoutMinutes 60
+                $lines.Add(('- Source Current (téléchargée pour Home2024Retail, comme le dépôt) : code {0}, {1} s' -f $d.ExitCode, $d.Seconds))
+                Set-OfficeCdnBlock -Enabled $true -BackupPath $hostsBackup
+                $u = Invoke-OdtSetup -Setup $setup -Mode 'configure' -Xml (Get-OdtConfigurationXml -SourcePath $source -Channel 'Current' -ProductId $ProductId -NoCdnFallback -Display) -ConfigPath (Join-Path $OutputDirectory '03-mise-a-jour.xml') -TimeoutMinutes 30
+                $after = Get-ClickToRunState
+                $lines.Add(('- Mise à jour par /configure depuis la source Current, CDN bloqué : code {0} (0x{0:X8}), {1} s, délai dépassé : {2}' -f $u.ExitCode, $u.Seconds, $u.TimedOut))
+                $lines.Add("- Après : version $($after.Version), produits $($after.Products)")
+                $winword = Join-Path $env:ProgramFiles 'Microsoft Office\root\Office16\WINWORD.EXE'
+                if (Test-Path $winword) { $lines.Add("- WINWORD.EXE : $((Get-Item $winword).VersionInfo.FileVersion)") }
+                $lines.Add('')
+                $lines.Add('Licence après (OSPP.VBS /dstatus) :')
+                $lines.Add('')
+                foreach ($l in Get-OfficeLicense -Label 'apres') { $lines.Add("- $l") }
             }
         }
     }
