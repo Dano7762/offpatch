@@ -32,7 +32,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [x] `Get-OpRoot` et fonctions de chemins (racine, dépôt, ProgramData)
 - [x] `Write-OpLog` : niveaux, fichier de session, file de messages pour l'interface
 - [x] `Invoke-OpProcess` : fonction unique de lancement de processus sur `System.Diagnostics.Process` (jamais `Start-Process`, dont l'`ExitCode` revient vide sous PowerShell 5.1, R-14), utilisée par tous les exécuteurs (DISM, ODT, mpam-fe.exe, plateforme Defender) : code de sortie, sortie standard capturée, délai maximal facultatif ; tests Pester avec `cmd /c exit 0`, `exit 3010`, `exit 1618`, un délai dépassé et une sortie standard capturée
-- [ ] Lecture et validation de `settings.json`, `catalog-queries.json`, `profiles.json`
+- [x] Lecture et validation de `settings.json`, `catalog-queries.json`, `profiles.json`
 - [ ] Lecture, validation et écriture atomique du manifeste
 - [ ] `Lancer-OffPatch.cmd` : élévation, contournement de la stratégie d'exécution, `Unblock-File`
 - [ ] `OffPatch-Cli.ps1` : squelette avec le paramètre `-Action`
@@ -155,3 +155,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-06 | 1 | `Start-OpLog` (journal du dépôt ou de session, sous-dossier des journaux DISM et ODT) et `Write-OpLog` (format de la section 10, niveau minimal, file de messages pour l'interface, clé de produit masquée, jamais bloquant) | `Invoke-OpProcess` |
 | 2026-10-06 | 1 | `Invoke-OpProcess` sur `System.Diagnostics.Process` : code de sortie, sorties lues en parallèle, délai maximal facultatif avec arrêt de l'arborescence (`taskkill /T /F` : un processus enfant gardait les sorties ouvertes), `-WhatIf` ; tests 0, 3010, 1618, délai dépassé, sorties capturées, sortie volumineuse | Lecture et validation de la configuration |
 | 2026-10-06 | 1 | Point de restauration, cahier des charges 1.21 : second indicateur `Win32_ShadowStorage` (documenté), concordance exigée avec `SPP\Clients` ; relevé sur runner (désaccords réels : protection activée sans point, protection désactivée avec réservation restante), relecture après l'appel, critère d'acceptation en 13 | Lecture et validation de la configuration |
+| 2026-10-06 | 1 | `Invoke-OpProcess` : délai obligatoire (`-TimeoutSeconds` ou `-NoTimeout` explicite), appel sans délai refusé ; essai `r08-keylog` lancé (fausse clé dans les journaux ODT) ; `Read-OpJsonFile`, `Test-OpConfiguration` (règles de 6.1 à 6.4, messages en français), `Get-OpConfiguration` (toutes les anomalies dans une seule erreur), 15 cas d'altération testés | Résultat de `r08-keylog`, puis manifeste |

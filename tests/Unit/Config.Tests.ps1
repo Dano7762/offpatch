@@ -1,78 +1,79 @@
-﻿# Cohérence des fichiers de config/ entre eux (bilan de phase 0). Aucun accès réseau.
+﻿# Lecture et validation de la configuration (cahier des charges, 6.1 à 6.4). La configuration réelle du dépôt doit
+# être sans anomalie ; chaque altération simulée doit être signalée. Aucun accès réseau.
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification = 'Variables partagées entre blocs Pester, non vues par l''analyse.')]
 param()
 
 BeforeAll {
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    function Read-Config([string]$Path) { Get-Content -Path (Join-Path $root $Path) -Raw -Encoding UTF8 | ConvertFrom-Json }
-    $settings = Read-Config 'config\settings.json'
-    $queries = Read-Config 'config\catalog-queries.json'
-    $profiles = (Read-Config 'config\office\profiles.json').profiles
-    $categories = 'windows-lcu', 'windows-checkpoint', 'windows-ekb', 'windows-ssu', 'dotnet', 'defender-platform', 'defender', 'office-source'
-}
-
-Describe 'config/settings.json' {
-    It 'donne une rétention Windows d''au moins 1 mois pour chaque cible' {
-        foreach ($t in $settings.targets) {
-            $settings.retention.windowsMonths.PSObject.Properties[$t] | Should -Not -BeNullOrEmpty -Because "la cible $t doit avoir sa rétention"
-            [int]$settings.retention.windowsMonths.$t | Should -BeGreaterOrEqual 1
-        }
+    foreach ($name in 'Get-OpRoot', 'Get-OpPath', 'Read-OpJsonFile', 'Test-OpConfiguration', 'Get-OpConfiguration') {
+        . (Join-Path $root "app\module\OffPatch\Private\$name.ps1")
     }
-
-    It 'liste des hôtes exacts, sans joker ni schéma' {
-        foreach ($d in $settings.allowedDomains) { $d | Should -Match '^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)+$' }
-    }
-
-    It 'donne des liens downloadPages en https sur des hôtes autorisés, avec un lien de définitions par architecture de cible' {
-        $links = @($settings.downloadPages.defenderDefinitions.PSObject.Properties | ForEach-Object { $_.Value }) + $settings.downloadPages.officeDeploymentToolPage
-        foreach ($l in $links) {
-            ([uri]$l).Scheme | Should -Be 'https'
-            $settings.allowedDomains | Should -Contain ([uri]$l).Host
-        }
-        foreach ($t in $settings.targets) {
-            $arch = ($t -split '-')[1]
-            $settings.downloadPages.defenderDefinitions.PSObject.Properties[$arch] | Should -Not -BeNullOrEmpty -Because "la cible $t doit avoir son lien de définitions"
-        }
-    }
-
-    It 'déclare au moins une empreinte de racine de 40 caractères hexadécimaux' {
-        @($settings.integrity.trustedRootThumbprints).Count | Should -BeGreaterThan 0
-        foreach ($t in $settings.integrity.trustedRootThumbprints) { $t | Should -Match '^[0-9A-F]{40}$' }
-    }
-}
-
-Describe 'config/catalog-queries.json' {
-    It 'couvre chaque cible de settings.json' {
-        foreach ($t in $settings.targets) { $queries.targets.PSObject.Properties[$t] | Should -Not -BeNullOrEmpty -Because "la cible $t doit avoir ses recherches" }
-    }
-
-    It 'n''utilise que des catégories connues, des motifs valides et des dépendances vers des catégories connues' {
-        foreach ($target in $queries.targets.PSObject.Properties) {
-            foreach ($q in $target.Value) {
-                $categories | Should -Contain $q.category
-                @($q.searches).Count | Should -BeGreaterThan 0
-                { [regex]::new($q.includeTitlePattern) } | Should -Not -Throw
-                { [regex]::new($q.excludeTitlePattern) } | Should -Not -Throw
-                $q.pick | Should -BeIn @('latestMonth', 'highestUbr', 'highestUbrFromReleaseInformation', 'highestVersion')
-                foreach ($d in @($q.prerequisites) + @($q.runsAfter)) { if ($d) { $categories | Should -Contain $d } }
-            }
+    # Une copie neuve de la configuration réelle, à altérer dans chaque test.
+    function Get-FreshConfiguration {
+        [pscustomobject]@{
+            Settings       = Read-OpJsonFile -Path (Join-Path $root 'config\settings.json')
+            CatalogQueries = Read-OpJsonFile -Path (Join-Path $root 'config\catalog-queries.json')
+            PinnedItems    = Read-OpJsonFile -Path (Join-Path $root 'config\pinned-items.json')
+            Profiles       = Read-OpJsonFile -Path (Join-Path $root 'config\office\profiles.json')
         }
     }
 }
 
-Describe 'config/office/profiles.json' {
-    It 'a des identifiants uniques et des sources déclarées dans settings.json' {
-        @($profiles.id | Sort-Object -Unique).Count | Should -Be @($profiles).Count
-        foreach ($p in $profiles) {
-            $settings.office.sources.PSObject.Properties[$p.source] | Should -Not -BeNullOrEmpty -Because "le profil $($p.id) utilise la source $($p.source)"
-        }
+Describe 'Get-OpConfiguration' {
+    It 'charge la configuration réelle du dépôt sans anomalie' {
+        $c = Get-OpConfiguration -Root $root
+        @($c.Settings.targets).Count | Should -BeGreaterThan 0
+        @(Test-OpConfiguration -Configuration $c).Count | Should -Be 0
     }
 
-    It 'n''accepte une clé de produit que pour les licences en volume' {
-        foreach ($p in $profiles) { [bool]$p.acceptsProductKey | Should -Be ($p.license -eq 'volume') }
+    It 'liste toutes les anomalies dans une seule erreur' {
+        $copy = Join-Path $TestDrive 'outil'
+        New-Item -ItemType Directory -Force -Path (Join-Path $copy 'config\office') | Out-Null
+        Set-Content -Path (Join-Path $copy 'offpatch.root') -Value '{}' -Encoding UTF8
+        foreach ($f in 'settings.json', 'catalog-queries.json', 'pinned-items.json') { Copy-Item (Join-Path $root "config\$f") (Join-Path $copy "config\$f") }
+        Copy-Item (Join-Path $root 'config\office\profiles.json') (Join-Path $copy 'config\office\profiles.json')
+        $settings = Get-Content (Join-Path $copy 'config\settings.json') -Raw -Encoding UTF8
+        $settings = $settings -replace '"level": "INFO"', '"level": "BAVARD"' -replace '"maxAutoReboots": 5', '"maxAutoReboots": 0'
+        [IO.File]::WriteAllText((Join-Path $copy 'config\settings.json'), $settings, (New-Object System.Text.UTF8Encoding $false))
+        { Get-OpConfiguration -Root $copy } | Should -Throw -ExpectedMessage '*2 anomalie(s)*maxAutoReboots*logging.level*'
+    }
+}
+
+Describe 'Read-OpJsonFile' {
+    It 'nomme le fichier absent' {
+        { Read-OpJsonFile -Path (Join-Path $TestDrive 'absent.json') } | Should -Throw -ExpectedMessage '*absent.json*'
     }
 
-    It 'cite une source Microsoft pour la prise en charge' {
-        foreach ($p in $profiles) { $p.supportedOn.source | Should -Match '^https://support\.microsoft\.com/' }
+    It 'nomme le fichier illisible' {
+        $bad = Join-Path $TestDrive 'casse.json'
+        Set-Content -Path $bad -Value '{ "a": ' -Encoding UTF8
+        { Read-OpJsonFile -Path $bad } | Should -Throw -ExpectedMessage '*illisible*casse.json*'
+    }
+}
+
+Describe 'Test-OpConfiguration' {
+    It 'signale <Attendu>' -TestCases @(
+        @{ Attendu = 'une cible sans rétention'; Alter = { param($c) $c.Settings.retention.windowsMonths.PSObject.Properties.Remove('win10-x64') }; Message = '*windowsMonths*win10-x64*' }
+        @{ Attendu = 'une cible inconnue'; Alter = { param($c) $c.Settings.targets = @('win11-x64', 'win7-x86') }; Message = '*cible inconnue*win7-x86*' }
+        @{ Attendu = 'un domaine avec joker'; Alter = { param($c) $c.Settings.allowedDomains = @($c.Settings.allowedDomains) + '*.microsoft.com' }; Message = "*noms d'hôte exacts*" }
+        @{ Attendu = 'un lien downloadPages hors allowedDomains'; Alter = { param($c) $c.Settings.downloadPages.officeDeploymentToolPage = 'https://exemple.net/odt' }; Message = '*exemple.net*allowedDomains*' }
+        @{ Attendu = 'un lien downloadPages en http'; Alter = { param($c) $c.Settings.downloadPages.defenderDefinitions.x64 = 'http://go.microsoft.com/fwlink/?LinkID=121721&arch=x64' }; Message = '*non https*' }
+        @{ Attendu = 'une empreinte de racine invalide'; Alter = { param($c) $c.Settings.integrity.trustedRootThumbprints = @('1234') }; Message = '*empreinte de racine invalide*' }
+        @{ Attendu = 'un point de restauration non booléen'; Alter = { param($c) $c.Settings.client.createRestorePointBeforeSession = 'oui' }; Message = '*createRestorePointBeforeSession*' }
+        @{ Attendu = 'une langue Office mal formée'; Alter = { param($c) $c.Settings.office.sources.current.languages = @('français') }; Message = '*langue*français*' }
+        @{ Attendu = 'un motif de titre invalide'; Alter = { param($c) $c.CatalogQueries.targets.'win11-x64'[0].includeTitlePattern = '(non fermé' }; Message = '*includeTitlePattern*' }
+        @{ Attendu = 'une règle de sélection inconnue'; Alter = { param($c) $c.CatalogQueries.targets.'win11-x64'[0].pick = 'latest' }; Message = '*règle de sélection*latest*' }
+        @{ Attendu = 'une dépendance vers une catégorie inconnue'; Alter = { param($c) $c.CatalogQueries.targets.'win10-x64'[0].prerequisites = @('windows-ssu-old') }; Message = '*windows-ssu-old*' }
+        @{ Attendu = 'un élément épinglé dont le SHA-1 ne correspond pas au nom'; Alter = { param($c) $c.PinnedItems.items[0].sha1 = ('0' * 40) }; Message = "*empreinte du nom de fichier*" }
+        @{ Attendu = 'un élément épinglé hors allowedDomains'; Alter = { param($c) $c.PinnedItems.items[0].url = 'https://exemple.net/a_' + $c.PinnedItems.items[0].sha1 + '.msu' }; Message = '*hôte du lien*' }
+        @{ Attendu = 'une clé acceptée pour une licence de détail'; Alter = { param($c) $c.Profiles.profiles[0].acceptsProductKey = $true }; Message = '*licence en volume*' }
+        @{ Attendu = 'un profil sur une source non déclarée'; Alter = { param($c) $c.Profiles.profiles[0].source = 'monthlyenterprise' }; Message = '*monthlyenterprise*' }
+    ) {
+        param($Attendu, $Alter, $Message)
+        $c = Get-FreshConfiguration
+        & $Alter $c
+        $errors = @(Test-OpConfiguration -Configuration $c)
+        $errors.Count | Should -BeGreaterThan 0 -Because "l'anomalie « $Attendu » doit être signalée"
+        ($errors -join ' | ') | Should -BeLike $Message
     }
 }
