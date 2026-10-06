@@ -22,10 +22,11 @@ jobs:
     defaults:
       run:
         shell: powershell
-    env:
-      OFFPATCH_DIAGNOSTIC_DIR: ${{ runner.temp }}/contrat-diagnostic
     steps:
       - uses: actions/checkout@v5
+
+      - name: Dossier de diagnostic
+        run: Add-Content -Path $env:GITHUB_ENV -Value "OFFPATCH_DIAGNOSTIC_DIR=$(Join-Path $env:RUNNER_TEMP 'contrat-diagnostic')" -Encoding UTF8
 
       - name: Pester (version figée)
         run: |
