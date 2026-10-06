@@ -32,10 +32,10 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [x] `Get-OpRoot` et fonctions de chemins (racine, dépôt, ProgramData)
 - [x] `Write-OpLog` : niveaux, fichier de session, file de messages pour l'interface
 - [x] `Invoke-OpProcess` : fonction unique de lancement de processus sur `System.Diagnostics.Process` (jamais `Start-Process`, dont l'`ExitCode` revient vide sous PowerShell 5.1, R-14), utilisée par tous les exécuteurs (DISM, ODT, mpam-fe.exe, plateforme Defender) : code de sortie, sortie standard capturée, délai maximal facultatif ; tests Pester avec `cmd /c exit 0`, `exit 3010`, `exit 1618`, un délai dépassé et une sortie standard capturée
-- [x] Lecture et validation de `settings.json`, `catalog-queries.json`, `profiles.json`
+- [x] Lecture et validation de `settings.json`, `catalog-queries.json`, `pinned-items.json`, `office/sources.json` (ex-`profiles.json`, recentrage 1.23)
 - [x] Lecture, validation et écriture atomique du manifeste
 - [x] `Lancer-OffPatch.cmd` : élévation, contournement de la stratégie d'exécution, `Unblock-File` (lancement non élevé depuis une vraie clé : à valider sur intervention réelle)
-- [ ] `OffPatch-Cli.ps1` : squelette avec le paramètre `-Action`
+- [x] `OffPatch-Cli.ps1` : squelette avec le paramètre `-Action`
 - [ ] Tests Pester du socle
 
 ## Phase 2 : dépôt Windows, .NET et Defender
@@ -63,10 +63,10 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [ ] Contrôles préalables (tableau 8.2)
 - [ ] Détection par catégorie (états `UpToDate`, `Pending`, `NotApplicable`, `MissingFromDepot`, `SkippedPrerequisite`, `Error`)
 - [ ] Planificateur : ordre, prérequis, points de redémarrage
-- [ ] Tests de planification `tests/Unit/Planner/` (fixtures d'état PC + manifeste, plan attendu dans l'ordre) : P1 24H2 .1742, P2 25H2 .9457 avec cumulative d'octobre au dépôt, P3 25H2 .9550, P4 26H2 à jour, P5 Windows 10 sans SSU récents, P6 25H2 .9457 sans cumulative atteignant `minUbr` (enablement package « Ignorée (prérequis) »), P7 Defender désactivé, P8 .NET 4.8 / 4.8.1 sous Windows 10, P9 Office bilingue et source fr-fr, P10 Office sur un canal absent du dépôt
+- [ ] Tests de planification `tests/Unit/Planner/` (fixtures d'état PC + manifeste, plan attendu dans l'ordre) : P1 24H2 .1742, P2 25H2 .9457 avec cumulative d'octobre au dépôt, P3 25H2 .9550, P4 26H2 à jour, P5 Windows 10 sans SSU récents, P6 25H2 .9457 sans cumulative atteignant `minUbr` (enablement package « Ignorée (prérequis) »), P7 Defender désactivé, P8 .NET 4.8 / 4.8.1 sous Windows 10, P9 Office bilingue et source fr-fr, P10 Office sur un canal absent du dépôt, P11 aucun Office Click-to-Run, P12 Office LTSC 2024 ancien mis à jour
 - [ ] Exécuteur Defender
 - [ ] Exécuteur DISM avec gestion des codes retour
-- [ ] Exécuteur Office : XML temporaire, clé en mémoire, suppression après usage
+- [ ] Exécuteur Office (mise à jour seulement) : canal lu dans le registre Click-to-Run, XML de mise à jour temporaire (produits et langues installés), `Invoke-OpOfficeSetup`, suppression après usage
 - [ ] Rapport d'intervention HTML
 - [ ] Actions CLI : `Plan`, `InstallStep`, `Report`
 - [ ] Tests avec mocks
@@ -162,3 +162,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-06 | 1 | Rapport : « journal ODT non masqué resté dans TEMP » avec le chemin (8.5, 8.8) ; essai `manifest-volume` (exFAT et NTFS) lancé ; `Lancer-OffPatch.cmd` en ASCII (PowerShell natif par Sysnative, élévation avec arguments conservés, mode d'essai sans UAC), testé en local (accents, cmd 32 bits, élévation simulée) ; `Unblock-OpToolFile` ; essai `launcher` (racine de lecteur par subst, x64 et ARM64) lancé | Résultats des essais, puis `OffPatch-Cli.ps1` |
 | 2026-10-06 | 1 | Lanceur : mode d'essai réservé au contexte de test (`OFFPATCH_PESTER` ou `GITHUB_ACTIONS=true`), prouvé par un faux `powershell.exe` sous un faux `SystemRoot` (aucune demande UAC) ; lancement non élevé depuis une vraie clé ajouté à « à valider sur intervention réelle » ; README : débloquer l'archive zip avant extraction ; manifeste sur exFAT et NTFS conforme | Résultat de l'essai `launcher`, puis `OffPatch-Cli.ps1` |
 | 2026-10-06 | 1 | Essai `launcher` conforme sur `windows-2025` et `windows-11-arm` : 16 cas (racine de lecteur R:\ par subst et chemin accentué ; cmd 64 et 32 bits ; branche directe réelle avec arguments accentués, PowerShell 64 bits ; commande d'élévation construite avec Sysnative depuis le cmd 32 bits, sans « \" » final) | `OffPatch-Cli.ps1` |
+| 2026-10-06 | 1 | Recentrage sur les mises à jour (décision de David), cahier des charges 1.23 : profils, clé, PIDKEY, masquage des journaux ODT et retrait abandonnés (code, tests, essai `r08-keylog` retirés) ; `config/office/sources.json` (sources par canal, langues, identifiants de canal installé mesurés) ; essai `office-update-scope` : canal lu dans `CDNBaseUrl` (Current, LTSC 2024, LTSC 2021 ; LTSC 2019 non installable, code 1603), Office 2019 en boîte sur le canal Current et mis à jour depuis la source Current, licence non concluante (aucune licence sans clé) ; `Invoke-OpOfficeSetup` sans clé ; squelette `OffPatch-Cli.ps1` (aucun paramètre de clé) et `Initialize-OpSession` (première fonction publique) | Décision de David sur la vérification de licence ; tests du socle |

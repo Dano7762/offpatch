@@ -22,6 +22,7 @@ Ce que les runners GitHub ne permettent pas de vérifier (décision de David du 
   En attendant, l'enablement package reste installé après le redémarrage de la cumulative.
 - Pause de Windows Update depuis Paramètres sous Windows 11 Famille (R-15) : pause posée à la main jusqu'au lendemain, effet pendant une session OffPatch connectée, reprise d'elle-même à la date choisie.
 - Point de restauration avant session (cahier des charges 8.2, critère d'acceptation en 13) : sur un PC où la protection du système est active d'origine, les deux indicateurs (`SPP\Clients`, `Win32_ShadowStorage`) concordent et le point est créé ; sur un PC où elle est inactive, aucun des deux et aucun appel à `Checkpoint-Computer`. À défaut de validation, l'option est livrée désactivée par défaut.
+- Licence d'Office conservée par la mise à jour (R-08) : sur un PC avec un Office Click-to-Run activé (en boîte avec compte Microsoft, ou LTSC avec une clé), relevé de l'état de licence (`OSPP.VBS /dstatus` : 5 derniers caractères de la clé, état) avant et après la mise à jour par OffPatch.
 - Lanceur `Lancer-OffPatch.cmd` depuis une vraie clé USB, outil à la racine du lecteur, dans une session **non élevée** : demande UAC acceptée (OffPatch démarre avec ses arguments), puis refusée (message « élévation refusée ou impossible »). Les runners GitHub ne le vérifient pas : compte déjà administrateur et UAC désactivé, et un lecteur créé par `subst` n'existe pas dans la session élevée par l'UAC (essai `launcher.yml`, branche directe seulement).
 - Session OffPatch sur un PC connecté pendant que Windows Update installe lui-même : code renvoyé par DISM (1618 / 0x80070652 attendu, non vérifié) et effet de la nouvelle tentative après 5 minutes (R-14).
 
@@ -349,6 +350,21 @@ Impact : tableau 8.5 du cahier des charges.
   - Masquage, copie des journaux et suppression du XML dans un bloc `finally` de l'étape Office, sur tous les chemins de sortie (réussite, erreur, délai dépassé, exception) : `Invoke-OpOfficeSetup` et `Protect-OpOdtLog`, testés sur ces quatre cas (`tests/Unit/OfficeSetup.Tests.ps1`).
   - Contrôle de forme de la clé avant l'ODT (cinq groupes de cinq dans l'alphabet `BCDFGHJKMPQRTVWXY2346789`, insensible à la casse) : `Test-OpProductKeyFormat` ; forme invalide refusée dans l'interface et la CLI ; rapport « clé enregistrée, activation non vérifiée, à réaliser en ligne ».
   - Fausse clé des essais suivants : `BCDFG-HJKMP-QRTVW-XY234-6789B`, conforme à l'alphabet.
+- **Recentrage sur les mises à jour (décision de David du 2026-10-06)** : OffPatch n'installe jamais Office, ne gère aucune clé de produit et ne retire aucun produit. Le contrôle de forme de la clé, le masquage des journaux de l'ODT et le retrait par `<Remove>` sont abandonnés (code et tests retirés) ; les mesures ci-dessus restent comme constats. Les journaux de l'ODT sont simplement copiés dans la session (`<Logging Path>` n'étant pas appliqué).
+- Essai `office-update-scope.yml` (runner `windows-11-arm`, un runner par cas ; runs https://github.com/Dano7762/offpatch/actions/runs/37512218460 et 37513746324) :
+  - **Canal lu dans le registre** (`HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration`), après installation depuis le CDN :
+
+    | Produit installé (canal ODT) | `CDNBaseUrl` et `UpdateChannel` (`http://officecdn.microsoft.com/pr/…`) | `AudienceId` | `AudienceData` | `VersionToReport` |
+    |---|---|---|---|---|
+    | Home2024Retail (Current) | `492350f6-3a01-4f97-b9c0-c7c6ddf67d60` | idem | Production::CC | 16.0.20430.20146 |
+    | HomeStudent2019Retail (Current) | `492350f6-3a01-4f97-b9c0-c7c6ddf67d60` | idem | Production::CC | 16.0.19127.20800 |
+    | ProPlus2024Volume (PerpetualVL2024) | `7983bac0-e531-40cf-be00-fd24fe66619c` | idem (en majuscules) | Production::LTSC2024 | 16.0.17932.21000 |
+    | ProPlus2021Volume (PerpetualVL2021) | `5030841d-c919-4594-8d2d-84ae4f96e58e` | idem | Production::LTSC2021 | 16.0.14334.20918 |
+    | ProPlus2019Volume (PerpetualVL2019) | — | — | — | non installable : `setup.exe /configure` code 1603 en 14 s |
+
+    Le canal se déduit donc de l'identifiant final de `CDNBaseUrl` (ou `UpdateChannel`), qui désigne la bonne source ; ces identifiants sont dans `config/office/sources.json` (`installedChannelIds`). Office 2019 en boîte partage l'identifiant du canal Current, avec une build propre plus ancienne.
+  - **Office 2019 en boîte mis à jour depuis la source Current** : HomeStudent2019Retail 16.0.19127.20800 installé depuis le CDN, source Current téléchargée pour Home2024Retail (comme le dépôt), CDN bloqué, `/configure` avec le produit HomeStudent2019Retail : code 0 (288 s), version 16.0.20430.20146 (`WINWORD.EXE` aussi), produit inchangé. Microsoft ne prend plus en charge Office 2019 ; OffPatch le traite comme tout Office du canal Current.
+  - **Licence conservée par la mise à jour : non concluant.** ProPlus2024Volume 16.0.17932.20976 installé sans clé depuis le CDN, mis à jour vers 16.0.17932.21000 par `/configure` depuis la source locale, CDN bloqué (code 0, 206 s). Mais `OSPP.VBS /dstatus` n'affiche aucune licence, avant comme après (seulement « ---Processing--- … ---Exiting--- ») : sans clé, il n'y a pas de licence à comparer. Vérifier la conservation demande un Office muni d'une licence : soit une clé dans le workflow (contraire à CLAUDE.md, « aucune clé de produit dans les workflows », sauf accord de David, par exemple la clé publique de licence en volume publiée par Microsoft, qui n'active rien sans serveur KMS), soit une intervention réelle (ajouté en tête de ce fichier).
 
 ## R-09 Détection des cumulatives installées
 

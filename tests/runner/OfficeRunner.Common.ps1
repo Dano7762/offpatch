@@ -156,7 +156,6 @@ function Get-OdtConfigurationXml {
         [switch]$NoCdnFallback,
         [switch]$RemoveAll,
         [switch]$Display,
-        [string]$ProductKey,
         [string]$LogPath
     )
     $sb = New-Object System.Text.StringBuilder
@@ -167,9 +166,7 @@ function Get-OdtConfigurationXml {
         if ($Version) { $attributes += ' Version="' + $Version + '"' }
         if ($NoCdnFallback) { $attributes += ' AllowCdnFallback="FALSE"' }
         [void]$sb.AppendLine("  <Add $attributes>")
-        $pidKey = ''
-        if ($ProductKey) { $pidKey = ' PIDKEY="' + $ProductKey + '"' }
-        [void]$sb.AppendLine("    <Product ID=""$ProductId""$pidKey>")
+        [void]$sb.AppendLine("    <Product ID=""$ProductId"">")
         foreach ($l in $Language) { [void]$sb.AppendLine("      <Language ID=""$l"" />") }
         [void]$sb.AppendLine('    </Product>')
         [void]$sb.AppendLine('  </Add>')

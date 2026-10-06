@@ -12,7 +12,7 @@ Outil Windows portable qui prépare une fois par mois un dépôt de mises à jou
 - l'enablement package Windows 11 26H2 ;
 - les cumulatives .NET Framework ;
 - la plateforme et les définitions Microsoft Defender ;
-- les sources d'installation Office (versions en boîte 2021 et 2024, Office LTSC 2021 et 2024), par l'Office Deployment Tool.
+- une source Office par canal (Current, Office LTSC 2024, Office LTSC 2021), par l'Office Deployment Tool, pour mettre à jour l'Office Click-to-Run déjà installé sur le PC.
 
 Chaque fichier est contrôlé au téléchargement (signature Authenticode Microsoft, SHA-256) et rangé dans un dépôt dédoublonné, décrit par un manifeste.
 
@@ -22,7 +22,7 @@ Chaque fichier est contrôlé au téléchargement (signature Authenticode Micros
 
 - Windows PowerShell 5.1 seulement, rien à installer sur le PC client, x64 et ARM64.
 - Téléchargements uniquement depuis des domaines Microsoft autorisés.
-- Aucune activation en dehors des mécanismes Microsoft officiels ; aucune clé de produit écrite sur disque ni dans un journal.
+- Uniquement des mises à jour : OffPatch n'installe ni Windows ni Office, ne gère aucune clé de produit, ne touche à aucune activation et ne retire aucun produit.
 - Les données qui changent avec Microsoft (titres du catalogue, product IDs, liens) vivent dans la configuration, pas dans le code.
 
 ## Installation depuis GitHub
@@ -40,7 +40,7 @@ Si vous téléchargez l'archive zip du dépôt, débloquez-la **avant** de l'ext
 
 - `ci.yml` : PSScriptAnalyzer et Pester 5 sous Windows PowerShell 5.1, à chaque push, sans accès réseau (pages du catalogue enregistrées dans `tests/Fixtures`).
 - `catalog-contract.yml` : chaque mercredi, vérifie que les pages actuelles du Microsoft Update Catalog sont toujours reconnues et que les liens de téléchargement du moment restent sur les domaines autorisés. Sur un dépôt public, GitHub désactive les workflows planifiés après 60 jours sans activité dans le dépôt : il faut alors réactiver `catalog-contract.yml` dans l'onglet Actions.
-- Les essais qui modifient le système (DISM, Defender, installation d'Office) tournent uniquement sur des runners GitHub hébergés et jetables, en déclenchement manuel. Ce que les runners ne permettent pas (redémarrages, Windows 10, Windows 11 x64 client) est validé sur intervention réelle.
+- Les essais qui modifient le système (DISM, Defender, Office) tournent uniquement sur des runners GitHub hébergés et jetables, en déclenchement manuel. Ce que les runners ne permettent pas (redémarrages, Windows 10, Windows 11 x64 client) est validé sur intervention réelle.
 
 ## Licence
 

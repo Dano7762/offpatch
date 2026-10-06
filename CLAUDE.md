@@ -29,8 +29,7 @@ Réponds-moi en français.
 - Les fonctions en lecture seule (détection, interrogation du catalogue) peuvent tourner sur la machine de développement.
 - Pour tester le téléchargement, utiliser `-ListOnly` (interroge le catalogue sans rien télécharger) ou la cible la plus légère (définitions Defender). Ne télécharger une cumulative complète ou une source Office que si je le demande.
 - Toute fonction qui modifie le système ou le dépôt déclare `[CmdletBinding(SupportsShouldProcess)]` et respecte `-WhatIf`.
-- Une clé de produit n'est jamais écrite dans un fichier persistant ni dans un journal. Elle reste en mémoire et dans le XML temporaire d'installation, supprimé juste après.
-- Aucune activation en dehors des mécanismes Microsoft officiels. Pas de KMS tiers, pas de contournement de licence.
+- OffPatch installe uniquement des mises à jour : il n'installe jamais Windows ni Office, ne gère aucune clé de produit, ne touche à aucune activation et ne retire aucun produit.
 - Téléchargements uniquement depuis les domaines listés dans `config/settings.json` (`allowedDomains`).
 - Aucun numéro de KB, titre de catalogue, product ID Office ou URL de téléchargement en dur dans le code. Ils vivent dans `config/` ou dans `depot/manifest.json`.
 - Ne jamais inventer un titre de catalogue, un product ID, une URL ou un comportement de DISM ou de l'ODT. Vérifier dans la documentation Microsoft et consigner la source dans `docs/RECHERCHE.md`.

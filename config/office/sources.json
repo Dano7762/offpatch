@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "current",
+      "channel": "Current",
+      "folder": "office/current",
+      "languages": ["fr-fr", "en-us"],
+      "installedChannelIds": ["492350f6-3a01-4f97-b9c0-c7c6ddf67d60"]
+    },
+    {
+      "id": "perpetualvl2024",
+      "channel": "PerpetualVL2024",
+      "folder": "office/perpetualvl2024",
+      "languages": ["fr-fr"],
+      "installedChannelIds": ["7983bac0-e531-40cf-be00-fd24fe66619c"]
+    },
+    {
+      "id": "perpetualvl2021",
+      "channel": "PerpetualVL2021",
+      "folder": "office/perpetualvl2021",
+      "languages": ["fr-fr"],
+      "installedChannelIds": ["5030841d-c919-4594-8d2d-84ae4f96e58e"]
+    }
+  ]
+}

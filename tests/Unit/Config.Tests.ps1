@@ -14,7 +14,7 @@ BeforeAll {
             Settings       = Read-OpJsonFile -Path (Join-Path $root 'config\settings.json')
             CatalogQueries = Read-OpJsonFile -Path (Join-Path $root 'config\catalog-queries.json')
             PinnedItems    = Read-OpJsonFile -Path (Join-Path $root 'config\pinned-items.json')
-            Profiles       = Read-OpJsonFile -Path (Join-Path $root 'config\office\profiles.json')
+            OfficeSources  = Read-OpJsonFile -Path (Join-Path $root 'config\office\sources.json')
         }
     }
 }
@@ -31,7 +31,7 @@ Describe 'Get-OpConfiguration' {
         New-Item -ItemType Directory -Force -Path (Join-Path $copy 'config\office') | Out-Null
         Set-Content -Path (Join-Path $copy 'offpatch.root') -Value '{}' -Encoding UTF8
         foreach ($f in 'settings.json', 'catalog-queries.json', 'pinned-items.json') { Copy-Item (Join-Path $root "config\$f") (Join-Path $copy "config\$f") }
-        Copy-Item (Join-Path $root 'config\office\profiles.json') (Join-Path $copy 'config\office\profiles.json')
+        Copy-Item (Join-Path $root 'config\office\sources.json') (Join-Path $copy 'config\office\sources.json')
         $settings = Get-Content (Join-Path $copy 'config\settings.json') -Raw -Encoding UTF8
         $settings = $settings -replace '"level": "INFO"', '"level": "BAVARD"' -replace '"maxAutoReboots": 5', '"maxAutoReboots": 0'
         [IO.File]::WriteAllText((Join-Path $copy 'config\settings.json'), $settings, (New-Object System.Text.UTF8Encoding $false))
@@ -60,14 +60,16 @@ Describe 'Test-OpConfiguration' {
         @{ Attendu = 'un lien downloadPages en http'; Alter = { param($c) $c.Settings.downloadPages.defenderDefinitions.x64 = 'http://go.microsoft.com/fwlink/?LinkID=121721&arch=x64' }; Message = '*non https*' }
         @{ Attendu = 'une empreinte de racine invalide'; Alter = { param($c) $c.Settings.integrity.trustedRootThumbprints = @('1234') }; Message = '*empreinte de racine invalide*' }
         @{ Attendu = 'un point de restauration non booléen'; Alter = { param($c) $c.Settings.client.createRestorePointBeforeSession = 'oui' }; Message = '*createRestorePointBeforeSession*' }
-        @{ Attendu = 'une langue Office mal formée'; Alter = { param($c) $c.Settings.office.sources.current.languages = @('français') }; Message = '*langue*français*' }
+        @{ Attendu = 'une langue Office mal formée'; Alter = { param($c) $c.OfficeSources.sources[0].languages = @('français') }; Message = '*langue*français*' }
         @{ Attendu = 'un motif de titre invalide'; Alter = { param($c) $c.CatalogQueries.targets.'win11-x64'[0].includeTitlePattern = '(non fermé' }; Message = '*includeTitlePattern*' }
         @{ Attendu = 'une règle de sélection inconnue'; Alter = { param($c) $c.CatalogQueries.targets.'win11-x64'[0].pick = 'latest' }; Message = '*règle de sélection*latest*' }
         @{ Attendu = 'une dépendance vers une catégorie inconnue'; Alter = { param($c) $c.CatalogQueries.targets.'win10-x64'[0].prerequisites = @('windows-ssu-old') }; Message = '*windows-ssu-old*' }
         @{ Attendu = 'un élément épinglé dont le SHA-1 ne correspond pas au nom'; Alter = { param($c) $c.PinnedItems.items[0].sha1 = ('0' * 40) }; Message = "*empreinte du nom de fichier*" }
         @{ Attendu = 'un élément épinglé hors allowedDomains'; Alter = { param($c) $c.PinnedItems.items[0].url = 'https://exemple.net/a_' + $c.PinnedItems.items[0].sha1 + '.msu' }; Message = '*hôte du lien*' }
-        @{ Attendu = 'une clé acceptée pour une licence de détail'; Alter = { param($c) $c.Profiles.profiles[0].acceptsProductKey = $true }; Message = '*licence en volume*' }
-        @{ Attendu = 'un profil sur une source non déclarée'; Alter = { param($c) $c.Profiles.profiles[0].source = 'monthlyenterprise' }; Message = '*monthlyenterprise*' }
+        @{ Attendu = 'deux sources sur le même canal'; Alter = { param($c) $c.OfficeSources.sources[1].channel = 'Current' }; Message = '*canal Current déjà couvert*' }
+        @{ Attendu = 'un identifiant de canal attribué à deux sources'; Alter = { param($c) $c.OfficeSources.sources[1].installedChannelIds = @($c.OfficeSources.sources[0].installedChannelIds) }; Message = '*déjà attribué*' }
+        @{ Attendu = 'une source sans identifiant de canal installé'; Alter = { param($c) $c.OfficeSources.sources[2].installedChannelIds = @() }; Message = '*installedChannelIds est vide*' }
+        @{ Attendu = 'un dossier de source mal formé'; Alter = { param($c) $c.OfficeSources.sources[0].folder = 'C:\office' }; Message = '*folder doit être*' }
     ) {
         param($Attendu, $Alter, $Message)
         $c = Get-FreshConfiguration

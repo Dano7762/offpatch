@@ -5,11 +5,6 @@
     "includeEnablementPackage": true
   },
   "office": {
-    "sources": {
-      "current": { "languages": ["fr-fr", "en-us"] },
-      "perpetualvl2024": { "languages": ["fr-fr"] },
-      "perpetualvl2021": { "languages": ["fr-fr"] }
-    },
     "clientEdition": "64"
   },
   "retention": {

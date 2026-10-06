@@ -1,15 +1,15 @@
 ﻿function Test-OpConfiguration {
     <#
     .SYNOPSIS
-        Contrôle la configuration chargée (settings, catalog-queries, pinned-items, profils Office) et renvoie la
+        Contrôle la configuration chargée (settings, catalog-queries, pinned-items, sources Office) et renvoie la
         liste des anomalies, en français ; liste vide si tout est cohérent.
 
     .DESCRIPTION
         Règles tirées du cahier des charges (6.1 à 6.4, 7.3, 8.2) : versions de schéma, cibles connues, rétention par
         cible, valeurs du client, niveau du journal, empreintes de racine, hôtes exacts de allowedDomains, liens
-        downloadPages en https sur un hôte autorisé, langues des sources Office, recherches du catalogue (catégories,
-        motifs, règles de sélection, dépendances), éléments épinglés (lien, SHA-1, builds), profils Office (source
-        déclarée, clé réservée aux licences en volume, source Microsoft de la prise en charge).
+        downloadPages en https sur un hôte autorisé, recherches du catalogue (catégories, motifs, règles de sélection,
+        dépendances), éléments épinglés (lien, SHA-1, builds), sources Office (un canal par source, dossier, langues,
+        identifiants de canal installé uniques).
     #>
     [CmdletBinding()]
     [OutputType([string[]])]
@@ -69,11 +69,6 @@
         if (-not [uri]::TryCreate($l, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -ne 'https') { $errors.Add("settings.json : lien downloadPages invalide ou non https : « $l ».") }
         elseif ($allowed -notcontains $uri.Host.ToLowerInvariant()) { $errors.Add("settings.json : l'hôte de « $l » n'est pas dans allowedDomains.") }
     }
-    foreach ($src in @($s.office.sources.PSObject.Properties)) {
-        $languages = @($src.Value.languages)
-        if ($languages.Count -eq 0) { $errors.Add("settings.json : la source Office $($src.Name) n'a aucune langue.") }
-        foreach ($lang in $languages) { if ($lang -notmatch '^[a-z]{2}-[a-z]{2}$') { $errors.Add("settings.json : langue « $lang » invalide pour la source Office $($src.Name) (forme xx-xx).") } }
-    }
 
     # catalog-queries.json
     $q = $Configuration.CatalogQueries
@@ -110,15 +105,28 @@
         if (@($item.appliesToBaseBuilds).Count -eq 0) { $errors.Add("$label : appliesToBaseBuilds est vide.") }
     }
 
-    # office/profiles.json
-    $profileIds = @{}
-    foreach ($p in @($Configuration.Profiles.profiles)) {
-        $label = "profiles.json, $($p.id)"
-        if ($profileIds.ContainsKey($p.id)) { $errors.Add("$label : identifiant en double.") } else { $profileIds[$p.id] = $true }
-        if (-not $p.productId) { $errors.Add("$label : productId absent.") }
-        if (-not (Test-Property $s.office.sources $p.source)) { $errors.Add("$label : source Office « $($p.source) » absente de settings.json.") }
-        if ([bool]$p.acceptsProductKey -ne ($p.license -eq 'volume')) { $errors.Add("$label : une clé de produit n'est acceptée que pour une licence en volume.") }
-        if ($p.supportedOn.source -notmatch '^https://support\.microsoft\.com/') { $errors.Add("$label : supportedOn.source doit citer une page support.microsoft.com.") }
+    # office/sources.json : une source par canal, ses langues, les identifiants de canal lus dans le registre (8.3)
+    $o = $Configuration.OfficeSources
+    if ([int]$o.schemaVersion -ne 1) { $errors.Add("sources.json : schemaVersion $($o.schemaVersion) non pris en charge (attendu : 1).") }
+    $sourceIds = @{}
+    $channels = @{}
+    $channelIds = @{}
+    foreach ($src in @($o.sources)) {
+        $label = "sources.json, $($src.id)"
+        if (-not $src.id) { $errors.Add('sources.json : source sans identifiant.') ; continue }
+        if ($sourceIds.ContainsKey($src.id)) { $errors.Add("$label : identifiant en double.") } else { $sourceIds[$src.id] = $true }
+        if (-not $src.channel) { $errors.Add("$label : channel absent.") }
+        elseif ($channels.ContainsKey($src.channel)) { $errors.Add("$label : canal $($src.channel) déjà couvert par une autre source.") } else { $channels[$src.channel] = $true }
+        if ([string]$src.folder -notmatch '^office/[a-z0-9]+$') { $errors.Add("$label : folder doit être de la forme office/<nom>.") }
+        $languages = @($src.languages)
+        if ($languages.Count -eq 0) { $errors.Add("$label : aucune langue.") }
+        foreach ($lang in $languages) { if ($lang -notmatch '^[a-z]{2}-[a-z]{2}$') { $errors.Add("$label : langue « $lang » invalide (forme xx-xx).") } }
+        $ids = @($src.installedChannelIds)
+        if ($ids.Count -eq 0) { $errors.Add("$label : installedChannelIds est vide : le canal installé ne pourrait pas être reconnu.") }
+        foreach ($id in $ids) {
+            if ($id -notmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') { $errors.Add("$label : identifiant de canal « $id » invalide (GUID en minuscules).") }
+            elseif ($channelIds.ContainsKey($id)) { $errors.Add("$label : identifiant de canal $id déjà attribué à une autre source.") } else { $channelIds[$id] = $true }
+        }
     }
 
     # Une chaîne par anomalie ; l'appelant regroupe le résultat avec @().

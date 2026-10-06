@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.22 du 6 octobre 2026.
+Version 1.23 du 6 octobre 2026.
 
 ## 1. Contexte
 
@@ -19,7 +19,7 @@ Usage visé : je prépare les PC un par un, à l'atelier ou chez le client. Il n
 ## 2. Objectifs
 
 1. Télécharger une fois par mois et installer sur autant de PC que nécessaire sans retélécharger.
-2. Un PC fraîchement installé ressort à jour : Windows, .NET, Defender, et Office installé dans sa dernière build.
+2. Un PC ressort à jour : Windows, .NET, Defender et, s'il en a un, son Office Click-to-Run dans la dernière build de son canal. OffPatch installe uniquement des mises à jour : il n'installe jamais Windows ni Office, ne gère aucune clé de produit et ne retire aucun produit.
 3. Le même outil sert dans deux situations :
    - le dépôt est mis à jour sur mon poste, puis copié sur un support (clé ou SSD) ;
    - le support est autonome : on y lance aussi le téléchargement, depuis n'importe quel PC connecté.
@@ -49,35 +49,29 @@ Tout le reste est détecté puis refusé avec un message clair, sans rien instal
 | `dotnet` | Cumulative .NET Framework | Toutes | Microsoft Update Catalog |
 | `defender-platform` | Mise à jour de la plateforme Microsoft Defender (KB4052623) | Toutes | Microsoft Update Catalog, canal « Current Channel (Broad) » uniquement |
 | `defender` | Définitions Microsoft Defender (mpam-fe.exe) | Toutes | Lien de téléchargement Microsoft |
-| `office-source` | Source d'installation Office par canal | Toutes | ODT `/download` |
+| `office-source` | Source locale d'un canal Office, pour mettre à jour l'Office Click-to-Run déjà installé sur ce canal | Toutes | ODT `/download` |
 
 Les points encore incertains (titres exacts du catalogue, prérequis checkpoint, enablement package, ESU) sont listés dans `RECHERCHE.md` et tranchés en phase 0.
 
-### 3.3 Éditions Office
+### 3.3 Office : sources par canal
 
-| Profil | Libellé | Product ID | Canal | Licence | Windows 10 22H2 |
-|---|---|---|---|---|---|
-| `home2024` | Office Famille 2024 | `Home2024Retail` | Current | Compte Microsoft du client | Non pris en charge |
-| `homebusiness2024` | Office Famille et Petite Entreprise 2024 | `HomeBusiness2024Retail` | Current | Compte Microsoft du client | Non pris en charge |
-| `homestudent2021` | Office Famille et Étudiant 2021 | `HomeStudent2021Retail` | Current | Compte Microsoft du client | Non pris en charge |
-| `homebusiness2021` | Office Famille et Petite Entreprise 2021 | `HomeBusiness2021Retail` | Current | Compte Microsoft du client | Non pris en charge |
-| `ltsc2024-proplus` | Office LTSC Professionnel Plus 2024 | `ProPlus2024Volume` | PerpetualVL2024 | Clé MAK | Non pris en charge |
-| `ltsc2024-std` | Office LTSC Standard 2024 | `Standard2024Volume` | PerpetualVL2024 | Clé MAK | Non pris en charge |
-| `ltsc2021-proplus` | Office LTSC Professionnel Plus 2021 | `ProPlus2021Volume` | PerpetualVL2021 | Clé MAK | Non pris en charge |
-| `ltsc2021-std` | Office LTSC Standard 2021 | `Standard2021Volume` | PerpetualVL2021 | Clé MAK | Non pris en charge |
+OffPatch met à jour l'Office Click-to-Run déjà installé sur le PC, depuis la source locale de son canal. Il n'installe pas Office, ne retire aucun produit et ne gère aucune clé de produit ni activation : le XML de mise à jour ne contient aucun élément de licence (6.3). Que la licence en place soit conservée par la mise à jour reste à vérifier sur un Office muni d'une licence (R-08, « À valider sur intervention réelle »).
 
-Les huit product IDs figurent dans la liste officielle de l'ODT (R-07). Les quatre profils en boîte utilisent le canal Current et partagent une seule source `current` : leur build est celle du Current Channel (R-07).
+| Source | Canal ODT | Office mis à jour (exemples) | Langues par défaut |
+|---|---|---|---|
+| `current` | Current | Office 2024 et 2021 en boîte, Microsoft 365 Famille ou Personnel préinstallés | `fr-fr`, `en-us` |
+| `perpetualvl2024` | PerpetualVL2024 | Office LTSC 2024 | `fr-fr` |
+| `perpetualvl2021` | PerpetualVL2021 | Office LTSC 2021 | `fr-fr` |
 
-Prise en charge sous Windows 10 22H2, d'après les configurations requises de Microsoft (« Office suites for individuals and families » et « Office suites for enterprise, business, education, and government », support.microsoft.com, consultées le 4 octobre 2026) : Office 2024 et Office 2021 en boîte ne citent que Windows 11 ; Office LTSC 2024 et LTSC 2021 citent Windows 11, Windows 11 LTSC 2024, Windows 10 LTSC 2021 et 2019 et des versions de Windows Server, pas Windows 10 22H2. L'installation reste possible, mais elle se fait hors du support Microsoft : l'outil le signale sans la bloquer (8.2, 8.6, 8.8). La liste est tenue à jour dans `profiles.json` (champ `supportedOn`), avec la source.
-
-Une source Office correspond à un canal et à une liste de langues. Il en faut donc trois au maximum : `current`, `perpetualvl2024`, `perpetualvl2021`. Office est installé en 64 bits, y compris sur les PC ARM64 (R-07). Langues par défaut : `fr-fr` et `en-us` pour la source `current`, `fr-fr` pour les sources LTSC (6.1). La liste des langues est réglable par source, mais l'installation ne peut utiliser que des langues présentes dans la source, puisque le repli sur le CDN est désactivé.
+Le canal de l'Office installé est lu dans le registre Click-to-Run (8.3) ; il désigne la source à utiliser. Un Office sur un canal absent du dépôt (par exemple Office LTSC 2019, canal PerpetualVL2019) est laissé tel quel, `NotApplicable` avec le motif « canal absent du dépôt ». Office 2019 en boîte est sur le canal Current (même identifiant que Office 2024) : il est mis à jour depuis la source `current` (mesuré : de 16.0.19127.20800 à 16.0.20430.20146, R-08), bien que Microsoft ne le prenne plus en charge. Office est en 64 bits, y compris sur les PC ARM64 (R-07). La liste des langues est réglable par source ; une mise à jour ne peut utiliser que des langues présentes dans la source, puisque le repli sur le CDN est désactivé (8.5).
 
 ### 3.4 Hors périmètre de la v1
 
 - Gestion de parc, déploiement réseau, serveur WSUS.
 - Pilotes, runtimes Visual C++, logiciels tiers.
-- Activation, en dehors de la saisie facultative d'une clé MAK pour les profils LTSC.
-- Microsoft 365 Apps (abonnement). Le mécanisme serait le même, voir la section 14.
+- Installation de Windows ou d'Office, retrait d'un produit, clés de produit et activation : OffPatch n'installe que des mises à jour.
+- Office installé en MSI : non applicable (« aucun Office Click-to-Run »).
+- Canaux Microsoft 365 Apps d'entreprise (Monthly Enterprise, Semi-Annual Enterprise) : aucune source dans le dépôt, `NotApplicable` « canal absent du dépôt ». Voir la section 14.
 - Création ou modification d'ISO.
 - Mises à niveau de version majeure (Windows 11 23H2 vers 24H2, Windows 10 vers 11). Elles passent par une ISO récente.
 - Windows Server, Windows x86, Office 32 bits.
@@ -119,9 +113,9 @@ OffPatch/
 │   ├── catalog-queries.json
 │   ├── pinned-items.json
 │   └── office/
-│       ├── profiles.json
+│       ├── sources.json            Sources par canal et par langue (6.3)
 │       ├── download.xml.template
-│       └── install.xml.template
+│       └── update.xml.template
 ├── tools/
 │   └── odt/                       setup.exe de l'ODT, récupéré par l'outil (hors git)
 ├── depot/                         Données téléchargées (hors git)
@@ -161,11 +155,6 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
     "includeEnablementPackage": true
   },
   "office": {
-    "sources": {
-      "current": { "languages": ["fr-fr", "en-us"] },
-      "perpetualvl2024": { "languages": ["fr-fr"] },
-      "perpetualvl2021": { "languages": ["fr-fr"] }
-    },
     "clientEdition": "64"
   },
   "retention": {
@@ -208,9 +197,7 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
 
 `downloadPages` regroupe les liens Microsoft hors catalogue : définitions Defender par architecture (redirection vers `definitionupdates.microsoft.com`, R-06) et page de l'Office Deployment Tool, d'où l'outil tire le lien versionné du fichier (`download.microsoft.com`, R-07). Les hôtes atteints restent soumis à `allowedDomains` ; le contrat en ligne hebdomadaire lit ces liens ici.
 
-Les valeurs chiffrées sont des valeurs de départ. `minFreeSpaceGB` (en Gio) vaut le pic d'espace consommé sur C: par l'installation d'une cumulative Windows 11 mesuré sur runner, sans redémarrage (10,7 Gio, le plus fort de trois essais), multiplié par 1,5 et arrondi au-dessus : la mesure est un minimum, puisque la phase de redémarrage n'est pas comptée (R-12). La liste `allowedDomains` contient les noms d'hôte réellement atteints, redirections comprises, mesurés en R-13. Règle : nom d'hôte exact, sans joker ni suffixe, `https` seulement. Un lien `http` renvoyé par une source (catalogue, redirection) est réécrit en `https` sur le même hôte ; rien n'est jamais téléchargé en `http`. Un hôte absent de la liste fait refuser le téléchargement, avec un message qui donne l'hôte, l'URL complète et la ligne exacte à ajouter à `allowedDomains`. Elle s'applique aux téléchargements faits par OffPatch lui-même (catalogue, mpam-fe.exe, plateforme Defender, éléments épinglés, ODT). Elle ne s'applique pas au trafic propre de l'ODT pendant `setup.exe /download`, qui contacte ses propres domaines (CDN Office, mais aussi par exemple `ecs.office.com` ou `mrodevicemgr.officeapps.live.com`) : OffPatch ne le contrôle pas, il se contente de le journaliser. L'interface modifie ce fichier quand je change les cibles ou les langues dans l'onglet Dépôt.
-
-Les langues se règlent par source Office. Par défaut, la source `current` porte `fr-fr` et `en-us` : les Office en boîte ou Microsoft 365 préinstallés par les fabricants sont souvent bilingues, et une langue installée absente de la source empêche leur mise à jour (8.5, R-08). L'anglais ajoute environ 350 Mo à la source Current (3 955 Mo au lieu de 3 605 Mo, mesuré le 5 octobre 2026). Les sources `perpetualvl2024` et `perpetualvl2021` portent `fr-fr` seul.
+Les valeurs chiffrées sont des valeurs de départ. `minFreeSpaceGB` (en Gio) vaut le pic d'espace consommé sur C: par l'installation d'une cumulative Windows 11 mesuré sur runner, sans redémarrage (10,7 Gio, le plus fort de trois essais), multiplié par 1,5 et arrondi au-dessus : la mesure est un minimum, puisque la phase de redémarrage n'est pas comptée (R-12). La liste `allowedDomains` contient les noms d'hôte réellement atteints, redirections comprises, mesurés en R-13. Règle : nom d'hôte exact, sans joker ni suffixe, `https` seulement. Un lien `http` renvoyé par une source (catalogue, redirection) est réécrit en `https` sur le même hôte ; rien n'est jamais téléchargé en `http`. Un hôte absent de la liste fait refuser le téléchargement, avec un message qui donne l'hôte, l'URL complète et la ligne exacte à ajouter à `allowedDomains`. Elle s'applique aux téléchargements faits par OffPatch lui-même (catalogue, mpam-fe.exe, plateforme Defender, éléments épinglés, ODT). Elle ne s'applique pas au trafic propre de l'ODT pendant `setup.exe /download`, qui contacte ses propres domaines (CDN Office, mais aussi par exemple `ecs.office.com` ou `mrodevicemgr.officeapps.live.com`) : OffPatch ne le contrôle pas, il se contente de le journaliser. L'interface modifie ce fichier quand je change les cibles dans l'onglet Dépôt ; les langues des sources Office sont dans `config/office/sources.json` (6.3).
 
 ### 6.2 `config/catalog-queries.json`
 
@@ -255,43 +242,38 @@ Une entrée peut porter les champs de dépendance `prerequisites` et `runsAfter`
 
 ### 6.3 Office
 
-`config/office/profiles.json` décrit les profils du tableau 3.3 :
+`config/office/sources.json` décrit les sources du tableau 3.3, une par canal, avec leurs langues et les valeurs du registre Click-to-Run qui désignent ce canal sur un PC (8.3) :
 
 ```json
 {
-  "id": "ltsc2024-proplus",
-  "label": "Office LTSC Professionnel Plus 2024",
-  "productId": "ProPlus2024Volume",
-  "channel": "PerpetualVL2024",
-  "source": "perpetualvl2024",
-  "license": "volume",
-  "acceptsProductKey": true,
-  "excludeApps": [],
-  "supportedOn": {
-    "windows": ["win11"],
-    "source": "https://support.microsoft.com/en-us/office/system-requirements/office-suites-for-enterprise-business-education-and-government"
-  }
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "current",
+      "channel": "Current",
+      "folder": "office/current",
+      "languages": ["fr-fr", "en-us"],
+      "installedChannelIds": ["…"]
+    }
+  ]
 }
 ```
 
-`install.xml.template` sert à générer, au moment de l'installation, un XML avec le chemin absolu de la source sur le support :
+Les langues se règlent par source. Par défaut, la source `current` porte `fr-fr` et `en-us` : les Office en boîte ou Microsoft 365 préinstallés par les fabricants sont souvent bilingues, et une langue installée absente de la source empêche leur mise à jour (8.5, R-08). L'anglais ajoute environ 350 Mo à la source Current (3 955 Mo au lieu de 3 605 Mo, mesuré le 5 octobre 2026). Les sources `perpetualvl2024` et `perpetualvl2021` portent `fr-fr` seul. `installedChannelIds` : identifiants de canal relevés dans `CDNBaseUrl` du registre Click-to-Run, mesurés sur runner (R-08).
+
+`update.xml.template` sert à générer, au moment de la mise à jour, un XML avec le chemin absolu de la source sur le support, les produits et les langues déjà installés (lus dans le registre Click-to-Run). Aucune clé de produit, aucun `<Remove>` :
 
 ```xml
 <Configuration>
   <Add OfficeClientEdition="64" Channel="{{Channel}}" SourcePath="{{SourcePath}}" AllowCdnFallback="FALSE">
-    <Product ID="{{ProductId}}"{{PidKeyAttribute}}>
-{{LanguageElements}}
-{{ExcludeAppElements}}
-    </Product>
+{{ProductElements}}
   </Add>
-{{RemoveElement}}
-  <RemoveMSI />
   <Updates Enabled="TRUE" Channel="{{Channel}}" />
   <Display Level="None" AcceptEULA="TRUE" />
 </Configuration>
 ```
 
-`AllowCdnFallback="FALSE"` garantit que l'installation n'utilise que la source locale. Les mises à jour ultérieures du PC client restent activées sur le canal normal de Microsoft. `<Remove All="TRUE" />` combiné à `<Add>` dans un même fichier fonctionne (vérifié en R-08).
+`{{ProductElements}}` contient un élément `<Product ID="…">` par produit installé, avec ses `<Language ID="…" />`. `AllowCdnFallback="FALSE"` garantit que la mise à jour n'utilise que la source locale. Les mises à jour ultérieures du PC client restent activées sur le canal normal de Microsoft. Une source d'un canal et d'une langue n'est pas propre à un produit : la source Current met à jour un Microsoft 365 Famille comme un Office Famille 2024 (R-08).
 
 ### 6.4 `config/pinned-items.json`
 
@@ -447,7 +429,6 @@ Assistant accessible depuis l'onglet Dépôt :
 | Processus PowerShell 32 bits sur un Windows 64 bits (`[Environment]::Is64BitOperatingSystem` vrai et `[Environment]::Is64BitProcess` faux) | Bloquant : DISM et le registre seraient vus à travers la redirection 32 bits. `Lancer-OffPatch.cmd` doit lancer le PowerShell natif (8.1) |
 | Cible reconnue (système, version, build, architecture, édition) | Hors périmètre : bloquant, avec le motif. Windows 10 et Windows 11 se distinguent par `CurrentBuild` (22000 et plus = Windows 11), jamais par `ProductName`, qui vaut encore « Windows 10 … » sur Windows 11. Le libellé affiché vient de `Win32_OperatingSystem.Caption` (R-09) |
 | Windows 10 : ESU actif | Absent ou indétectable : avertissement. En mode auto, l'étape Windows est ignorée sauf si je la force dans le récapitulatif (R-04) |
-| Profil Office choisi pris en charge par Microsoft sur ce Windows (3.3, `supportedOn`) | Non pris en charge (par exemple tout profil sur Windows 10 22H2) : avertissement non bloquant, avec la source Microsoft ; rappel dans l'écran récapitulatif du mode auto (8.6) et dans le rapport (8.8) |
 | Redémarrage en attente (CBS, Windows Update, renommages de fichiers en attente) | Proposer de redémarrer avant de commencer |
 | Espace libre sur C: | Sous `minFreeSpaceGB` : bloquant |
 | Portable sur batterie | Avertissement, confirmation demandée avant le mode auto |
@@ -497,7 +478,7 @@ Méthodes de détection, établies en R-09. La famille (Windows 10 ou 11) se lit
 - .NET : à jour si la liste des paquets DISM contient un paquet de même nom que `package.name`, à l'état `Installed`, de version supérieure ou égale à `package.version` ; à installer sinon. Sous Windows 10, le fichier est choisi d'après la valeur `Release` de `HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full` (`netRelease`). `Get-HotFix` ne sert qu'au diagnostic : une cumulative plus récente fait disparaître le KB du dépôt de sa liste (R-05).
 - Plateforme Defender : mêmes règles d'applicabilité que les définitions ci-dessous ; à jour si `AMProductVersion` est supérieure ou égale à la version du fichier du dépôt (`FileVersion`), à installer sinon (R-06).
 - Defender : applicable si `Get-MpComputerStatus` répond et que `AMRunningMode` indique un Defender actif (`Normal`) ou passif (`Passive Mode`, `EDR Block Mode`). Si Defender est désactivé (antivirus tiers, service arrêté) ou si `Get-MpComputerStatus` échoue, l'étape est non applicable avec son motif dans le rapport, jamais en erreur. Sinon, à jour si `AntivirusSignatureVersion` est supérieure ou égale à la version de mpam-fe.exe (`FileVersion`), à installer dans le cas contraire (R-06).
-- Office : registre ClickToRun (produits installés, canal, langues déclarées sous `ProductReleaseIDs`). La version installée est la version de fichier de `WINWORD.EXE`, à défaut `EXCEL.EXE`, puis `POWERPNT.EXE`, dans le dossier tiré de `InstallationPath` (registre Click-to-Run). `VersionToReport` ne sert qu'au diagnostic : il peut annoncer une version que les applications n'ont pas après un échec de l'ODT (R-08). En cas d'écart entre les deux, avertissement dans le rapport, et Office est « À installer ». Avant toute mise à jour ou installation sur un Office existant, les langues installées sont comparées à celles de la source du canal : s'il en manque une, l'étape est `NotApplicable` avec le motif « langue absente de la source », et l'ODT n'est pas lancé (8.5, R-08).
+- Office : registre Click-to-Run (`HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration`). Absent : `NotApplicable`, « aucun Office Click-to-Run ». Produits installés : `ProductReleaseIds` ; langues : clés déclarées sous `ProductReleaseIDs`. Canal : identifiant final de `CDNBaseUrl` (par exemple `http://officecdn.microsoft.com/pr/492350f6-3a01-4f97-b9c0-c7c6ddf67d60`), comparé aux `installedChannelIds` des sources (6.3) ; sans source correspondante : `NotApplicable`, « canal absent du dépôt ». Mesuré sur runner (R-08) : `CDNBaseUrl`, `UpdateChannel` et `AudienceId` portent le même identifiant (`492350f6-…` pour Current, `7983bac0-…` pour PerpetualVL2024, `5030841d-…` pour PerpetualVL2021), `AudienceData` le nomme (`Production::CC`, `Production::LTSC2024`, `Production::LTSC2021`) ; en cas de désaccord entre `CDNBaseUrl` et `UpdateChannel`, `UpdateChannel` (canal visé par Office pour ses prochaines mises à jour) fait foi, avec un avertissement. La version installée est la version de fichier de `WINWORD.EXE`, à défaut `EXCEL.EXE`, puis `POWERPNT.EXE`, dans le dossier tiré de `InstallationPath` (registre Click-to-Run). `VersionToReport` ne sert qu'au diagnostic : il peut annoncer une version que les applications n'ont pas après un échec de l'ODT (R-08). En cas d'écart entre les deux, avertissement dans le rapport, et Office est « À installer » (la mise à jour est relancée). Avant toute mise à jour, les langues installées sont comparées à celles de la source du canal : s'il en manque une, l'étape est `NotApplicable` avec le motif « langue absente de la source », et l'ODT n'est pas lancé (8.5, R-08).
 
 Le plan est la liste ordonnée des étapes, avec les points de redémarrage. Ordre par défaut :
 
@@ -505,7 +486,7 @@ Le plan est la liste ordonnée des étapes, avec les points de redémarrage. Ord
 2. SSU autonome Windows 10 si nécessaire, checkpoints, puis cumulative Windows, puis redémarrage.
 3. Enablement package 26H2 si l'option est active et que l'UBR du PC, après le redémarrage de l'étape 2, est supérieur ou égal à `minUbr` ; puis redémarrage.
 4. Cumulative .NET, redémarrage si demandé. Le paquet .NET est le même fichier pour 24H2, 25H2 et 26H2 (R-05) : il ne dépend pas de l'enablement package.
-5. Office : installation ou mise à jour.
+5. Office : mise à jour de l'Office Click-to-Run déjà installé, depuis la source de son canal.
 6. Contrôle final : nouvelle détection et rapport.
 
 Regroupement des redémarrages (R-02, R-03) : les checkpoints et la cumulative s'enchaînent dans la même étape, avant un seul redémarrage. L'enablement package reste installé après le redémarrage de la cumulative : son regroupement avec elle n'est pas prouvé (essai à mener sur intervention réelle, `RECHERCHE.md`).
@@ -540,36 +521,29 @@ Règles de prérequis :
 
 ### 8.5 Office
 
+OffPatch met à jour l'Office Click-to-Run déjà installé ; il n'installe ni ne retire aucun produit, et ne touche pas à la licence (3.3).
+
 | Situation détectée | Action |
 |---|---|
-| Aucun Office Click-to-Run | Installation du profil choisi depuis la source locale |
-| Autre produit Click-to-Run sur un canal présent dans le dépôt (par exemple Microsoft 365 Famille préinstallé, canal Current) | Par défaut : conservé et mis à jour depuis la source locale. Option dans le récapitulatif (8.6) : le retirer et installer le profil choisi |
-| Autre produit Click-to-Run sur un canal absent du dépôt | Par défaut : conservé tel quel, `NotApplicable` avec le motif « canal absent du dépôt » dans le rapport. Option dans le récapitulatif (8.6) : le retirer et installer le profil choisi |
-| Même produit déjà installé, version plus ancienne que la source | Mise à jour depuis la source locale |
-| Même produit, version égale ou plus récente | À jour |
+| Aucun Office Click-to-Run (aucun Office, ou Office MSI) | `NotApplicable`, motif « aucun Office Click-to-Run » |
+| Office Click-to-Run sur un canal présent dans le dépôt, version plus ancienne que la source (par exemple Office Famille 2024, Microsoft 365 Famille préinstallé, Office LTSC 2024) | Mise à jour depuis la source locale de ce canal |
+| Office Click-to-Run sur un canal présent dans le dépôt, version égale ou plus récente | À jour |
+| Office Click-to-Run sur un canal absent du dépôt | Conservé tel quel, `NotApplicable`, motif « canal absent du dépôt » |
 | Langue installée absente de la source du canal | `NotApplicable`, motif « langue absente de la source » ; l'ODT n'est pas lancé |
-| Office MSI ancien | Retiré par `<RemoveMSI />` lors de l'installation |
 
 Mécanisme (R-08) :
 
 - Mise à jour d'un Office existant : uniquement `setup.exe /configure` relancé, avec `<Add SourcePath="…" AllowCdnFallback="FALSE">`, les produits et les langues déjà installés. `OfficeC2RClient.exe` n'est pas utilisé (options non documentées, modification du registre du client). En cas d'échec, l'étape passe en erreur avec le code retour de l'ODT dans le rapport.
 - Intégrité de la source avant l'ODT : avant tout `setup.exe /configure`, revérification du SHA-256 de tous les fichiers de la source utilisée, par rapport au manifeste. Au moindre écart, l'étape passe en erreur, l'ODT n'est pas lancé, et les fichiers fautifs sont listés dans le rapport. Mesuré en R-10 : hors ligne, l'ODT face à un fichier de source corrompu n'échoue pas, il attend le retour du réseau.
 - Garde-fou de durée : `setup.exe` est arrêté au-delà de `client.odtTimeoutMinutes` (30 min par défaut, 6.1). L'étape passe alors en erreur avec le motif « délai dépassé », les journaux de l'ODT sont conservés, et Office est détecté de nouveau par la version de `WINWORD.EXE` (8.3).
-- Retrait et installation : un seul XML avec `<Remove All="TRUE" />` et `<Add>`, validé sur runner.
 - Langues : le contrôle de 8.3 se fait avant de lancer l'ODT. Mesuré sur runner : un Office installé en fr-fr et en-us mis à jour depuis une source fr-fr seule fait échouer l'ODT (code 17002), avec ou sans `Language ID="MatchInstalled"`, après qu'il a déjà mis à jour le client Click-to-Run.
+- Journaux de l'ODT : il les écrit dans le TEMP de l'utilisateur, sous la forme `<NOMDUPC>-AAAAMMJJ-HHMM.log`, et n'applique pas l'élément `<Logging Path>` du XML (il le lit, mais le dossier demandé reste vide, mesuré sur quatre passages, R-08). OffPatch copie dans le sous-dossier de session (10) les journaux de l'ODT créés ou modifiés depuis le début de l'étape.
 
-Le XML d'installation est généré dans `C:\ProgramData\OffPatch\temp\` avec le chemin absolu de la source, puis supprimé dès la fin de l'étape. Pour un profil LTSC, une clé MAK peut être saisie dans un champ masqué. Elle reste en mémoire, est injectée dans le XML temporaire, et le journal indique seulement « clé fournie : oui ». Pour un profil en boîte, le rapport rappelle que l'activation se fait avec le compte Microsoft du client.
-
-Clé de produit et journaux de l'ODT (R-08) :
-
-- Forme contrôlée avant l'ODT, qui accepte une clé invalide sans erreur (code 0, mesuré) : cinq groupes de cinq caractères dans l'alphabet `BCDFGHJKMPQRTVWXY2346789`, sans tenir compte de la casse. Forme invalide : saisie refusée, dans l'interface comme dans la CLI. Une clé de forme valide n'est pas vérifiée : le rapport indique « clé enregistrée, activation non vérifiée, à réaliser en ligne ».
-- L'ODT écrit la clé en clair dans son journal principal (ligne « ConfigFile::ParseAttribute: Value of PIDKEY: … », UTF-16). Il écrit ses journaux dans le TEMP de l'utilisateur, sous la forme `<NOMDUPC>-AAAAMMJJ-HHMM.log`, et n'applique pas l'élément `<Logging Path>` du XML : il le lit, mais le dossier demandé reste vide, même créé avant l'appel (mesuré sur quatre passages). OffPatch ne s'appuie donc pas sur `<Logging>` ; s'il venait à fonctionner, le masquage s'appliquerait aux deux emplacements.
-- Dès la fin de chaque étape Office, chaque journal de l'ODT créé ou modifié depuis le début de l'étape dans le TEMP de l'utilisateur est masqué sur place : relu dans son encodage d'origine (UTF-16 pour le journal principal), la clé saisie remplacée sous toutes ses formes (avec et sans tirets, sans tenir compte de la casse) ainsi que toute chaîne de forme de clé, puis réécrit dans le même encodage. Les journaux ainsi masqués sont ensuite copiés dans le sous-dossier de session (10), puis avec le rapport sur le support. Aucune copie n'a lieu avant le masquage.
-- Ce masquage, la copie des journaux et la suppression du XML temporaire (qui contient la clé) s'exécutent dans un bloc `finally` de l'étape Office, donc sur tous ses chemins de sortie : réussite, erreur de l'ODT, délai `odtTimeoutMinutes` dépassé, exception. Un échec du masquage est journalisé sans masquer l'erreur d'origine de l'étape ; un journal qui n'a pas pu être masqué n'est pas copié, et le rapport indique « journal ODT non masqué resté dans TEMP » avec son chemin complet, pour suppression manuelle avant de rendre le PC (8.8).
+Le XML de mise à jour est généré dans `C:\ProgramData\OffPatch\temp\` avec le chemin absolu de la source (6.3). La copie des journaux et la suppression du XML s'exécutent dans un bloc `finally` de l'étape Office, donc sur tous ses chemins de sortie : réussite, erreur de l'ODT, délai `odtTimeoutMinutes` dépassé, exception ; un échec de ces opérations est journalisé sans masquer l'erreur d'origine de l'étape.
 
 ### 8.6 Mode automatique
 
-Toutes les décisions sont prises avant le démarrage, sur un écran récapitulatif : étapes prévues, profil Office (avec le rappel, s'il y a lieu, que Microsoft ne prend pas ce profil en charge sur ce Windows, et la source), retrait d'un Office existant (jamais par défaut : un Office existant est conservé et mis à jour s'il est sur un canal du dépôt, son retrait est un choix explicite), clé éventuelle, forçage éventuel pour Windows 10, rappel du mode Avion si le PC est connecté à un réseau (8.2). Je valide une seule fois, puis plus aucune question n'est posée.
+Toutes les décisions sont prises avant le démarrage, sur un écran récapitulatif : étapes prévues (dont la mise à jour de l'Office détecté, avec son canal et la source utilisée, ou le motif de non-application), forçage éventuel pour Windows 10, rappel du mode Avion si le PC est connecté à un réseau (8.2). Je valide une seule fois, puis plus aucune question n'est posée.
 
 Pendant la session :
 
@@ -594,13 +568,11 @@ En fin de session, ou en cas d'abandon, un rapport HTML autonome et imprimable e
 - Windows avant et après (édition, version, build et UBR), statut ESU pour Windows 10 ;
 - Defender : version des définitions installées (et de la plateforme), ou motif de non-application, avec le rappel que Defender se met à jour seul dès que le PC est connecté à Internet ;
 - chaque étape avec son résultat, son code retour éventuel et sa durée ;
-- Office installé (produit, version, canal, langues) et le mode d'activation attendu, avec la mention, s'il y a lieu, que Microsoft ne prend pas ce profil en charge sur ce Windows (et la source) ;
-- erreurs et avertissements, dont « journal ODT non masqué resté dans TEMP » avec le chemin complet du fichier, à supprimer à la main avant de rendre le PC (8.5) ;
+- Office détecté (produits, canal, langues), version avant et après, ou motif de non-application (« aucun Office Click-to-Run », « canal absent du dépôt », « langue absente de la source ») ;
+- erreurs et avertissements ;
 - si le PC était hors ligne en fin de session : rappel de désactiver le mode Avion ou de rebrancher le réseau ;
 - point de restauration : point créé par OffPatch (description, date), ou point existant de moins de 24 heures cité à sa place, ou motif de l'absence (protection du système inactive, indicateurs en désaccord, option désactivée) ; le cas échéant, « protection du système activée par Checkpoint-Computer, à vérifier » ;
 - version de l'outil et date du dépôt utilisé.
-
-Aucune clé de produit n'y figure.
 
 ## 9. Interface graphique
 
@@ -610,14 +582,14 @@ Fenêtre WPF unique. En-tête : nom et version de l'outil, date du dépôt, aler
 
 - Bandeau système : édition, version, build et UBR, architecture, statut ESU (Windows 10), Office détecté, espace libre, alimentation, fabricant, modèle, numéro de série.
 - Tableau des étapes : étape, détail (KB ou version), état, case à cocher en mode manuel.
-- Bloc Office : liste des profils dont la source est présente dans le dépôt, langues disponibles dans cette source, case « Retirer l'Office déjà présent », champ de clé masqué pour les profils LTSC.
+- Bloc Office (lecture seule) : Office détecté (produits, canal, langues, version), source du dépôt correspondante et ses langues, ou motif de non-application.
 - Boutons : « Installation automatique », « Installer la sélection », « Redémarrer maintenant » (visible si nécessaire), « Reprendre la session interrompue » (si un état existe).
 - Barre de progression globale, étape en cours, dernières lignes du journal.
 
 **Onglet « Dépôt »**
 
 - Résumé : date de la dernière mise à jour, taille totale, alerte de fraîcheur.
-- Cibles, sources Office et langues à cocher (enregistrées dans `settings.json`).
+- Cibles, sources Office et langues à cocher (enregistrées dans `settings.json` et `config/office/sources.json`).
 - Tableau du manifeste : cible, catégorie, KB ou version, date, taille, état de l'intégrité.
 - Boutons : « Vérifier les nouveautés » (`-ListOnly`), « Mettre à jour le dépôt », « Purger », « Préparer un support… », « Annuler ».
 
@@ -643,7 +615,7 @@ Règles de comportement :
 - Téléchargements limités aux noms d'hôte de `allowedDomains`, contrôlés sur toute la chaîne de redirections avant le téléchargement, en `https` seulement (6.1, 7.1). Limite : BITS suit lui-même une redirection qui surviendrait au moment du transfert, sans que l'outil puisse la contrôler. La garantie principale reste donc la signature Authenticode et l'empreinte de la racine, vérifiées sur chaque fichier reçu ; la liste des domaines est une défense en profondeur.
 - Authenticité vérifiée côté dépôt, en ligne, au téléchargement : `Status` = `Valid`, signataire de l'organisation Microsoft Corporation, chaîne jusqu'à une racine dont l'empreinte figure dans `integrity.trustedRootThumbprints` (racine inconnue : téléchargement refusé avec un message explicite) ; un certificat expiré mais horodaté reste valide, sans contrôle de date d'expiration (7.1, R-10).
 - SHA-256 calculé au téléchargement et stocké dans le manifeste, y compris pour chaque fichier d'une source Office. Côté client : revérification du SHA-256 seulement, sur les fichiers utilisés, juste avant l'étape ; toute la source Office avant `setup.exe /configure` (8.4, 8.5).
-- Clé de produit : mémoire et XML temporaire uniquement. Masquée dans tous les journaux : ceux d'OffPatch (`Write-OpLog`) et ceux de l'ODT, qui l'écrit en clair dans le TEMP de l'utilisateur ; ces derniers sont masqués sur place dans leur encodage d'origine, avant toute copie dans la session ou sur le support (8.5, R-08). Forme de la clé contrôlée avant l'ODT.
+- Aucune clé de produit : OffPatch n'installe ni n'active aucun produit (3.3). Par précaution, `Write-OpLog` masque toute chaîne de forme de clé dans les journaux d'OffPatch.
 - Aucune élévation persistante : la tâche planifiée disparaît en fin de session.
 - Écriture atomique du manifeste et de `state.json`.
 
@@ -665,6 +637,8 @@ Tests de planification (`tests/Unit/Planner/`) : chaque cas associe une fixture 
 | P8 | Windows 10 22H2 avec .NET 4.8 (`Release` entre 528040 et 533319), puis le même avec .NET 4.8.1 (`Release` ≥ 533320) | Élément .NET de Windows 10 : fichier ndp48 dans le premier cas, ndp481 dans le second (`netRelease`, 7.2) |
 | P9 | Office installé en fr-fr et en-us, source `current` du dépôt en fr-fr seul | Office `NotApplicable`, motif « langue absente de la source » ; ODT non lancé |
 | P10 | Office présent sur un canal absent du dépôt | Office conservé, `NotApplicable`, motif « canal absent du dépôt » (8.5) |
+| P11 | Aucun Office, ou Office MSI | Office `NotApplicable`, motif « aucun Office Click-to-Run » ; aucun appel à l'ODT |
+| P12 | Office LTSC 2024 (canal PerpetualVL2024) plus ancien que la source `perpetualvl2024` du dépôt | Mise à jour depuis la source `perpetualvl2024`, en dernière étape du plan |
 
 Tests réels, selon deux moyens :
 
@@ -673,12 +647,12 @@ Tests réels, selon deux moyens :
 
 | Test | Situation de départ | Attendu | Où |
 |---|---|---|---|
-| T1 | Windows 11 26H2 x64 installé depuis une ISO, sans Office | Mode auto complet, Office Famille 2024 installé, rapport sans erreur | Intervention réelle (redémarrages, x64 client) |
-| T2 | Windows 11 24H2 x64 avec un Office préinstallé | Enablement package appliqué, ancien Office retiré, profil LTSC 2024 installé avec une clé | Intervention réelle (redémarrages, x64 client) |
+| T1 | Windows 11 26H2 x64 installé depuis une ISO, sans Office | Mode auto complet, Office `NotApplicable` « aucun Office Click-to-Run », rapport sans erreur | Intervention réelle (redémarrages, x64 client) |
+| T2 | Windows 11 24H2 x64 avec un Office Click-to-Run préinstallé ancien (Microsoft 365 Famille ou Office 2024, canal Current) | Enablement package appliqué, Office mis à jour depuis la source Current, licence inchangée | Intervention réelle (redémarrages, x64 client) |
 | T3 | Windows 11 25H2 x64 déjà à jour | Rien à installer, rapport cohérent | Runner `windows-11-arm` pour l'action `Plan` sur un 25H2 à jour (en ARM64), puis intervention réelle en x64 |
 | T4 | Windows 10 22H2 x64 avec ESU actif | Cumulative ESU installée | Intervention réelle (Windows 10) |
 | T5 | Windows 10 22H2 x64 sans ESU | Avertissement, aucune étape Windows en mode auto | Intervention réelle (Windows 10) |
-| T6 | Windows 11 ARM64 | Mode manuel complet, Office 64 bits fonctionnel | Runner `windows-11-arm` pour les étapes sans redémarrage, puis matériel réel |
+| T6 | Windows 11 ARM64 avec un Office 64 bits Click-to-Run ancien | Mode manuel complet, Office mis à jour et fonctionnel | Runner `windows-11-arm` pour les étapes sans redémarrage, puis matériel réel |
 | T7 | Support débranché pendant un redémarrage | Fenêtre d'attente, reprise dès le rebranchement, même sur une autre lettre de lecteur | Intervention réelle (redémarrage, support physique) |
 | T8 | Préparation d'un support en FAT32 | Refus avec message explicite | Runner `windows-2025` avec un disque virtuel formaté en FAT32, puis support réel |
 
@@ -695,7 +669,7 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 | `windows-lcu` | Toutes | Catalogue, `catalog-queries.json`, UBR le plus élevé (R-01) ; Windows 10 : release-information | Build dans `baseBuilds` et UBR ≥ `resultingUbr` ; après DISM : liste DISM, puis UBR après redémarrage (8.4) | `prerequisites` : `windows-checkpoint` (Windows 11), `windows-ssu` (Windows 10 ancien) | Étape 2, puis redémarrage | P1 à P5 ; `depot-x64`, `r02-arm64` ; T1 à T4 |
 | `windows-ekb` | Windows 11 24H2 et 25H2 | Élément épinglé (KB5121794) | Build dans `appliesToBaseBuilds`, option active ; après redémarrage : build `resultingBuild` | Prérequis `minUbr` (9550, contrôlé par OffPatch seul) ; `runsAfter` : `windows-lcu` | Étape 3, après le redémarrage de la cumulative | P1 à P4, P6 ; `r02-arm64` (R-03), `r14-dism` ; T2 ; regroupement à valider sur intervention réelle |
 | `dotnet` | Toutes | Catalogue, `catalog-queries.json` (R-05) | Version du paquet lue dans le .msu, comparée à la liste DISM ; Windows 10 : fichier choisi par `Release` | Aucune | Étape 4 | `msu-inspect`, `r14-dism` ; T1, T4 ; P8 |
-| `office-source` | Toutes | ODT `/download` ; page de l'ODT, `settings.json` (`downloadPages.officeDeploymentToolPage`) | Registre Click-to-Run, version de `WINWORD.EXE`, langues comparées à la source | Aucune ; langue absente : `NotApplicable` | Étape 5 | `r07-office`, `r07-install`, `r08-office`, `r10-integrity` ; T1, T2, T6 ; P9, P10 |
+| `office-source` | Toutes (mise à jour d'un Office Click-to-Run déjà installé) | ODT `/download`, une source par canal (`config/office/sources.json`) ; page de l'ODT, `settings.json` (`downloadPages.officeDeploymentToolPage`) | Registre Click-to-Run : canal (`CDNBaseUrl`) qui désigne la source, produits et langues ; version de `WINWORD.EXE` ; langues comparées à la source ; aucun Office Click-to-Run ou canal absent : `NotApplicable` | Aucune | Étape 5, dernière | `r07-office`, `r08-office`, `r10-integrity`, `office-update-scope` ; T1, T2, T6 ; P9 à P12 |
 
 ## 13. Critères d'acceptation de la v1
 
@@ -710,7 +684,7 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 
 ## 14. Évolutions envisagées après la v1
 
-- Profil Microsoft 365 Apps (même mécanisme ODT, canal Current).
+- Sources pour les canaux Microsoft 365 Apps d'entreprise (Monthly Enterprise, Semi-Annual Enterprise), même mécanisme de mise à jour.
 - Génération d'une ISO Windows à jour en intégrant la cumulative hors ligne.
 - Outil de suppression de logiciels malveillants (MSRT).
 - Signature des scripts avec un certificat de code.
@@ -742,3 +716,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.20 (6 octobre 2026) : décisions du bilan de phase 0. Format de `catalog-queries.json` (`searches`, `{month}`, `monthsToSearch`, règles `highestUbr`, `highestUbrFromReleaseInformation`, `latestMonth` triée sur le préfixe `AAAA-MM` du titre, la date du catalogue ne départageant que deux entrées du même mois avec un avertissement, `highestVersion`, `fileNamePattern`) (6.2) ; `downloadPages` dans `settings.json` (6.1) ; cas de planification P7 à P10 (12) ; matrice de traçabilité sans case à traiter (12) ; corrections : détection établie en R-09, regroupement des redémarrages (8.3), `<Remove>` + `<Add>` vérifié (6.3), `Invoke-OpProcess`, dépôt public et contrat hebdomadaire (12) ; point de restauration avant session, actif par défaut, créé seulement si la protection du système est déjà active, vérifié par `Get-ComputerRestorePoint`, point existant de moins de 24 heures cité au rapport, mesures sur runner (6.1, 8.2, 8.8).
 - 1.21 (6 octobre 2026) : point de restauration : second indicateur documenté `Win32_ShadowStorage`, protection jugée active seulement si `SPP\Clients` et `Win32_ShadowStorage` concordent, sinon aucun appel et avertissement ; relevé des deux indicateurs dans chaque état sur runner ; relecture après l'appel et mention « protection du système activée par Checkpoint-Computer, à vérifier » (8.2, 8.8) ; critère d'acceptation : indicateurs validés sur intervention réelle, sinon option livrée désactivée par défaut (13).
 - 1.22 (6 octobre 2026) : clé de produit : forme contrôlée avant l'ODT (alphabet `BCDFGHJKMPQRTVWXY2346789`, saisie refusée sinon dans l'interface et la CLI), rapport « clé enregistrée, activation non vérifiée, à réaliser en ligne » ; l'ODT écrit la clé en clair dans son journal principal (UTF-16, TEMP de l'utilisateur) et ignore `<Logging Path>` : journaux de l'ODT masqués sur place dans leur encodage d'origine dès la fin de l'étape, avant toute copie, dans un bloc `finally` (tous les chemins de sortie de l'étape) (8.5, 11). Suite de R-08.
+- 1.23 (6 octobre 2026) : recentrage sur les mises à jour (décision de David). OffPatch n'installe jamais Windows ni Office, ne gère aucune clé de produit et ne retire aucun produit (2, 3.3, 3.4). Office : mise à jour de l'Office Click-to-Run déjà installé depuis la source locale de son canal, sinon `NotApplicable` « aucun Office Click-to-Run » ; canal lu dans le registre Click-to-Run (`CDNBaseUrl`, identifiants mesurés sur runner) (8.3, 8.5). Retirés : profils d'installation (`profiles.json` remplacé par `config/office/sources.json`, sources par canal et par langue, avec les identifiants de canal installé ; langues sorties de `settings.json`), saisie et contrôle de la clé, PIDKEY et masquage des journaux de l'ODT, `<Remove>` et `<RemoveMSI />`, messages d'activation, avertissement Office sous Windows 10, choix d'édition dans l'interface et le récapitulatif (6.1, 6.3, 8.2, 8.5, 8.6, 8.8, 9, 11). Conservés : sources par canal et par langue, purge selon `v64.cab`, mise à jour par `setup.exe /configure` depuis la source locale, règle « langue absente de la source », vérification de la source avant l'ODT, délai de 30 min, version lue sur `WINWORD.EXE`, masquage générique de `Write-OpLog`. Modèle `update.xml.template` (6.3) ; tests T1, T2, T6 revus et cas P11, P12 (12) ; matrice de traçabilité (ligne `office-source`) mise à jour ; Office reste la dernière étape du plan. Licence conservée par la mise à jour : à valider sur intervention réelle. Suite de R-08.
