@@ -20,7 +20,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [x] R-12 Volumes
 - [x] R-13 Domaines de téléchargement
 - [x] R-14 Moteur d'installation des paquets
-- [ ] R-15 Suspendre Windows Update pendant une session
+- [x] R-15 Suspendre Windows Update pendant une session
 - [ ] Bilan de phase : reporter dans le cahier des charges ce qui change (avec mon accord) et compléter `config/` avec les valeurs établies
   - [ ] Ajouter au cahier des charges une matrice de traçabilité (accord de David du 2026-10-04), une ligne par catégorie (`windows-lcu`, `windows-checkpoint`, `windows-ekb`, `windows-ssu`, `dotnet`, `defender-platform`, `defender`, `office-source`). Colonnes : cibles concernées, source (requête catalogue ou élément épinglé), règle de détection, dépendances (`prerequisites` / `runsAfter`), position dans le plan, scénarios de test qui la couvrent (P1 à P5, T1 à T8, workflows). Toute case vide est un point à traiter avant la phase 1.
   - [ ] Examiner l'option « point de restauration avant session » (note de David du 2026-10-06, pas encore au cahier des charges) : `Checkpoint-Computer` avant la première étape ; contraintes : protection du système désactivée sur certains PC (pas de point possible sans l'activer), un seul point par 24 h par défaut (`SystemRestorePointCreationFrequency`), espace réservé sur C:.
@@ -66,7 +66,6 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [ ] Exécuteur Defender
 - [ ] Exécuteur DISM avec gestion des codes retour
 - [ ] Exécuteur Office : XML temporaire, clé en mémoire, suppression après usage
-- [ ] Suspension et rétablissement de Windows Update
 - [ ] Rapport d'intervention HTML
 - [ ] Actions CLI : `Plan`, `InstallStep`, `Report`
 - [ ] Tests avec mocks
@@ -79,7 +78,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [ ] Tâche planifiée `OffPatch-Reprise` : création et suppression
 - [ ] Compte à rebours, redémarrage, limite de redémarrages, double échec d'une étape
 - [ ] Fenêtre d'attente quand le support est absent
-- [ ] Fin de session propre (tâche, fichiers temporaires, Windows Update, rapport)
+- [ ] Fin de session propre (tâche, fichiers temporaires, rappel du mode Avion si le PC est hors ligne, rapport)
 - [ ] Tests avec mocks
 - [ ] [VM] T1, T2, T7
 
@@ -146,3 +145,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-06 | 0 | Dépôt passé en public (licence MIT, README) ; `windows-11-arm` démarre sans refus ; contrat du catalogue réussi sur runner ; R-14 mesuré : un .msu non applicable renvoie 0 (0x800f081e seulement dans le journal DISM), 3010 pour l'enablement package, 0xCA00A009 pour un .msu altéré, 3 pour un chemin absent ; `dism.exe` préféré à `Add-WindowsPackage` ; README : désactivation des workflows planifiés après 60 jours | Accord de David sur la nouvelle règle de jugement d'une étape DISM (cahier des charges 8.4), puis R-15 |
 | 2026-10-06 | 0 | R-14 tranché, cahier des charges 1.17 : `dism.exe` par chemin complet, jugement en deux temps (liste DISM puis UBR après redémarrage), `NotApplicable` par le journal avec avertissement, contrôle bloquant du PowerShell 32 bits | R-15 |
 | 2026-10-06 | 0 | R-15 mesuré (`r15-windowsupdate`, ARM64) : arrêt simple de `wuauserv` relancé seul après 4 min 49 s, DISM indifférent à l'arrêt ; `IAutomaticUpdates::Pause` sans effet depuis Windows 10 ; pause par stratégie exclue (Famille non couverte, 35 jours) ; pause « Paramètres » sans méthode programmatique documentée | Accord de David sur la règle proposée (`pauseWindowsUpdateDuringSession` à `false`, arrêt simple avant chaque étape si activé, réseau coupé recommandé), puis bilan de phase 0 |
+| 2026-10-06 | 0 | R-15 tranché, cahier des charges 1.18 : option de suspension retirée, mode Avion recommandé et rappel en fin de session ; essai de deux DISM simultanés (le second attend, pas d'erreur), nouvelle tentative après 5 min sur 1618 / 0x80070652 ; contrôle en ligne local en échec passager du catalogue, repassé ensuite | Bilan de phase 0 |

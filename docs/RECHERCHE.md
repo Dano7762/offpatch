@@ -21,6 +21,7 @@ Ce que les runners GitHub ne permettent pas de vérifier (décision de David du 
   5. relevé de `CurrentBuild`, `UBR` et `DisplayVersion`, et de la liste DISM.
   En attendant, l'enablement package reste installé après le redémarrage de la cumulative.
 - Pause de Windows Update depuis Paramètres sous Windows 11 Famille (R-15) : pause posée à la main jusqu'au lendemain, effet pendant une session OffPatch connectée, reprise d'elle-même à la date choisie.
+- Session OffPatch sur un PC connecté pendant que Windows Update installe lui-même : code renvoyé par DISM (1618 / 0x80070652 attendu, non vérifié) et effet de la nouvelle tentative après 5 minutes (R-14).
 
 Statuts possibles : À vérifier, En cours, Tranché, Bloqué.
 
@@ -555,6 +556,10 @@ Impact : exécuteur des étapes Windows.
   - Règle proposée validée, avec vérification en deux temps : juste après DISM, paquet `Install Pending` ou `Installed` dans la liste DISM (cumulative par la version `<build>.<resultingUbr>`, enablement package par son KB, .NET par la version lue dans le .msu) ; après le redémarrage, UBR ≥ `resultingUbr`, sinon `Error` « non appliquée après redémarrage (retour arrière probable) ».
   - `NotApplicable` détecté à l'exécution (ligne `CBS HRESULT=0x800f081e`) : étape `NotApplicable` et avertissement « jugé applicable par le planificateur », pour corriger la détection.
   - Exécuteur : `%SystemRoot%\System32\dism.exe` par chemin complet ; contrôle préalable bloquant d'un processus PowerShell 32 bits sur un Windows 64 bits, `Lancer-OffPatch.cmd` lançant le PowerShell natif.
+- Complément « autre opération de maintenance en cours » (demande de David du 2026-10-06, suite de R-15) :
+  - Documentation : https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes--1300-1699- : `ERROR_INSTALL_ALREADY_RUNNING`, 1618 (0x652), « Another installation is already in progress. Complete that installation before proceeding with this install. » (HRESULT correspondant 0x80070652). Les codes `WU_E_OPERATIONINPROGRESS` (0x80240009) et `WU_E_INSTALL_NOT_ALLOWED` (0x80240016) de la référence Windows Update concernent l'agent Windows Update, pas DISM. Aucune page Microsoft ne dit quel code DISM renvoie quand une autre opération de maintenance est en cours.
+  - Mesure : https://github.com/Dano7762/offpatch/actions/runs/37467872241 (`r14-dism.yml`, scénario `Concurrent`, `windows-11-arm`) : deux `dism.exe /Add-Package` lancés à 5 s d'intervalle (cumulative .NET déjà installée, puis enablement package). **Le second n'échoue pas : il attend.** Journaux : premier ouvert à 06:04:46, fermé à 06:05:51 (« Reboot required=no ») ; second ouvert à 06:04:51, fermé à 06:05:53 (« Reboot required=yes ») ; consoles « The operation completed successfully. » pour les deux. Codes de sortie non relevés (défaut du script : `ExitCode` de `Start-Process` vide sous PowerShell 5.1 sans lecture préalable de `Handle`) ; la ligne « Reboot required=yes » correspond au 3010 mesuré dans les autres essais.
+  - Conclusion : entre deux DISM, la maintenance est sérialisée sans erreur. Le cas « installation de Windows Update en parallèle » n'est pas reproductible sur runner (à observer sur intervention réelle). Critère retenu pour la nouvelle tentative : code 1618 ou 0x80070652, seul code documenté pour une installation déjà en cours.
 
 ## R-15 Suspendre Windows Update pendant une session
 
@@ -562,7 +567,7 @@ Question : quelle méthode documentée permet de suspendre Windows Update le tem
 
 Impact : option `pauseWindowsUpdateDuringSession`.
 
-- Statut : Mesuré ; règle proposée, en attente de l'accord de David (cahier des charges 6.1, 8.2, 8.4)
+- Statut : Tranché (2026-10-06) : option retirée
 - Critère prioritaire (David, 2026-10-06) : aucune trace durable si OffPatch s'arrête en pleine session (plantage, coupure, PC rendu avant la fin). Type de démarrage « Désactivé » pour `wuauserv` écarté du design quel que soit le résultat.
 - Sources (consultées le 2026-10-06) :
   - https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iautomaticupdates-pause : « IAutomaticUpdates::Pause is no longer supported. Starting with Windows 10 calls to Pause always return S_OK, but do nothing. » (même mention pour `Resume`). Aucune interface de programmation documentée pour suspendre Windows Update sur Windows 10 et 11.
@@ -585,4 +590,7 @@ Impact : option `pauseWindowsUpdateDuringSession`.
   3. Au lancement : si l'état d'une session interrompue (`state.json`) indique une suspension non rétablie, la rétablir avant toute autre action et le noter dans le journal. Avec la règle 1, l'état ne contient aucune suspension à rétablir ; la règle reste en place pour toute méthode future qui modifierait un réglage.
   4. Le résultat des étapes ne dépend pas de la suspension : le jugement en deux temps de 8.4 (R-14) constate ce qui est réellement installé, même si Windows Update a travaillé en parallèle.
 - À valider sur intervention réelle (ajouté en tête de ce fichier) : comportement de la pause « Paramètres » sous Windows 11 Famille (pause posée à la main par le technicien jusqu'au lendemain, effet sur une session OffPatch, reprise d'elle-même à la date choisie).
-- Décision :
+- Décision (David, 2026-10-06), cahier des charges 1.18 :
+  - Constat validé, avec une simplification : option `pauseWindowsUpdateDuringSession` retirée (6.1, 8.2, 8.6), ainsi que la règle de rétablissement au lancement ; l'arrêt simple tient moins de 5 minutes, le bénéfice ne justifie pas le code. Notée en évolution (14) si une méthode qui expire d'elle-même apparaît.
+  - Contrôle préalable : PC connecté à un réseau → mode Avion recommandé (il survit aux redémarrages), rappel dans le récapitulatif du mode auto. En fin de session, PC hors ligne → l'écran de fin et le rapport rappellent de désactiver le mode Avion ou de rebrancher le réseau.
+  - Exécuteur DISM : sur le code d'une installation déjà en cours (1618 / 0x80070652, R-14), attente de 5 minutes et une seule nouvelle tentative ; jugement en deux temps ensuite.

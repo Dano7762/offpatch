@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.17 du 6 octobre 2026.
+Version 1.18 du 6 octobre 2026.
 
 ## 1. Contexte
 
@@ -177,7 +177,6 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
     "maxAutoReboots": 5,
     "rebootCountdownSeconds": 30,
     "staleDepotWarningDays": 35,
-    "pauseWindowsUpdateDuringSession": true,
     "odtTimeoutMinutes": 30
   },
   "logging": {
@@ -426,7 +425,7 @@ Assistant accessible depuis l'onglet Dépôt :
 | Espace libre sur C: | Sous `minFreeSpaceGB` : bloquant |
 | Portable sur batterie | Avertissement, confirmation demandée avant le mode auto |
 | Âge du dépôt | Au-delà de `staleDepotWarningDays` : avertissement |
-| PC connecté à Internet | Avertissement : Windows Update peut travailler en parallèle. Si `pauseWindowsUpdateDuringSession` est actif, Windows Update est suspendu pendant la session et rétabli à la fin (méthode en R-15) |
+| PC connecté à un réseau | Avertissement : Windows Update peut travailler en parallèle. L'outil recommande d'activer le mode Avion pendant la session (il survit aux redémarrages) ; rappel dans l'écran récapitulatif du mode auto (8.6). OffPatch ne suspend pas Windows Update lui-même : aucune méthode documentée qui expire d'elle-même (R-15) |
 | Intégrité des fichiers nécessaires | Hash différent du manifeste : l'étape passe en erreur, les autres continuent |
 
 ### 8.3 Détection et plan
@@ -482,6 +481,7 @@ Règles de prérequis :
 - Installation des paquets par DISM en ligne, sans redémarrage automatique, avec un journal DISM par étape : `%SystemRoot%\System32\dism.exe`, appelé par son chemin complet, avec `/English /Online /Add-Package /PackagePath:<fichier> /NoRestart /LogPath:<journal de l'étape>` (R-14 ; `Add-WindowsPackage` écarté). Pas de délai maximal sur DISM.
 - Juste avant chaque étape, revérification du SHA-256 des seuls fichiers utilisés par l'étape, par rapport au manifeste. Côté client, pas de contrôle Authenticode : l'authenticité a été établie au téléchargement (R-10).
 - Jugement d'une étape (R-14). Le code retour seul ne suffit pas : un paquet non applicable sort en 0, avec le même message qu'une installation réussie, et 0x800f081e n'apparaît que dans le journal DISM.
+  - Autre opération de maintenance en cours : code 1618 ou 0x80070652 (`ERROR_INSTALL_ALREADY_RUNNING`, seul code documenté pour ce cas) : attente de 5 minutes, puis une seule nouvelle tentative, notée dans le journal ; le résultat est ensuite jugé comme ci-dessous. Mesuré entre deux DISM : le second attend la fin du premier au lieu d'échouer (R-14).
   - Code autre que 0 ou 3010 : `Error`, avec le code dans le journal et le rapport (exemples mesurés : 3, chemin introuvable ; 0xCA00A009, .msu altéré).
   - Code 0 ou 3010 : vérification en deux temps pour les cumulatives, l'enablement package et .NET.
     1. Juste après DISM, liste DISM (`/Get-Packages`) : le paquet doit être à l'état `Install Pending` ou `Installed`. Repérage : cumulative par la version `<build>.<resultingUbr>` de `Package_for_RollupFix` (la build y vaut 26100 même sur 25H2 et 26H2, R-02) ; enablement package par son numéro de KB ; .NET par la version du paquet lue dans le .msu (7.2).
@@ -515,7 +515,7 @@ Le XML d'installation est généré dans `C:\ProgramData\OffPatch\temp\` avec le
 
 ### 8.6 Mode automatique
 
-Toutes les décisions sont prises avant le démarrage, sur un écran récapitulatif : étapes prévues, profil Office (avec le rappel, s'il y a lieu, que Microsoft ne prend pas ce profil en charge sur ce Windows, et la source), retrait d'un Office existant (jamais par défaut : un Office existant est conservé et mis à jour s'il est sur un canal du dépôt, son retrait est un choix explicite), clé éventuelle, forçage éventuel pour Windows 10. Je valide une seule fois, puis plus aucune question n'est posée.
+Toutes les décisions sont prises avant le démarrage, sur un écran récapitulatif : étapes prévues, profil Office (avec le rappel, s'il y a lieu, que Microsoft ne prend pas ce profil en charge sur ce Windows, et la source), retrait d'un Office existant (jamais par défaut : un Office existant est conservé et mis à jour s'il est sur un canal du dépôt, son retrait est un choix explicite), clé éventuelle, forçage éventuel pour Windows 10, rappel du mode Avion si le PC est connecté à un réseau (8.2). Je valide une seule fois, puis plus aucune question n'est posée.
 
 Pendant la session :
 
@@ -523,7 +523,7 @@ Pendant la session :
 - Avant un redémarrage : copie de `resume.ps1` dans ProgramData, création de la tâche planifiée `OffPatch-Reprise` (à l'ouverture de session de l'utilisateur courant, privilèges les plus élevés), compte à rebours de `rebootCountdownSeconds` avec bouton Annuler, puis redémarrage.
 - À l'ouverture de session suivante, `resume.ps1` cherche le support sur tous les lecteurs (fichier `offpatch.root` et numéro de série du volume) et relance l'interface avec `-Resume`. Si le support est absent, une petite fenêtre demande de le rebrancher et vérifie toutes les 5 secondes.
 - Garde-fous : au plus `maxAutoReboots` redémarrages. Une étape qui échoue deux fois est abandonnée et signalée, la session continue avec les suivantes.
-- En fin de session : suppression de la tâche, de `resume.ps1` et de `temp\`, archivage de `state.json` dans les journaux, rétablissement de Windows Update, bilan à l'écran, rapport écrit.
+- En fin de session : suppression de la tâche, de `resume.ps1` et de `temp\`, archivage de `state.json` dans les journaux, bilan à l'écran, rapport écrit. Si le PC est hors ligne (aucune connexion réseau active), l'écran de fin rappelle de désactiver le mode Avion ou de rebrancher le réseau, pour que Windows et Defender se mettent à jour d'eux-mêmes.
 - Pas d'ouverture de session automatique : je rouvre la session moi-même après chaque redémarrage.
 - Si je ferme la fenêtre en cours de route, l'outil demande confirmation et conserve l'état. Un bouton « Reprendre la session interrompue » apparaît au lancement suivant.
 
@@ -542,6 +542,7 @@ En fin de session, ou en cas d'abandon, un rapport HTML autonome et imprimable e
 - chaque étape avec son résultat, son code retour éventuel et sa durée ;
 - Office installé (produit, version, canal, langues) et le mode d'activation attendu, avec la mention, s'il y a lieu, que Microsoft ne prend pas ce profil en charge sur ce Windows (et la source) ;
 - erreurs et avertissements ;
+- si le PC était hors ligne en fin de session : rappel de désactiver le mode Avion ou de rebrancher le réseau ;
 - version de l'outil et date du dépôt utilisé.
 
 Aucune clé de produit n'y figure.
@@ -641,6 +642,7 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - Outil de suppression de logiciels malveillants (MSRT).
 - Signature des scripts avec un certificat de code.
 - Paquet de préparation ESU Windows 10 (KB5126256 à ce jour) dans le dépôt. Écarté de la v1 : l'inscription à l'ESU demande de toute façon une connexion, et le paquet redémarre le PC de lui-même (R-04).
+- Suspension de Windows Update pendant une session, si Microsoft documente un jour une méthode qui expire d'elle-même et fonctionne sous toutes les éditions, y compris Famille. Retirée de la v1 : l'arrêt simple de `wuauserv` tient moins de 5 minutes, la pause par stratégie exclut Famille et dure 35 jours, la pause « Paramètres » n'a pas de méthode programmatique documentée (R-15).
 
 ## 15. Historique
 
@@ -662,3 +664,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.15 (6 octobre 2026) : `minUbr` contrôlé par OffPatch seul, DISM acceptant l'enablement package sous le prérequis (8.3) ; cas de test de planification P6, enablement package « Ignorée (prérequis) » sans cumulative qui atteigne `minUbr` (12). L'enablement package reste installé après le redémarrage de la cumulative. Suite de R-03.
 - 1.16 (6 octobre 2026) : `allowedDomains` remplacé par les 8 noms d'hôte mesurés (retrait de `catalog.update.microsoft.com`, `download.windowsupdate.com` et `officecdn.microsoft.com`) ; règle du nom d'hôte exact, `https` seulement, lien `http` réécrit en `https` sur le même hôte, message de refus avec la ligne à ajouter (6.1) ; chaîne de redirections résolue et contrôlée avant le téléchargement de l'URL finale (7.1) ; limite de BITS et défense en profondeur, Authenticode restant la garantie principale (11). Suite de R-13.
 - 1.17 (6 octobre 2026) : exécuteur Windows par `%SystemRoot%\System32\dism.exe` (chemin complet, `/English /Online /Add-Package /NoRestart /LogPath`), `Add-WindowsPackage` écarté ; jugement d'une étape en deux temps (liste DISM juste après, UBR ou build après le redémarrage, sinon « non appliquée après redémarrage (retour arrière probable) ») ; `NotApplicable` reconnu par la ligne `CBS HRESULT=0x800f081e` du journal, avec avertissement « jugé applicable par le planificateur » (8.4) ; contrôle préalable bloquant d'un PowerShell 32 bits sur Windows 64 bits (8.2), lancement du PowerShell natif (8.1). Suite de R-14.
+- 1.18 (6 octobre 2026) : option `pauseWindowsUpdateDuringSession` retirée, avec le rétablissement de Windows Update en fin de session (6.1, 8.2, 8.6) ; PC connecté à un réseau : mode Avion recommandé, rappel dans le récapitulatif du mode auto (8.2, 8.6) ; PC hors ligne en fin de session : rappel de désactiver le mode Avion ou de rebrancher le réseau à l'écran de fin et dans le rapport (8.6, 8.8) ; DISM : code 1618 ou 0x80070652 (installation déjà en cours), attente de 5 minutes et une seule nouvelle tentative (8.4) ; suspension de Windows Update notée en évolution (14). Suite de R-15 et R-14.

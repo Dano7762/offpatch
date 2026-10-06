@@ -21,7 +21,6 @@
     "maxAutoReboots": 5,
     "rebootCountdownSeconds": 30,
     "staleDepotWarningDays": 35,
-    "pauseWindowsUpdateDuringSession": true,
     "odtTimeoutMinutes": 30
   },
   "logging": {
