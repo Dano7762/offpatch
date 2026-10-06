@@ -22,7 +22,9 @@ Réponds-moi en français.
   - les opérations qui modifient le système ne sont autorisées que dans des jobs sur runners hébergés par GitHub (jetables) ; jamais sur un runner auto-hébergé, jamais sur ma machine ;
   - les workflows lourds (téléchargement de cumulatives, installation) se déclenchent uniquement à la main (`workflow_dispatch`) ; seul `ci.yml` (analyse statique et tests, sans accès réseau) tourne à chaque push ; `catalog-contract.yml` (contrat en ligne avec le catalogue, lecture seule) tourne chaque mercredi et à la demande ;
   - aucun secret ni clé de produit dans les workflows, les scripts de `tests/runner/` ou les artefacts ;
-  - avec `gh`, tu peux pousser sur ce dépôt, lancer des workflows, lire leurs journaux et récupérer leurs artefacts. Rien d'autre sur mon compte GitHub.
+  - avec `gh`, tu peux pousser sur ce dépôt, lancer des workflows, lire leurs journaux et récupérer leurs artefacts. Rien d'autre sur mon compte GitHub ;
+  - ne pas utiliser `gh run watch` (il a épuisé la limite de l'API GitHub) : interroger l'état des runs au plus une fois toutes les 5 minutes.
+- Aucune opération DISM d'analyse ou de maintenance du magasin de composants (`/AnalyzeComponentStore`, `/StartComponentCleanup`, `/ResetBase`…) quand un redémarrage est en attente, ni dans les essais ni dans l'exécuteur d'OffPatch : elle peut bloquer des heures (R-12).
 - Ce que les runners ne permettent pas (redémarrage, mode auto, Windows 11 x64 client, Windows 10 ESU, support sans checkpoint) est validé sur intervention réelle, en commençant par l'action `Plan` en lecture seule.
 - Les fonctions en lecture seule (détection, interrogation du catalogue) peuvent tourner sur la machine de développement.
 - Pour tester le téléchargement, utiliser `-ListOnly` (interroge le catalogue sans rien télécharger) ou la cible la plus légère (définitions Defender). Ne télécharger une cumulative complète ou une source Office que si je le demande.

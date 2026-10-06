@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.14 du 6 octobre 2026.
+Version 1.15 du 6 octobre 2026.
 
 ## 1. Contexte
 
@@ -468,6 +468,7 @@ Règles de dépendance. Deux types, déclarés dans le manifeste (7.2) et dans `
 
 Règles de prérequis :
 
+- `minUbr` est contrôlé par OffPatch seul : DISM n'offre aucune protection. Il accepte l'enablement package sous l'UBR requis (code 3010 à l'UBR 9457 pour un `minUbr` de 9550, paquet « Install Pending », R-03), sans que l'issue au redémarrage soit connue. Le planificateur ne lance donc jamais l'étape si le prérequis n'est pas rempli (cas de test P6).
 - Un prérequis peut être satisfait par une étape antérieure du même plan. L'UBR projeté après une cumulative prévue est son `resultingUbr` ; c'est lui qui sert à évaluer les étapes suivantes (par exemple l'enablement package et son `minUbr`).
 - Juste avant chaque étape, et donc après chaque redémarrage, l'outil revérifie l'état réel du PC (build, UBR, détection de la catégorie) au lieu de se fier au plan.
 - Si un prérequis n'est pas rempli, à la planification ou au moment de l'étape, l'étape passe à l'état `SkippedPrerequisite` (« Ignorée (prérequis) ») avec son motif dans le rapport. Les étapes qui en dépendent par un prérequis bloquant sont ignorées de la même façon ; celles qui n'en dépendent que par l'ordre sont exécutées normalement. Le reste du plan continue.
@@ -593,6 +594,7 @@ Tests de planification (`tests/Unit/Planner/`) : chaque cas associe une fixture 
 | P3 | Windows 11 25H2, 26200.9550 | Cumulative à jour si celle du dépôt n'est pas plus récente ; enablement package installable d'emblée (UBR réel ≥ `minUbr`), redémarrage |
 | P4 | Windows 11 26H2 à jour | Aucune étape Windows ; enablement package non applicable |
 | P5 | Windows 10 22H2 sans les SSU récents (UBR < 3271) | SSU autonome, puis cumulative, redémarrage |
+| P6 | Windows 11 25H2, 26200.9457, aucune cumulative au dépôt qui porte l'UBR à 9550 ou plus | Enablement package « Ignorée (prérequis) », motif « UBR 9457 inférieur à `minUbr` 9550 » ; aucun appel à DISM pour lui |
 
 Tests réels, selon deux moyens :
 
@@ -647,3 +649,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.12 (5 octobre 2026) : critères Authenticode au téléchargement (`Valid`, organisation Microsoft Corporation, racine Microsoft, certificat expiré mais horodaté accepté) et SHA-256 de chaque fichier d'une source Office (7.1, 11) ; côté client, SHA-256 seul, juste avant l'étape (8.4, 11) ; source Office entière revérifiée avant `setup.exe /configure`, étape en erreur et ODT non lancé au moindre écart ; garde-fou de 30 min sur l'ODT (`odtTimeoutMinutes`), « délai dépassé », nouvelle détection d'Office ; pas de délai sur DISM (6.1, 8.4, 8.5). Suite de R-10.
 - 1.13 (5 octobre 2026) : racines de confiance par empreinte, `integrity.trustedRootThumbprints` (au départ Microsoft Root Certificate Authority 2010, `3B1EFD3A66EA28B16697394703A72CA340A05BD5`) ; signataire jugé sur l'organisation Microsoft Corporation ; racine inconnue : téléchargement refusé avec un message explicite (6.1, 7.1, 11). Suite de R-10.
 - 1.14 (6 octobre 2026) : MSCatalogLTS retiré, dossier `lib/` supprimé de l'arborescence et de la copie sur support ; recherche au catalogue par les fonctions du module, avec pagination (paramètre `p`) et plafond de pages au-delà duquel la recherche échoue (5, 7.1, 7.4) ; `retention.windowsMonths` par cible, défauts 1 pour Windows 11 et 2 pour Windows 10, chaque cible obligatoire (6.1, 7.3) ; `minFreeSpaceGB` ramené de 20 à 17, pic mesuré × 1,5 (6.1) ; espace libre du volume du dépôt contrôlé avant téléchargement (7.1) ; FAT32 refusé à cause de la cumulative Windows 11 x64 de plus de 4 Gio, support de 64 Go recommandé pour un dépôt complet (7.4). Suite de R-11 et R-12.
+- 1.15 (6 octobre 2026) : `minUbr` contrôlé par OffPatch seul, DISM acceptant l'enablement package sous le prérequis (8.3) ; cas de test de planification P6, enablement package « Ignorée (prérequis) » sans cumulative qui atteigne `minUbr` (12). L'enablement package reste installé après le redémarrage de la cumulative. Suite de R-03.

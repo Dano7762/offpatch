@@ -13,6 +13,13 @@ Ce que les runners GitHub ne permettent pas de vérifier (décision de David du 
 - Windows 11 x64 client : aucun runner standard (`windows-2025` est un Windows Server 2025).
 - Windows 10 22H2 avec et sans ESU (R-04).
 - Support d'installation sans checkpoint (24H2 antérieure à 26100.1742, R-02).
+- Regroupement de la cumulative et de l'enablement package avant un redémarrage unique (R-03, décision de David du 2026-10-06). Uniquement sur un PC Windows 11 24H2 ou 25H2 fraîchement installé et sous l'UBR 9550 :
+  1. point de restauration créé juste avant (`Checkpoint-Computer`) ;
+  2. cumulative du dépôt par DISM, sans redémarrer ;
+  3. KB5121794 par DISM, sans redémarrer ;
+  4. un seul redémarrage ;
+  5. relevé de `CurrentBuild`, `UBR` et `DisplayVersion`, et de la liste DISM.
+  En attendant, l'enablement package reste installé après le redémarrage de la cumulative.
 
 Statuts possibles : À vérifier, En cours, Tranché, Bloqué.
 
@@ -131,7 +138,10 @@ Impact : catégorie `windows-ekb`, regroupement des redémarrages.
   - **(a) KB5121794 avant la cumulative** (run https://github.com/Dano7762/offpatch/actions/runs/37371740048, UBR 9457, sous le `minUbr` 9550 et sous les 9546 exigés par la page du KB) : DISM l'**accepte** : code **3010**, « Processing 1 of 1 - Applying package servicing unattend / The operation completed successfully. », journal « Reboot required=yes », 28 s. DISM ne contrôle donc pas le prérequis d'UBR au moment de l'ajout : ce contrôle reste à la charge d'OffPatch (`minUbr`). La suite (KB5043080 code 0, KB5124010 code 3010) se déroule normalement. KB5121794 repassé juste après la cumulative : 3010 en 1 s, paquet déjà en attente.
   - **(b) KB5121794 juste après la cumulative, seul** (run https://github.com/Dano7762/offpatch/actions/runs/37401620967) : KB5043080 code 0 (12 s), KB5124010 code **3010** (1 160 s), puis KB5121794 code **3010** (31 s), même message. Liste DISM après coup, sans redémarrage : `Package_for_KB5121794~31bf3856ad364e35~arm64~~26100.8966.1.0 | Install Pending` à côté de `Package_for_RollupFix~…~26100.9550.1.28 | Install Pending` et `Package_for_RollupFix~…~26100.9457.1.0 | Uninstall Pending` ; UBR du registre toujours 9457.
 - Conclusion de l'essai : **au niveau de DISM, l'enablement package s'enchaîne après la cumulative avant un redémarrage unique** (les deux paquets restent en attente ensemble, aucun refus). Ce qui n'est pas prouvé : que le redémarrage unique termine les deux (26x00.9550 puis passage en 26300), puisque le runner ne peut pas redémarrer. Comme DISM accepte aussi le paquet sous l'UBR requis, son code retour ne garantit rien sur l'issue au redémarrage.
-- Proposition (à trancher par David) : garder la règle actuelle (enablement package après le redémarrage de la cumulative, une fois l'UBR réel ≥ `minUbr`) tant que l'enchaînement avant un redémarrage unique n'a pas été vérifié sur intervention réelle (Windows 11 24H2 ou 25H2 sous 9550 : cumulative puis KB5121794 sans redémarrer, un seul redémarrage, relevé de `CurrentBuild` et `UBR`). Si l'essai réussit, le planificateur pourra regrouper les deux étapes avec l'UBR projeté (8.3), ce qui économise un redémarrage.
+- Décision (David, 2026-10-06) :
+  - Règle actuelle maintenue : enablement package après le redémarrage de la cumulative, une fois l'UBR réel ≥ `minUbr`.
+  - Essai de regroupement inscrit en tête de ce fichier (« À valider sur intervention réelle ») : PC Windows 11 fraîchement installé sous 9550, point de restauration juste avant, un seul redémarrage. S'il réussit, le planificateur pourra regrouper les deux étapes avec l'UBR projeté (8.3).
+  - DISM acceptant le paquet sous le prérequis, `minUbr` est contrôlé par OffPatch seul (cahier des charges 1.15, 8.3) ; cas de test P6 (12).
 
 ## R-04 Windows 10 22H2 et ESU
 
@@ -448,7 +458,7 @@ Impact : refus du FAT32, README.
   - **c. Rétention par cible** : `retention.windowsMonths` devient un objet par cible. Défauts proposés : 1 pour `win11-x64` et `win11-arm64`, 2 pour `win10-x64`. Une cumulative contient tout le mois précédent : le mois précédent ne sert que de repli si la cumulative courante pose problème sur un PC. Pour Windows 11, ce repli coûte environ 4,4 Gio par cible, et une cumulative qui échoue se corrige en général par la suivante plutôt que par la précédente. Pour Windows 10, il coûte 1 Gio et reste utile (dernières cumulatives ESU, parc plus hétérogène). Le mois précédent reste disponible pendant toute la mise à jour, puisque la purge passe en dernier.
 - Décision :
   - David (2026-10-06) : `minFreeSpaceGB` = pic mesuré × 1,5, arrondi au-dessus, soit 17.
-  - David (2026-10-05) : rétention `retention.windowsMonths` par cible. **Valeurs par défaut 1 / 1 / 2 : proposition de Claude**, reportée dans le cahier des charges 1.14 et `config/settings.json` pour que la configuration reste cohérente ; elle ne se change que dans la configuration si David préfère d'autres valeurs.
+  - David (2026-10-06) : rétention `retention.windowsMonths` par cible, 1 mois pour `win11-x64` et `win11-arm64`, 2 mois pour `win10-x64` ; support recommandé de 64 Go.
   - Reporté dans le cahier des charges 1.14 (6.1, 7.1, 7.3, 7.4) et `config/settings.json` : support de 64 Go recommandé pour un dépôt complet, FAT32 refusé, espace libre du volume du dépôt contrôlé avant téléchargement.
 
 ## R-13 Domaines de téléchargement

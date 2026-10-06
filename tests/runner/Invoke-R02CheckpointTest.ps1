@@ -12,8 +12,8 @@
       5. même chose une seconde fois, pour relever les codes retour quand les paquets sont déjà installés ;
       6. relevé final.
     Espace disque (R-12) : l'espace libre de C: est échantillonné toutes les 2 secondes pendant DISM ; le résumé donne
-    la consommation finale (sans redémarrage) et le pic, avec la taille du magasin de composants avant et après
-    (DISM /Cleanup-Image /AnalyzeComponentStore). -AllowPreview accepte une préversion cumulative, seule
+    la consommation finale (sans redémarrage) et le pic, avec la taille du magasin de composants avant DISM
+    (DISM /Cleanup-Image /AnalyzeComponentStore, jamais avec un redémarrage en attente : CLAUDE.md). -AllowPreview accepte une préversion cumulative, seule
     installable quand l'image du runner est déjà à jour : réservé à cette mesure.
     -PinnedItemId (élément de config/pinned-items.json, par exemple l'enablement package) : le fichier épinglé est
     téléchargé et contrôlé par Test-PinnedFile.ps1, puis passé à DISM au premier passage juste avant les prérequis
@@ -93,8 +93,9 @@ function Get-SystemDriveFreeByte {
 }
 
 function Get-ComponentStoreSize {
-    # Analyse bornée à 10 minutes : avec un redémarrage en attente, elle n'a pas rendu la main en 4 h 30 (2026-10-05).
+    # Jamais avec un redémarrage en attente : elle n'a pas rendu la main en 4 h 30 (2026-10-05). Bornée à 10 minutes.
     param([string]$Suffix)
+    if (Test-Path $cbsKey) { return 'non relevé (redémarrage en attente)' }
     $file = Join-Path $OutputDirectory "componentstore-$Suffix.txt"
     $process = Start-Process -FilePath 'dism.exe' -ArgumentList '/English', '/Online', '/Cleanup-Image', '/AnalyzeComponentStore' -RedirectStandardOutput $file -NoNewWindow -PassThru
     if (-not $process.WaitForExit(600000)) {
@@ -190,7 +191,6 @@ $freeAfterDism = Get-SystemDriveFreeByte
 $samples = @(Import-Csv -Path $samplesPath | ForEach-Object { [int64]$_.OctetsLibres })
 $minFreeDuringDism = $freeAfterDism
 if ($samples.Count -gt 0) { $minFreeDuringDism = [int64](($samples + $freeAfterDism) | Sort-Object | Select-Object -First 1) }
-$storeAfter = Get-ComponentStoreSize -Suffix 'apres'
 $disk = [pscustomobject]@{
     Drive                = $env:SystemDrive
     FreeBeforeDownloadGB = [math]::Round($freeBeforeDownload / 1GB, 2)
@@ -201,7 +201,6 @@ $disk = [pscustomobject]@{
     DismNetGB            = [math]::Round(($freeBeforeDism - $freeAfterDism) / 1GB, 2)
     Samples              = $samples.Count
     ComponentStoreBefore = $storeBefore
-    ComponentStoreAfter  = $storeAfter
 }
 
 # 6. Relevé final
@@ -263,7 +262,7 @@ $lines.Add('')
 $lines.Add("- Libre avant téléchargement : $($disk.FreeBeforeDownloadGB) Go ; avant DISM : $($disk.FreeBeforeDismGB) Go")
 $lines.Add("- Minimum pendant DISM : $($disk.MinFreeDuringDismGB) Go ($($disk.Samples) échantillons) ; après DISM : $($disk.FreeAfterDismGB) Go")
 $lines.Add("- Pic consommé par DISM : $($disk.DismPeakGB) Go ; consommation nette : $($disk.DismNetGB) Go")
-$lines.Add("- Magasin de composants : $($disk.ComponentStoreBefore) avant, $($disk.ComponentStoreAfter) après")
+$lines.Add("- Magasin de composants avant DISM : $($disk.ComponentStoreBefore) (pas d'analyse après : redémarrage en attente)")
 $summary = $lines -join "`n"
 $summary | Set-Content -Path (Join-Path $OutputDirectory 'resume.md') -Encoding UTF8
 if ($env:GITHUB_STEP_SUMMARY) { $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding UTF8 }
