@@ -467,7 +467,7 @@ Question : domaines réellement atteints après redirection pour le catalogue, m
 
 Impact : `allowedDomains`.
 
-- Statut : À vérifier
+- Statut : Tranché sur la mesure ; liste et règle de comparaison proposées, en attente de l'accord de David (cahier des charges 6.1)
 - Pistes (2026-10-04) :
   - Recherche et résolution des liens : `www.catalog.update.microsoft.com` (avec `www.`), pages `Search.aspx` et `DownloadDialog.aspx`. La liste du cahier des charges (6.1) porte `catalog.update.microsoft.com` sans `www.` : à compléter.
   - Fichiers des cumulatives : `catalog.sf.dl.delivery.mp.microsoft.com`, sans aucune redirection (requête HEAD avec suivi des redirections, workflow `depot-x64`, https://github.com/Dano7762/offpatch/actions/runs/37199155132). Absent de la liste actuelle.
@@ -476,7 +476,25 @@ Impact : `allowedDomains`.
   - Office (R-07, https://github.com/Dano7762/offpatch/actions/runs/37235902323) : page de l'ODT `www.microsoft.com`, fichier de l'ODT `download.microsoft.com` ; domaines cités dans les journaux de l'ODT pendant `/download` : `officecdn.microsoft.com`, `f.c2r.ts.cdn.office.net`, `ecs.office.com`, `mrodevicemgr.officeapps.live.com`. Les deux derniers servent à la configuration et au suivi, pas aux fichiers. Décision de David du 2026-10-04 (cahier des charges 1.9, 6.1) : `allowedDomains` ne concerne que les téléchargements faits par OffPatch, pas le trafic propre de l'ODT ; ces domaines ne sont donc pas à y ajouter.
   - Fichiers anciens du catalogue (SSU Windows 10 de 2023, R-04) : `catalog.s.download.windowsupdate.com`, sans redirection (https://github.com/Dano7762/offpatch/actions/runs/37202749032). Absent de la liste actuelle.
 - Sources :
+  - Mesure du 2026-10-06 depuis la machine de développement, lecture seule (`scratch/r13-chaines.ps1` : requêtes HEAD, ou GET pour les pages, sans suivi automatique, chaque redirection relevée jusqu'au code final) : un cas par type de téléchargement fait par OffPatch, liens du mois résolus par `Find-OpCatalogUpdate` et `DownloadDialog.aspx`, éléments épinglés lus dans `config/pinned-items.json`.
+  - Mêmes domaines relevés sur les runners GitHub (`windows-2025` et `windows-11-arm`) : `depot-x64` (runs 37199155132, 37200937432, 37369418641), R-04 (37202749032), R-06, R-07 (37235902323), R-10 (Get-RedirectHost et contrôle des domaines du scénario Signatures), R-03 et R-12 (37371740048, 37401620967).
 - Conclusion :
+
+  | Téléchargement fait par OffPatch | Chaîne observée (code final 200) |
+  |---|---|
+  | Recherche et fenêtre de téléchargement du catalogue | `www.catalog.update.microsoft.com` |
+  | Cumulative Windows 11 (+ checkpoint), .NET Windows 11, enablement package épinglé | `catalog.sf.dl.delivery.mp.microsoft.com` |
+  | Cumulative Windows 10, .NET Windows 10, plateforme Defender KB4052623, SSU épinglé KB5031539 | `catalog.s.download.windowsupdate.com` |
+  | mpam-fe.exe x64 et ARM64 | `go.microsoft.com` → `definitionupdates.microsoft.com` → `definitionupdates.microsoft.com` |
+  | Page de l'ODT | `www.microsoft.com` |
+  | Fichier de l'ODT | `download.microsoft.com` |
+  | Correspondance KB → build (release-information Windows 11 et Windows 10) | `learn.microsoft.com` |
+
+  - Tous les liens rendus par `DownloadDialog.aspx` sont en `https`, y compris les anciens fichiers (`catalog.s.download.windowsupdate.com`) ; aucun fichier du catalogue ne passe par une redirection.
+  - La liste 6.1 actuelle ne correspond à aucun hôte réel pour deux entrées (`catalog.update.microsoft.com` sans `www.`, `download.windowsupdate.com` sans `catalog.s.`) : elle ne fonctionne que si la comparaison accepte les sous-domaines. `officecdn.microsoft.com` n'est jamais contacté par OffPatch lui-même (trafic de l'ODT, hors périmètre de la liste depuis 1.9).
+- Proposition (à valider par David, cahier des charges 6.1 et `config/settings.json`) :
+  - Liste : `www.catalog.update.microsoft.com`, `catalog.sf.dl.delivery.mp.microsoft.com`, `catalog.s.download.windowsupdate.com`, `go.microsoft.com`, `definitionupdates.microsoft.com`, `www.microsoft.com`, `download.microsoft.com`, `learn.microsoft.com`. Retirer `catalog.update.microsoft.com`, `download.windowsupdate.com` et `officecdn.microsoft.com`.
+  - Règle : **nom d'hôte exact**, sans joker ni suffixe, `https` seulement, contrôlé pour l'URL de départ **et pour chaque redirection** avant de la suivre ; hôte inconnu : téléchargement refusé avec un message qui nomme l'hôte et l'URL. Raison : une comparaison par suffixe (`microsoft.com`) accepterait n'importe quel sous-domaine ; avec des noms exacts, un changement de CDN chez Microsoft fait échouer le téléchargement de façon visible, et la correction tient en une ligne de configuration après vérification. `depot-x64` relève déjà les hôtes atteints par chaque fichier.
 - Décision :
 
 ## R-14 Moteur d'installation des paquets
