@@ -28,7 +28,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 ## Phase 1 : socle
 
 - [x] Arborescence, `.gitignore`, `offpatch.root`, `PSScriptAnalyzerSettings.psd1`
-- [ ] Module `OffPatch` : manifeste `.psd1`, chargement automatique de `Public/` et `Private/`
+- [x] Module `OffPatch` : manifeste `.psd1`, chargement automatique de `Public/` et `Private/`
 - [ ] `Get-OpRoot` et fonctions de chemins (racine, dépôt, ProgramData)
 - [ ] `Write-OpLog` : niveaux, fichier de session, file de messages pour l'interface
 - [ ] `Invoke-OpProcess` : fonction unique de lancement de processus sur `System.Diagnostics.Process` (jamais `Start-Process`, dont l'`ExitCode` revient vide sous PowerShell 5.1, R-14), utilisée par tous les exécuteurs (DISM, ODT, mpam-fe.exe, plateforme Defender) : code de sortie, sortie standard capturée, délai maximal facultatif ; tests Pester avec `cmd /c exit 0`, `exit 3010`, `exit 1618`, un délai dépassé et une sortie standard capturée
@@ -150,3 +150,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-06 | 0 | Politique de nouvelles tentatives (`Invoke-OpWebRequest`, `Invoke-OpHeadRequest`), `Get-OpCatalogDownloadLink`, contrat en ligne sur le code de production avec diagnostic et relance unique ; tests avant push hors `Live` ; `Invoke-OpProcess` au backlog ; bilan de phase 0 : R-02 et R-04 ouverts non bloquants, `catalog-queries.json` et `office/profiles.json` créés et contrôlés, tests de cohérence de `config/`, matrice de traçabilité (cahier des charges 1.19), `docs/BILAN-PHASE-0.md` | Décisions de David sur les points A à D du bilan, puis phase 1 |
 | 2026-10-06 | 0 | Bilan de phase 0 clos, cahier des charges 1.20 : format de `catalog-queries.json` (`latestMonth` sur le préfixe `AAAA-MM`), `downloadPages` lu par le contrat en ligne, P7 à P10, corrections ; point de restauration mesuré (`restore-point.yml`) : `Checkpoint-Computer` active lui-même la protection, état lu avant l'appel (`SPP\Clients`, indicateur non documenté), avertissement sans erreur dans les 24 h | Phase 1 |
 | 2026-10-06 | 1 | Arborescence de la section 5 (`Public/`, `gui/Dialogs/`, `tools/odt/`), `offpatch.root` (JSON : produit, identifiant d'installation), tests de structure et d'exclusions git | Module `OffPatch` : manifeste et chargement |
+| 2026-10-06 | 1 | Module `OffPatch` : manifeste (PowerShell 5.1, Desktop, `FunctionsToExport` explicite), `OffPatch.psm1` (StrictMode, chargement de `Private/` puis `Public/`, export limité à `Public/`, erreur qui nomme le fichier fautif) ; tests sur une copie du module | `Get-OpRoot` et fonctions de chemins |
