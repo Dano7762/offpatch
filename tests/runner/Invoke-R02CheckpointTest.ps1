@@ -72,7 +72,7 @@ function Invoke-DismAddPackage {
     $output | Out-File -FilePath $console -Encoding UTF8
     # Message de DISM : lignes utiles de la console, sans l'en-tête ni la barre de progression.
     $message = @($output | ForEach-Object { "$_".Trim() } | Where-Object {
-            $_ -and $_ -notmatch '^\[[= ]*[\d.]*%?[= ]*\]$' -and $_ -notmatch '^(Deployment Image Servicing|Version:|Image Version:|Processing \d+ of \d+)'
+            $_ -and $_ -notmatch '^\[[= ]*[\d.]*%?[= ]*\]$' -and $_ -notmatch '^(Deployment Image Servicing|Version:|Image Version:|HOTPATCHUTIL )'
         }) -join ' / '
     $result = [pscustomobject]@{
         Label         = $Label

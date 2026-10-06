@@ -17,7 +17,7 @@
     "officeVersions": 1
   },
   "client": {
-    "minFreeSpaceGB": 16,
+    "minFreeSpaceGB": 17,
     "maxAutoReboots": 5,
     "rebootCountdownSeconds": 30,
     "staleDepotWarningDays": 35,
