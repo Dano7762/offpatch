@@ -183,6 +183,7 @@ Impact : contrôle préalable Windows 10, comportement du mode auto.
   1. Trace lisible hors ligne d'une inscription ESU grand public (produit de licence, identifiant, état).
   2. Confirmation de la détection entreprise sur un PC avec MAK ESU.
   3. Plus tard, avec l'accord de David : installation par DISM d'une cumulative ESU sur un PC inscrit et sur un PC non inscrit (tests T4 et T5).
+- Piste (David, 2026-10-06), à évaluer avec les résultats du relevé, sans rien implémenter pour l'instant : si une cumulative ESU ne s'installe pas sur un Windows 10 22H2 non inscrit, prévoir un élément épinglé « dernière cumulative publique de Windows 10 22H2 » (celle d'octobre 2025, publiée avant la fin du support ; KB et UBR à relever sur la page release-information, rien n'est fixé ici), installé sur les PC sans ESU pour les amener à leur dernier niveau public. Le rapport préciserait alors : « Windows 10 sans ESU : dernier niveau public, plus de correctifs de sécurité depuis octobre 2025 ». À trancher avec le point 3 ci-dessus.
 
 ## R-05 Cumulatives .NET Framework
 
