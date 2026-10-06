@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.15 du 6 octobre 2026.
+Version 1.16 du 6 octobre 2026.
 
 ## 1. Contexte
 
@@ -187,16 +187,19 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
     "trustedRootThumbprints": ["3B1EFD3A66EA28B16697394703A72CA340A05BD5"]
   },
   "allowedDomains": [
-    "catalog.update.microsoft.com",
-    "download.windowsupdate.com",
-    "download.microsoft.com",
+    "www.catalog.update.microsoft.com",
+    "catalog.sf.dl.delivery.mp.microsoft.com",
+    "catalog.s.download.windowsupdate.com",
     "go.microsoft.com",
-    "officecdn.microsoft.com"
+    "definitionupdates.microsoft.com",
+    "www.microsoft.com",
+    "download.microsoft.com",
+    "learn.microsoft.com"
   ]
 }
 ```
 
-Les valeurs chiffrées sont des valeurs de départ. `minFreeSpaceGB` (en Gio) vaut le pic d'espace consommé sur C: par l'installation d'une cumulative Windows 11 mesuré sur runner, sans redémarrage (10,7 Gio, le plus fort de trois essais), multiplié par 1,5 et arrondi au-dessus : la mesure est un minimum, puisque la phase de redémarrage n'est pas comptée (R-12). La liste `allowedDomains` sera complétée en phase 0 avec les domaines réellement atteints après redirection (R-13). Elle s'applique aux téléchargements faits par OffPatch lui-même (catalogue, mpam-fe.exe, plateforme Defender, éléments épinglés, ODT). Elle ne s'applique pas au trafic propre de l'ODT pendant `setup.exe /download`, qui contacte ses propres domaines (CDN Office, mais aussi par exemple `ecs.office.com` ou `mrodevicemgr.officeapps.live.com`) : OffPatch ne le contrôle pas, il se contente de le journaliser. L'interface modifie ce fichier quand je change les cibles ou les langues dans l'onglet Dépôt.
+Les valeurs chiffrées sont des valeurs de départ. `minFreeSpaceGB` (en Gio) vaut le pic d'espace consommé sur C: par l'installation d'une cumulative Windows 11 mesuré sur runner, sans redémarrage (10,7 Gio, le plus fort de trois essais), multiplié par 1,5 et arrondi au-dessus : la mesure est un minimum, puisque la phase de redémarrage n'est pas comptée (R-12). La liste `allowedDomains` contient les noms d'hôte réellement atteints, redirections comprises, mesurés en R-13. Règle : nom d'hôte exact, sans joker ni suffixe, `https` seulement. Un lien `http` renvoyé par une source (catalogue, redirection) est réécrit en `https` sur le même hôte ; rien n'est jamais téléchargé en `http`. Un hôte absent de la liste fait refuser le téléchargement, avec un message qui donne l'hôte, l'URL complète et la ligne exacte à ajouter à `allowedDomains`. Elle s'applique aux téléchargements faits par OffPatch lui-même (catalogue, mpam-fe.exe, plateforme Defender, éléments épinglés, ODT). Elle ne s'applique pas au trafic propre de l'ODT pendant `setup.exe /download`, qui contacte ses propres domaines (CDN Office, mais aussi par exemple `ecs.office.com` ou `mrodevicemgr.officeapps.live.com`) : OffPatch ne le contrôle pas, il se contente de le journaliser. L'interface modifie ce fichier quand je change les cibles ou les langues dans l'onglet Dépôt.
 
 Les langues se règlent par source Office. Par défaut, la source `current` porte `fr-fr` et `en-us` : les Office en boîte ou Microsoft 365 préinstallés par les fabricants sont souvent bilingues, et une langue installée absente de la source empêche leur mise à jour (8.5, R-08). L'anglais ajoute environ 350 Mo à la source Current (3 955 Mo au lieu de 3 605 Mo, mesuré le 5 octobre 2026). Les sources `perpetualvl2024` et `perpetualvl2021` portent `fr-fr` seul.
 
@@ -302,7 +305,7 @@ Pour chaque cible cochée :
 1. Vérifier l'accès à Internet et aux domaines autorisés.
 2. Interroger le catalogue avec les requêtes de `catalog-queries.json`, par les fonctions du module, sans dépendance tierce (R-11) : `Search.aspx`, page après page (paramètre `p`) tant que la page reçue est pleine et que le compteur du site annonce une suite, avec un plafond de pages au-delà duquel la recherche échoue plutôt que de renvoyer un résultat tronqué ; puis `DownloadDialog.aspx` pour résoudre les liens. Une page de structure inconnue lève une erreur explicite. Le téléchargement est fait par l'outil, pour maîtriser la reprise, le dossier temporaire et le contrôle d'intégrité.
 3. Comparer avec le manifeste. Un élément déjà présent avec le même hash n'est pas retéléchargé. Comparer ensuite la taille des nouveautés (taille annoncée par le catalogue, 4 Go par source Office qui change de version) à l'espace libre du volume du dépôt : la purge ne passe qu'en fin de mise à jour, l'ancien et le nouveau mois coexistent jusque-là (R-12). Espace insuffisant : arrêt avant tout téléchargement, avec l'espace manquant.
-4. Télécharger dans `depot/.tmp/` avec BITS (`Start-BitsTransfer`, reprise possible), et un repli sur `HttpClient` en flux si BITS n'est pas disponible.
+4. Résoudre la chaîne de redirections de chaque lien sans redirection automatique (requêtes HEAD successives), valider l'hôte de chaque étape (6.1), puis télécharger l'URL finale dans `depot/.tmp/` avec BITS (`Start-BitsTransfer`, reprise possible), et un repli sur `HttpClient` en flux si BITS n'est pas disponible.
 5. Vérifier l'authenticité, en ligne, au téléchargement, et calculer le SHA-256 (R-10). Critères Authenticode pour les fichiers signés (.msu, .exe, .cab) : `Status` = `Valid`, signataire de l'organisation Microsoft Corporation (`O=Microsoft Corporation`), chaîne jusqu'à une racine dont l'empreinte figure dans `integrity.trustedRootThumbprints` (6.1 ; au départ, Microsoft Root Certificate Authority 2010). Racine inconnue : téléchargement refusé, avec un message qui nomme la racine rencontrée et son empreinte. Un certificat expiré mais horodaté reste valide ; aucun contrôle sur la date d'expiration du certificat. Pour une source Office, le SHA-256 de chaque fichier est enregistré dans le manifeste ; ses fichiers `.dat` ne portent pas de signature Authenticode (ils sont couverts par des catalogues `.dat.cat` signés) et l'ODT les valide lui-même pendant `/download`.
 6. Pour une cumulative Windows ou .NET, lire dans le .msu le nom et la version du paquet (fichier `update.mum` du .cab, extrait avec `expand.exe`) et les inscrire dans le manifeste (7.2).
 7. Déplacer le fichier à sa place définitive et ajouter l'élément au manifeste.
@@ -574,7 +577,7 @@ Règles de comportement :
 
 ## 11. Sécurité et intégrité
 
-- Téléchargements limités aux domaines Microsoft autorisés.
+- Téléchargements limités aux noms d'hôte de `allowedDomains`, contrôlés sur toute la chaîne de redirections avant le téléchargement, en `https` seulement (6.1, 7.1). Limite : BITS suit lui-même une redirection qui surviendrait au moment du transfert, sans que l'outil puisse la contrôler. La garantie principale reste donc la signature Authenticode et l'empreinte de la racine, vérifiées sur chaque fichier reçu ; la liste des domaines est une défense en profondeur.
 - Authenticité vérifiée côté dépôt, en ligne, au téléchargement : `Status` = `Valid`, signataire de l'organisation Microsoft Corporation, chaîne jusqu'à une racine dont l'empreinte figure dans `integrity.trustedRootThumbprints` (racine inconnue : téléchargement refusé avec un message explicite) ; un certificat expiré mais horodaté reste valide, sans contrôle de date d'expiration (7.1, R-10).
 - SHA-256 calculé au téléchargement et stocké dans le manifeste, y compris pour chaque fichier d'une source Office. Côté client : revérification du SHA-256 seulement, sur les fichiers utilisés, juste avant l'étape ; toute la source Office avant `setup.exe /configure` (8.4, 8.5).
 - Clé de produit : mémoire et XML temporaire uniquement.
@@ -650,3 +653,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.13 (5 octobre 2026) : racines de confiance par empreinte, `integrity.trustedRootThumbprints` (au départ Microsoft Root Certificate Authority 2010, `3B1EFD3A66EA28B16697394703A72CA340A05BD5`) ; signataire jugé sur l'organisation Microsoft Corporation ; racine inconnue : téléchargement refusé avec un message explicite (6.1, 7.1, 11). Suite de R-10.
 - 1.14 (6 octobre 2026) : MSCatalogLTS retiré, dossier `lib/` supprimé de l'arborescence et de la copie sur support ; recherche au catalogue par les fonctions du module, avec pagination (paramètre `p`) et plafond de pages au-delà duquel la recherche échoue (5, 7.1, 7.4) ; `retention.windowsMonths` par cible, défauts 1 pour Windows 11 et 2 pour Windows 10, chaque cible obligatoire (6.1, 7.3) ; `minFreeSpaceGB` ramené de 20 à 17, pic mesuré × 1,5 (6.1) ; espace libre du volume du dépôt contrôlé avant téléchargement (7.1) ; FAT32 refusé à cause de la cumulative Windows 11 x64 de plus de 4 Gio, support de 64 Go recommandé pour un dépôt complet (7.4). Suite de R-11 et R-12.
 - 1.15 (6 octobre 2026) : `minUbr` contrôlé par OffPatch seul, DISM acceptant l'enablement package sous le prérequis (8.3) ; cas de test de planification P6, enablement package « Ignorée (prérequis) » sans cumulative qui atteigne `minUbr` (12). L'enablement package reste installé après le redémarrage de la cumulative. Suite de R-03.
+- 1.16 (6 octobre 2026) : `allowedDomains` remplacé par les 8 noms d'hôte mesurés (retrait de `catalog.update.microsoft.com`, `download.windowsupdate.com` et `officecdn.microsoft.com`) ; règle du nom d'hôte exact, `https` seulement, lien `http` réécrit en `https` sur le même hôte, message de refus avec la ligne à ajouter (6.1) ; chaîne de redirections résolue et contrôlée avant le téléchargement de l'URL finale (7.1) ; limite de BITS et défense en profondeur, Authenticode restant la garantie principale (11). Suite de R-13.

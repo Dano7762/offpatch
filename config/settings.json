@@ -31,10 +31,13 @@
     "trustedRootThumbprints": ["3B1EFD3A66EA28B16697394703A72CA340A05BD5"]
   },
   "allowedDomains": [
-    "catalog.update.microsoft.com",
-    "download.windowsupdate.com",
-    "download.microsoft.com",
+    "www.catalog.update.microsoft.com",
+    "catalog.sf.dl.delivery.mp.microsoft.com",
+    "catalog.s.download.windowsupdate.com",
     "go.microsoft.com",
-    "officecdn.microsoft.com"
+    "definitionupdates.microsoft.com",
+    "www.microsoft.com",
+    "download.microsoft.com",
+    "learn.microsoft.com"
   ]
 }

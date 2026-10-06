@@ -18,7 +18,7 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [x] R-10 Contrôle d'intégrité
 - [x] R-11 MSCatalogLTS
 - [x] R-12 Volumes
-- [ ] R-13 Domaines de téléchargement
+- [x] R-13 Domaines de téléchargement
 - [ ] R-14 Moteur d'installation des paquets
 - [ ] R-15 Suspendre Windows Update pendant une session
 - [ ] Bilan de phase : reporter dans le cahier des charges ce qui change (avec mon accord) et compléter `config/` avec les valeurs établies
@@ -141,3 +141,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-06 | 0 | R-11 clos : MSCatalogLTS retiré (cahier des charges, CLAUDE.md, backlog), pagination `&p=` dans `Find-OpCatalogUpdate` avec plafond, `catalog-contract.yml` hebdomadaire, `ci.yml` sans réseau ; `Test-OpFileSignature` et contrôle de racine dans `depot-x64` (racine Microsoft Root CA 2010 reconnue) ; `config/settings.json` créé ; R-12 tranché : dépôt complet 23 Gio, pic de mise à jour 43,9 Gio, support de 64 Go, pic de 10,7 Gio sur C: (ARM64, préversion KB5124010, trois runs), `minFreeSpaceGB` 17, rétention par cible proposée 1/1/2 ; cahier des charges 1.14 ; R-03 : KB5121794 accepté par DISM (3010) avant et après la cumulative sans redémarrage, en attente avec elle ; codes DISM reportés en R-14 ; analyse du magasin de composants bloquée avec redémarrage en attente, bornée à 10 min | Décision de David sur l'enchaînement de l'enablement package avant un redémarrage unique (à vérifier sur intervention réelle) ; suite : R-13 |
 | 2026-10-06 | 0 | Décisions de David : rétention 1/1/2 et support de 64 Go validés ; enablement package toujours après le redémarrage de la cumulative, essai de regroupement inscrit « à valider sur intervention réelle » (point de restauration avant) ; cahier des charges 1.15 (`minUbr` contrôlé par OffPatch seul, cas P6) ; CLAUDE.md (pas de `gh run watch`, aucune maintenance du magasin de composants avec un redémarrage en attente, script R-02 aligné) ; option « point de restauration avant session » notée pour le bilan | R-13 |
 | 2026-10-06 | 0 | R-13 mesuré (lecture seule, mêmes hôtes que sur les runners) : 8 noms d'hôte exacts, tous en `https`, seule redirection `go.microsoft.com` → `definitionupdates.microsoft.com` ; deux entrées de la liste 6.1 ne correspondent à aucun hôte réel | Accord de David sur la liste et la règle « nom d'hôte exact, contrôlé à chaque redirection » (cahier des charges 6.1, `settings.json`), puis R-14 |
+| 2026-10-06 | 0 | R-13 tranché : 8 hôtes exacts dans `settings.json`, `Resolve-OpDownloadUrl` (redirections résolues une à une, http réécrit en https, refus avec la ligne à ajouter) et ses tests ; contrat hebdomadaire étendu aux liens réels du moment (18 liens conformes) ; cahier des charges 1.16 (6.1, 7.1, 11, limite de BITS) | R-14 |

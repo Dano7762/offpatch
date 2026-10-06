@@ -1,5 +1,7 @@
 # Contrat avec le Microsoft Update Catalog en ligne (R-11) : les fonctions d'analyse reconnaissent-elles
-# toujours les pages actuelles du site ? Lecture seule, quelques requêtes, aucun téléchargement de fichier.
+# toujours les pages actuelles du site ? Et (R-13) les liens réels du moment (catalogue, mpam-fe.exe, ODT,
+# éléments épinglés), redirections comprises, restent-ils dans allowedDomains ? Échec sinon.
+# Lecture seule : pages et requêtes HEAD, aucun téléchargement de fichier.
 # Chaque mercredi (lendemain du Patch Tuesday les semaines concernées) et à la demande.
 name: catalog-contract
 

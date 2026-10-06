@@ -467,7 +467,7 @@ Question : domaines réellement atteints après redirection pour le catalogue, m
 
 Impact : `allowedDomains`.
 
-- Statut : Tranché sur la mesure ; liste et règle de comparaison proposées, en attente de l'accord de David (cahier des charges 6.1)
+- Statut : Tranché (2026-10-06)
 - Pistes (2026-10-04) :
   - Recherche et résolution des liens : `www.catalog.update.microsoft.com` (avec `www.`), pages `Search.aspx` et `DownloadDialog.aspx`. La liste du cahier des charges (6.1) porte `catalog.update.microsoft.com` sans `www.` : à compléter.
   - Fichiers des cumulatives : `catalog.sf.dl.delivery.mp.microsoft.com`, sans aucune redirection (requête HEAD avec suivi des redirections, workflow `depot-x64`, https://github.com/Dano7762/offpatch/actions/runs/37199155132). Absent de la liste actuelle.
@@ -495,7 +495,13 @@ Impact : `allowedDomains`.
 - Proposition (à valider par David, cahier des charges 6.1 et `config/settings.json`) :
   - Liste : `www.catalog.update.microsoft.com`, `catalog.sf.dl.delivery.mp.microsoft.com`, `catalog.s.download.windowsupdate.com`, `go.microsoft.com`, `definitionupdates.microsoft.com`, `www.microsoft.com`, `download.microsoft.com`, `learn.microsoft.com`. Retirer `catalog.update.microsoft.com`, `download.windowsupdate.com` et `officecdn.microsoft.com`.
   - Règle : **nom d'hôte exact**, sans joker ni suffixe, `https` seulement, contrôlé pour l'URL de départ **et pour chaque redirection** avant de la suivre ; hôte inconnu : téléchargement refusé avec un message qui nomme l'hôte et l'URL. Raison : une comparaison par suffixe (`microsoft.com`) accepterait n'importe quel sous-domaine ; avec des noms exacts, un changement de CDN chez Microsoft fait échouer le téléchargement de façon visible, et la correction tient en une ligne de configuration après vérification. `depot-x64` relève déjà les hôtes atteints par chaque fichier.
-- Décision :
+- Décision (David, 2026-10-06) :
+  - Les 8 hôtes exacts ci-dessus ; `catalog.update.microsoft.com`, `download.windowsupdate.com` et `officecdn.microsoft.com` retirés. Nom d'hôte exact, `https` seulement.
+  - Redirections résolues sans redirection automatique, chaque hôte validé, puis téléchargement de l'URL finale. Limite documentée en 11 : BITS suit lui-même une redirection survenant au moment du transfert ; la garantie principale reste Authenticode et l'empreinte de la racine, la liste des domaines est une défense en profondeur.
+  - Lien `http` renvoyé par une source : réécrit en `https` sur le même hôte, jamais de téléchargement en `http`.
+  - Message de refus : hôte, URL complète et ligne exacte à ajouter à `allowedDomains`.
+  - Mise en œuvre : `Resolve-OpDownloadUrl` et `Invoke-OpHeadRequest` (module, privées), 10 tests sur requêtes simulées (`tests/Unit/Resolve-OpDownloadUrl.Tests.ps1`) ; `catalog-contract.yml` résout chaque semaine les liens réels du moment (cumulatives Windows 11 x64 et ARM64, Windows 10, .NET, plateforme Defender, éléments épinglés, mpam-fe.exe x64 et ARM64, page et fichier de l'ODT) et échoue si un hôte sort de la liste. Premier passage local le 2026-10-06 : 18 liens, tous conformes. Les liens de mpam-fe.exe et de la page de l'ODT sont écrits dans le test en attendant leur place dans `config/` (phase 2).
+  - Cahier des charges 1.16 (6.1, 7.1, 11) et `config/settings.json`.
 
 ## R-14 Moteur d'installation des paquets
 
