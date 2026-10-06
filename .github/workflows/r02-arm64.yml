@@ -17,6 +17,10 @@ on:
         description: 'Élément de pinned-items.json passé à DISM avant puis après la cumulative (ex. win11-arm64-ekb-26H2), vide sinon'
         required: false
         default: ''
+      pinned_position:
+        description: 'Position de l''élément épinglé : Both (avant et après), Before ou After'
+        required: false
+        default: 'Both'
 
 permissions:
   contents: read
@@ -36,7 +40,8 @@ jobs:
           TARGET_KB: ${{ inputs.kb }}
           ALLOW_PREVIEW: ${{ inputs.allow_preview }}
           PINNED_ITEM_ID: ${{ inputs.pinned_item_id }}
-        run: ./tests/runner/Invoke-R02CheckpointTest.ps1 -Kb $env:TARGET_KB -Arch arm64 -OutputDirectory "$env:RUNNER_TEMP\r02-out" -AllowPreview:($env:ALLOW_PREVIEW -eq 'true') -PinnedItemId $env:PINNED_ITEM_ID
+          PINNED_POSITION: ${{ inputs.pinned_position }}
+        run: ./tests/runner/Invoke-R02CheckpointTest.ps1 -Kb $env:TARGET_KB -Arch arm64 -OutputDirectory "$env:RUNNER_TEMP\r02-out" -AllowPreview:($env:ALLOW_PREVIEW -eq 'true') -PinnedItemId $env:PINNED_ITEM_ID -PinnedPosition $env:PINNED_POSITION
 
       - name: Journaux DISM et relevés
         if: always()

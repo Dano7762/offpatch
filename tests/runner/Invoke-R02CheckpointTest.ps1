@@ -17,7 +17,7 @@
     installable quand l'image du runner est déjà à jour : réservé à cette mesure.
     -PinnedItemId (élément de config/pinned-items.json, par exemple l'enablement package) : le fichier épinglé est
     téléchargé et contrôlé par Test-PinnedFile.ps1, puis passé à DISM au premier passage juste avant les prérequis
-    de la cumulative et juste après la cible, sans redémarrage (R-03, R-14).
+    de la cumulative, juste après la cible, ou les deux (-PinnedPosition), sans redémarrage (R-03, R-14).
     Les codes retour de DISM sont relevés, pas jugés : le script n'échoue que sur une erreur imprévue.
 
 .EXAMPLE
@@ -30,7 +30,8 @@ param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     [string]$WorkDirectory,
     [switch]$AllowPreview,
-    [string]$PinnedItemId
+    [string]$PinnedItemId,
+    [ValidateSet('Both', 'Before', 'After')][string]$PinnedPosition = 'Both'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -92,10 +93,15 @@ function Get-SystemDriveFreeByte {
 }
 
 function Get-ComponentStoreSize {
+    # Analyse bornée à 10 minutes : avec un redémarrage en attente, elle n'a pas rendu la main en 4 h 30 (2026-10-05).
     param([string]$Suffix)
-    $text = & dism.exe /English /Online /Cleanup-Image /AnalyzeComponentStore
-    $text | Out-File -FilePath (Join-Path $OutputDirectory "componentstore-$Suffix.txt") -Encoding UTF8
-    $line = @($text | Where-Object { $_ -match 'Actual Size of Component Store\s*:\s*(.+)$' }) | Select-Object -First 1
+    $file = Join-Path $OutputDirectory "componentstore-$Suffix.txt"
+    $process = Start-Process -FilePath 'dism.exe' -ArgumentList '/English', '/Online', '/Cleanup-Image', '/AnalyzeComponentStore' -RedirectStandardOutput $file -NoNewWindow -PassThru
+    if (-not $process.WaitForExit(600000)) {
+        $process.Kill()
+        return 'non relevé (analyse arrêtée après 10 min)'
+    }
+    $line = @(Get-Content -Path $file | Where-Object { $_ -match 'Actual Size of Component Store\s*:\s*(.+)$' }) | Select-Object -First 1
     if ($line -and $line -match ':\s*(.+)$') { $Matches[1].Trim() } else { 'non relevé' }
 }
 
@@ -161,7 +167,7 @@ $sampler = Start-Job -ScriptBlock {
 # 4 et 5. Méthode 1, puis répétition pour le cas « déjà installé »
 $steps = New-Object System.Collections.Generic.List[object]
 foreach ($pass in 1, 2) {
-    if ($pinned -and $pass -eq 1 -and $PSCmdlet.ShouldProcess($pinned.Name, 'DISM /Add-Package')) {
+    if ($pinned -and $pass -eq 1 -and $PinnedPosition -ne 'After' -and $PSCmdlet.ShouldProcess($pinned.Name, 'DISM /Add-Package')) {
         $steps.Add((Invoke-DismAddPackage -Label ("passe1-epingle-avant-{0}" -f $pinned.Kb) -PackagePath $pinned.Path))
     }
     foreach ($p in $prerequisites) {
@@ -172,7 +178,7 @@ foreach ($pass in 1, 2) {
     if ($PSCmdlet.ShouldProcess($target[0].Name, 'DISM /Add-Package')) {
         $steps.Add((Invoke-DismAddPackage -Label ("passe{0}-cible-{1}" -f $pass, $target[0].Kb) -PackagePath $target[0].Path))
     }
-    if ($pinned -and $pass -eq 1 -and $PSCmdlet.ShouldProcess($pinned.Name, 'DISM /Add-Package')) {
+    if ($pinned -and $pass -eq 1 -and $PinnedPosition -ne 'Before' -and $PSCmdlet.ShouldProcess($pinned.Name, 'DISM /Add-Package')) {
         $steps.Add((Invoke-DismAddPackage -Label ("passe1-epingle-apres-{0}" -f $pinned.Kb) -PackagePath $pinned.Path))
     }
 }
