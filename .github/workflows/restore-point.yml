@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       scenario:
-        description: 'Enabled (protection telle quelle) ou Disabled (protection désactivée avant l''essai)'
+        description: 'Enabled (protection telle quelle), Disabled (protection désactivée avant l''essai) ou Indicators (SPP\Clients et Win32_ShadowStorage dans chaque état)'
         required: false
         default: 'Enabled'
 

@@ -19,7 +19,7 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [ValidateSet('Enabled', 'Disabled')][string]$Scenario = 'Enabled'
+    [ValidateSet('Enabled', 'Disabled', 'Indicators')][string]$Scenario = 'Enabled'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -59,6 +59,37 @@ function Get-ProtectionProbe {
     "WMI SystemRestoreConfig : $wmi | SPP\Clients : $spp | vssadmin : $vss"
 }
 
+function Get-ProtectionIndicator {
+    # Les deux indicateurs retenus pour le cahier des charges (8.2) :
+    #  - SPP\Clients : une valeur dont les données citent le volume système (mesuré, non documenté) ;
+    #  - Win32_ShadowStorage : une réservation de clichés pour le volume système (classe WMI documentée).
+    $volume = Get-CimInstance Win32_Volume -Filter "DriveLetter='$env:SystemDrive'"
+    $sppEntries = @()
+    $sppKey = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SPP\Clients' -ErrorAction SilentlyContinue
+    if ($sppKey) {
+        $sppEntries = @($sppKey.PSObject.Properties | Where-Object { $_.Name -notmatch '^PS' -and (@($_.Value) -join ';') -like "*$($volume.DeviceID)*" })
+    }
+    $storage = @(Get-CimInstance Win32_ShadowStorage -ErrorAction SilentlyContinue | Where-Object { $_.Volume.DeviceID -eq $volume.DeviceID })
+    $storageText = 'aucune'
+    if ($storage.Count -gt 0) {
+        $s = $storage[0]
+        $storageText = 'allouée {0:N1} Mo, utilisée {1:N1} Mo, maximum {2:N1} Go' -f ($s.AllocatedSpace / 1MB), ($s.UsedSpace / 1MB), ($s.MaxSpace / 1GB)
+    }
+    [pscustomobject]@{
+        Spp       = ($sppEntries.Count -gt 0)
+        Storage   = ($storage.Count -gt 0)
+        Text      = "SPP\Clients cite C: : $($sppEntries.Count -gt 0) ; Win32_ShadowStorage pour C: : $storageText"
+    }
+}
+
+function Add-IndicatorLine {
+    param([string]$Label)
+    $i = Get-ProtectionIndicator
+    $verdict = 'désaccord'
+    if ($i.Spp -and $i.Storage) { $verdict = 'active' } elseif (-not $i.Spp -and -not $i.Storage) { $verdict = 'inactive' }
+    $lines.Add("| $Label | $($i.Spp) | $($i.Storage) | $verdict | $($i.Text) |")
+}
+
 function Invoke-Checkpoint {
     param([string]$Label)
     $before = Get-FreeGiB
@@ -92,6 +123,26 @@ try {
     }
     $lines.Add('- vssadmin avant : ' + ((& vssadmin.exe list shadowstorage 2>&1 | Out-String) -replace '\s+', ' ').Trim())
     $lines.Add('')
+
+    if ($Scenario -eq 'Indicators') {
+        # Les deux indicateurs dans chaque état : départ, protection activée, après un point, protection désactivée.
+        $lines.Add('| Étape | SPP\Clients | Win32_ShadowStorage | Verdict (concordance) | Détail |')
+        $lines.Add('|---|---|---|---|---|')
+        Add-IndicatorLine -Label 'départ (image du runner)'
+        if ($PSCmdlet.ShouldProcess('C:', 'Enable-ComputerRestore, point, Disable-ComputerRestore')) {
+            Enable-ComputerRestore -Drive "$env:SystemDrive\"
+            Add-IndicatorLine -Label 'après Enable-ComputerRestore'
+            Checkpoint-Computer -Description 'OffPatch essai indicateurs' -RestorePointType MODIFY_SETTINGS -WarningAction SilentlyContinue
+            Add-IndicatorLine -Label 'après Checkpoint-Computer (protection active)'
+            Disable-ComputerRestore -Drive "$env:SystemDrive\"
+            Add-IndicatorLine -Label 'après Disable-ComputerRestore'
+            Start-Sleep -Seconds 30
+            Add-IndicatorLine -Label 'après Disable-ComputerRestore, 30 s plus tard'
+        }
+        $lines.Add('')
+        $lines.Add('- Points à la fin : ' + ((Get-RestorePointList) -join ' ; '))
+        return
+    }
 
     if ($Scenario -eq 'Disabled') {
         # Protection désactivée d'abord (runner jetable) : que fait Checkpoint-Computer, et que voit-on ?
