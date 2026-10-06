@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "home2024",
+      "label": "Office Famille 2024",
+      "productId": "Home2024Retail",
+      "channel": "Current",
+      "source": "current",
+      "license": "retail",
+      "acceptsProductKey": false,
+      "excludeApps": [],
+      "supportedOn": {
+        "windows": ["win11"],
+        "source": "https://support.microsoft.com/en-us/office/system-requirements/office-suites-for-individuals-and-families"
+      }
+    },
+    {
+      "id": "homebusiness2024",
+      "label": "Office Famille et Petite Entreprise 2024",
+      "productId": "HomeBusiness2024Retail",
+      "channel": "Current",
+      "source": "current",
+      "license": "retail",
+      "acceptsProductKey": false,
+      "excludeApps": [],
+      "supportedOn": {
+        "windows": ["win11"],
+        "source": "https://support.microsoft.com/en-us/office/system-requirements/office-suites-for-individuals-and-families"
+      }
+    },
+    {
+      "id": "homestudent2021",
+      "label": "Office Famille et Étudiant 2021",
+      "productId": "HomeStudent2021Retail",
+      "channel": "Current",
+      "source": "current",
+      "license": "retail",
+      "acceptsProductKey": false,
+      "excludeApps": [],
+      "supportedOn": {
+        "windows": ["win11"],
+        "source": "https://support.microsoft.com/en-us/office/system-requirements/office-suites-for-individuals-and-families"
+      }
+    },
+    {
+      "id": "homebusiness2021",
+      "label": "Office Famille et Petite Entreprise 2021",
+      "productId": "HomeBusiness2021Retail",
+      "channel": "Current",
+      "source": "current",
+      "license": "retail",
+      "acceptsProductKey": false,
+      "excludeApps": [],
+      "supportedOn": {
+        "windows": ["win11"],
+        "source": "https://support.microsoft.com/en-us/office/system-requirements/office-suites-for-individuals-and-families"
+      }
+    },
+    {
+      "id": "ltsc2024-proplus",
+      "label": "Office LTSC Professionnel Plus 2024",
+      "productId": "ProPlus2024Volume",
+      "channel": "PerpetualVL2024",
+      "source": "perpetualvl2024",
+      "license": "volume",
+      "acceptsProductKey": true,
+      "excludeApps": [],
+      "supportedOn": {
+        "windows": ["win11"],
+        "source": "https://support.microsoft.com/en-us/office/system-requirements/office-suites-for-enterprise-business-education-and-government"
+      }
+    },
+    {
+      "id": "ltsc2024-std",
+      "label": "Office LTSC Standard 2024",
+      "productId": "Standard2024Volume",
+      "channel": "PerpetualVL2024",
+      "source": "perpetualvl2024",
+      "license": "volume",
+      "acceptsProductKey": true,
+      "excludeApps": [],
+      "supportedOn": {
+        "windows": ["win11"],
+        "source": "https://support.microsoft.com/en-us/office/system-requirements/office-suites-for-enterprise-business-education-and-government"
+      }
+    },
+    {
+      "id": "ltsc2021-proplus",
+      "label": "Office LTSC Professionnel Plus 2021",
+      "productId": "ProPlus2021Volume",
+      "channel": "PerpetualVL2021",
+      "source": "perpetualvl2021",
+      "license": "volume",
+      "acceptsProductKey": true,
+      "excludeApps": [],
+      "supportedOn": {
+        "windows": ["win11"],
+        "source": "https://support.microsoft.com/en-us/office/system-requirements/office-suites-for-enterprise-business-education-and-government"
+      }
+    },
+    {
+      "id": "ltsc2021-std",
+      "label": "Office LTSC Standard 2021",
+      "productId": "Standard2021Volume",
+      "channel": "PerpetualVL2021",
+      "source": "perpetualvl2021",
+      "license": "volume",
+      "acceptsProductKey": true,
+      "excludeApps": [],
+      "supportedOn": {
+        "windows": ["win11"],
+        "source": "https://support.microsoft.com/en-us/office/system-requirements/office-suites-for-enterprise-business-education-and-government"
+      }
+    }
+  ]
+}

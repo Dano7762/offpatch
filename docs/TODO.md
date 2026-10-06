@@ -7,9 +7,9 @@ Une phase ne commence que lorsque la précédente est terminée, sauf indication
 Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 
 - [x] R-01 Titres des cumulatives Windows dans le catalogue
-- [ ] R-02 Cumulatives checkpoint
+- [ ] R-02 Cumulatives checkpoint : ouvert, non bloquant pour la phase 1 ; déblocage : `r02-arm64` avec la cumulative d'octobre, après le Patch Tuesday du 13 octobre 2026
 - [x] R-03 Enablement package 26H2
-- [ ] R-04 Windows 10 22H2 et ESU
+- [ ] R-04 Windows 10 22H2 et ESU : ouvert, non bloquant pour la phase 1 ; déblocage : relevé `docs/essais/R-04-esu.md` sur un vrai PC Windows 10 22H2
 - [x] R-05 Cumulatives .NET Framework
 - [x] R-06 Définitions Defender
 - [x] R-07 ODT et sources Office
@@ -22,8 +22,8 @@ Aucun code dans `app/`. Scripts d'essai dans `scratch/`.
 - [x] R-14 Moteur d'installation des paquets
 - [x] R-15 Suspendre Windows Update pendant une session
 - [ ] Bilan de phase : reporter dans le cahier des charges ce qui change (avec mon accord) et compléter `config/` avec les valeurs établies
-  - [ ] Ajouter au cahier des charges une matrice de traçabilité (accord de David du 2026-10-04), une ligne par catégorie (`windows-lcu`, `windows-checkpoint`, `windows-ekb`, `windows-ssu`, `dotnet`, `defender-platform`, `defender`, `office-source`). Colonnes : cibles concernées, source (requête catalogue ou élément épinglé), règle de détection, dépendances (`prerequisites` / `runsAfter`), position dans le plan, scénarios de test qui la couvrent (P1 à P5, T1 à T8, workflows). Toute case vide est un point à traiter avant la phase 1.
-  - [ ] Examiner l'option « point de restauration avant session » (note de David du 2026-10-06, pas encore au cahier des charges) : `Checkpoint-Computer` avant la première étape ; contraintes : protection du système désactivée sur certains PC (pas de point possible sans l'activer), un seul point par 24 h par défaut (`SystemRestorePointCreationFrequency`), espace réservé sur C:.
+  - [x] Ajouter au cahier des charges une matrice de traçabilité (accord de David du 2026-10-04), une ligne par catégorie (`windows-lcu`, `windows-checkpoint`, `windows-ekb`, `windows-ssu`, `dotnet`, `defender-platform`, `defender`, `office-source`). Colonnes : cibles concernées, source (requête catalogue ou élément épinglé), règle de détection, dépendances (`prerequisites` / `runsAfter`), position dans le plan, scénarios de test qui la couvrent (P1 à P5, T1 à T8, workflows). Toute case vide est un point à traiter avant la phase 1.
+  - [x] Examiner l'option « point de restauration avant session » (note de David du 2026-10-06, pas encore au cahier des charges) : `Checkpoint-Computer` avant la première étape ; contraintes : protection du système désactivée sur certains PC (pas de point possible sans l'activer), un seul point par 24 h par défaut (`SystemRestorePointCreationFrequency`), espace réservé sur C:.
 
 ## Phase 1 : socle
 
@@ -147,3 +147,4 @@ Une ligne par session, la plus récente en bas.
 | 2026-10-06 | 0 | R-14 tranché, cahier des charges 1.17 : `dism.exe` par chemin complet, jugement en deux temps (liste DISM puis UBR après redémarrage), `NotApplicable` par le journal avec avertissement, contrôle bloquant du PowerShell 32 bits | R-15 |
 | 2026-10-06 | 0 | R-15 mesuré (`r15-windowsupdate`, ARM64) : arrêt simple de `wuauserv` relancé seul après 4 min 49 s, DISM indifférent à l'arrêt ; `IAutomaticUpdates::Pause` sans effet depuis Windows 10 ; pause par stratégie exclue (Famille non couverte, 35 jours) ; pause « Paramètres » sans méthode programmatique documentée | Accord de David sur la règle proposée (`pauseWindowsUpdateDuringSession` à `false`, arrêt simple avant chaque étape si activé, réseau coupé recommandé), puis bilan de phase 0 |
 | 2026-10-06 | 0 | R-15 tranché, cahier des charges 1.18 : option de suspension retirée, mode Avion recommandé et rappel en fin de session ; essai de deux DISM simultanés (le second attend, pas d'erreur), nouvelle tentative après 5 min sur 1618 / 0x80070652 ; contrôle en ligne local en échec passager du catalogue, repassé ensuite | Bilan de phase 0 |
+| 2026-10-06 | 0 | Politique de nouvelles tentatives (`Invoke-OpWebRequest`, `Invoke-OpHeadRequest`), `Get-OpCatalogDownloadLink`, contrat en ligne sur le code de production avec diagnostic et relance unique ; tests avant push hors `Live` ; `Invoke-OpProcess` au backlog ; bilan de phase 0 : R-02 et R-04 ouverts non bloquants, `catalog-queries.json` et `office/profiles.json` créés et contrôlés, tests de cohérence de `config/`, matrice de traçabilité (cahier des charges 1.19), `docs/BILAN-PHASE-0.md` | Décisions de David sur les points A à D du bilan, puis phase 1 |

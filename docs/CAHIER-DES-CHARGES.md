@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.18 du 6 octobre 2026.
+Version 1.19 du 6 octobre 2026.
 
 ## 1. Contexte
 
@@ -625,6 +625,19 @@ Tests réels, selon deux moyens :
 
 Les résultats sont notés dans le journal de `TODO.md`.
 
+Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case marquée **à traiter** est un point à régler avant la phase 1. Workflows cités : `depot-x64`, `r02-arm64`, `msu-inspect`, `r06-defender`, `r07-office`, `r07-install`, `r08-office`, `r10-integrity`, `r14-dism`, `catalog-contract`.
+
+| Catégorie | Cibles | Source | Détection (8.3) | Dépendances | Position dans le plan | Scénarios de test |
+|---|---|---|---|---|---|---|
+| `defender-platform` | Toutes | Catalogue, `catalog-queries.json` (KB4052623, Current Channel (Broad)) | Defender actif ou passif ; `AMProductVersion` ≥ `FileVersion` | Aucune (les définitions en dépendent par l'ordre) | Étape 1 | `r06-defender`, `r10-integrity`, `catalog-contract` ; T1, T6 ; planification : **à traiter** |
+| `defender` | Toutes | Lien Microsoft (go.microsoft.com, R-06) ; emplacement du lien dans `config/` : **à traiter** | Defender actif ou passif ; `AntivirusSignatureVersion` ≥ `FileVersion` ; désactivé : `NotApplicable` | `runsAfter` : `defender-platform` | Étape 1, après la plateforme | `r06-defender`, `r10-integrity`, `catalog-contract` ; T1, T6 ; planification : **à traiter** |
+| `windows-ssu` | `win10-x64` | Élément épinglé (KB5031539) | Build 19045 et UBR < `applyBelowUbr` (3271) | Prérequis bloquant de `windows-lcu` sur image ancienne | Étape 2, avant la cumulative | P5 ; `depot-x64` (liens directs), `r14-dism` (non applicable sur Windows 11) ; T4 |
+| `windows-checkpoint` | `win11-x64`, `win11-arm64` | Catalogue, jointe à l'entrée de la cumulative (R-02) | Build de base de la branche et UBR ≥ UBR de la checkpoint (1742) | Prérequis bloquant de `windows-lcu` | Étape 2, avant la cumulative (même dossier pour DISM) | P1 ; `r02-arm64`, `depot-x64` ; T1, T2 ; R-02 ouvert |
+| `windows-lcu` | Toutes | Catalogue, `catalog-queries.json`, UBR le plus élevé (R-01) ; Windows 10 : release-information | Build dans `baseBuilds` et UBR ≥ `resultingUbr` ; après DISM : liste DISM, puis UBR après redémarrage (8.4) | `prerequisites` : `windows-checkpoint` (Windows 11), `windows-ssu` (Windows 10 ancien) | Étape 2, puis redémarrage | P1 à P5 ; `depot-x64`, `r02-arm64` ; T1 à T4 |
+| `windows-ekb` | Windows 11 24H2 et 25H2 | Élément épinglé (KB5121794) | Build dans `appliesToBaseBuilds`, option active ; après redémarrage : build `resultingBuild` | Prérequis `minUbr` (9550, contrôlé par OffPatch seul) ; `runsAfter` : `windows-lcu` | Étape 3, après le redémarrage de la cumulative | P1 à P4, P6 ; `r02-arm64` (R-03), `r14-dism` ; T2 ; regroupement à valider sur intervention réelle |
+| `dotnet` | Toutes | Catalogue, `catalog-queries.json` (R-05) | Version du paquet lue dans le .msu, comparée à la liste DISM ; Windows 10 : fichier choisi par `Release` | Aucune | Étape 4 | `msu-inspect`, `r14-dism` ; T1, T4 ; planification : **à traiter** |
+| `office-source` | Toutes | ODT `/download` ; page de l'ODT (www.microsoft.com) ; emplacement du lien dans `config/` : **à traiter** | Registre Click-to-Run, version de `WINWORD.EXE`, langues comparées à la source | Aucune ; langue absente : `NotApplicable` | Étape 5 | `r07-office`, `r07-install`, `r08-office`, `r10-integrity` ; T1, T2, T6 ; planification : **à traiter** |
+
 ## 13. Critères d'acceptation de la v1
 
 - Mise à jour du dépôt en un clic, avec le résumé des nouveautés.
@@ -665,3 +678,4 @@ Les résultats sont notés dans le journal de `TODO.md`.
 - 1.16 (6 octobre 2026) : `allowedDomains` remplacé par les 8 noms d'hôte mesurés (retrait de `catalog.update.microsoft.com`, `download.windowsupdate.com` et `officecdn.microsoft.com`) ; règle du nom d'hôte exact, `https` seulement, lien `http` réécrit en `https` sur le même hôte, message de refus avec la ligne à ajouter (6.1) ; chaîne de redirections résolue et contrôlée avant le téléchargement de l'URL finale (7.1) ; limite de BITS et défense en profondeur, Authenticode restant la garantie principale (11). Suite de R-13.
 - 1.17 (6 octobre 2026) : exécuteur Windows par `%SystemRoot%\System32\dism.exe` (chemin complet, `/English /Online /Add-Package /NoRestart /LogPath`), `Add-WindowsPackage` écarté ; jugement d'une étape en deux temps (liste DISM juste après, UBR ou build après le redémarrage, sinon « non appliquée après redémarrage (retour arrière probable) ») ; `NotApplicable` reconnu par la ligne `CBS HRESULT=0x800f081e` du journal, avec avertissement « jugé applicable par le planificateur » (8.4) ; contrôle préalable bloquant d'un PowerShell 32 bits sur Windows 64 bits (8.2), lancement du PowerShell natif (8.1). Suite de R-14.
 - 1.18 (6 octobre 2026) : option `pauseWindowsUpdateDuringSession` retirée, avec le rétablissement de Windows Update en fin de session (6.1, 8.2, 8.6) ; PC connecté à un réseau : mode Avion recommandé, rappel dans le récapitulatif du mode auto (8.2, 8.6) ; PC hors ligne en fin de session : rappel de désactiver le mode Avion ou de rebrancher le réseau à l'écran de fin et dans le rapport (8.6, 8.8) ; DISM : code 1618 ou 0x80070652 (installation déjà en cours), attente de 5 minutes et une seule nouvelle tentative (8.4) ; suspension de Windows Update notée en évolution (14). Suite de R-15 et R-14.
+- 1.19 (6 octobre 2026) : matrice de traçabilité par catégorie (12), accord de David du 4 octobre 2026 ; les cases « à traiter » sont reprises dans `docs/BILAN-PHASE-0.md`. Bilan de phase 0.

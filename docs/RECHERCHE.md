@@ -74,7 +74,7 @@ Question : sur une installation récente de Windows 11 24H2, 25H2 ou 26H2, quell
 
 Impact : catégorie `windows-checkpoint`, ordre du plan, champ `prerequisites` du manifeste.
 
-- Statut : En cours (documentation dépouillée, essai sur runner GitHub : `docs/essais/R-02-checkpoint.md`, workflow `r02-arm64.yml`)
+- Statut : Ouvert, non bloquant pour la phase 1 (bilan de phase 0, 2026-10-06). Condition de déblocage : relancer `r02-arm64.yml` après le Patch Tuesday du 13 octobre 2026, avec la cumulative d'octobre, sur l'image du runner encore en 9457 ou 9550 (installation réelle de la cible et de ses checkpoints, sans préversion), puis noter les codes et l'état DISM. Documentation dépouillée, essai sur runner GitHub : `docs/essais/R-02-checkpoint.md`.
 - Sources (consultées le 2026-10-04) :
   - https://learn.microsoft.com/en-us/windows/deployment/update/catalog-checkpoint-cumulative-updates (« Checkpoint cumulative updates and Microsoft Update Catalog usage », mise à jour du 2025-01-31).
   - https://support.microsoft.com/help/5129195 (KB5129195), section « Microsoft Update Catalog » : tableau « Required checkpoint cumulative update » / « Target cumulative update », méthodes 1 et 2.
@@ -151,7 +151,7 @@ Question : les cumulatives ESU téléchargées depuis le catalogue s'installent-
 
 Impact : contrôle préalable Windows 10, comportement du mode auto.
 
-- Statut : Bloqué (documentation dépouillée ; deux points ne peuvent se trancher que sur un vrai PC Windows 10, aucun runner GitHub ne fournissant Windows 10 client. Relevé en lecture seule prêt : `docs/essais/R-04-esu.md`)
+- Statut : Ouvert, non bloquant pour la phase 1 (bilan de phase 0, 2026-10-06). Condition de déblocage : relevé en lecture seule `docs/essais/R-04-esu.md` sur un vrai PC Windows 10 22H2 (avec ESU si possible, sinon sans), aucun runner GitHub ne fournissant Windows 10 client. Documentation dépouillée ; deux points ne peuvent se trancher que sur ce relevé.
 - Sources (consultées le 2026-10-04) :
   - https://learn.microsoft.com/en-us/windows/whats-new/extended-security-updates (mise à jour du 2025-11-17) : programme ESU, Windows 10 22H2 seulement.
   - https://learn.microsoft.com/en-us/windows/whats-new/enable-extended-security-updates (mise à jour du 2026-04-22) : activation de l'ESU entreprise par MAK, identifiants d'activation, vérification par `slmgr.vbs /dlv`, activation par téléphone.

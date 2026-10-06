@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "monthsToSearch": 2,
+  "targets": {
+    "win11-x64": [
+      {
+        "category": "windows-lcu",
+        "searches": [
+          "{month} Cumulative Update for Windows 11, version 24H2",
+          "{month} Cumulative Update for Windows 11, version 25H2",
+          "{month} Cumulative Update for Windows 11, version 26H2"
+        ],
+        "includeTitlePattern": "^\\d{4}-\\d{2} Cumulative Update for Windows 11, version (24H2|25H2|26H2) for x64-based Systems \\(KB\\d+\\) \\(\\d+\\.\\d+\\)$",
+        "excludeTitlePattern": "Preview|Dynamic|Hotpatch|Server|\\.NET|26H1|arm64",
+        "pick": "highestUbr",
+        "prerequisites": ["windows-checkpoint"],
+        "runsAfter": []
+      },
+      {
+        "category": "dotnet",
+        "searches": [
+          "{month} Cumulative Update for .NET Framework Windows 11 version 24H2",
+          "{month} Cumulative Update for .NET Framework Windows 11 version 25H2",
+          "{month} Cumulative Update for .NET Framework Windows 11 version 26H2"
+        ],
+        "includeTitlePattern": "^\\d{4}-\\d{2} Cumulative Update for \\.NET Framework 3\\.5 and 4\\.8\\.1 for Windows 11, version (24H2|25H2|26H2) for x64 \\(KB\\d+\\)$",
+        "excludeTitlePattern": "Preview|Server|26H1",
+        "pick": "latest",
+        "prerequisites": [],
+        "runsAfter": []
+      },
+      {
+        "category": "defender-platform",
+        "searches": ["KB4052623"],
+        "includeTitlePattern": "^Update for Microsoft Defender Antivirus antimalware platform - KB4052623 \\(Version 4\\.18\\.\\d+\\.\\d+\\) - Current Channel \\(Broad\\)$",
+        "excludeTitlePattern": "Preview|Staged|Beta",
+        "pick": "highestVersion",
+        "fileNamePattern": "^updateplatform\\.amd64fre_[0-9a-f]{40}\\.exe$",
+        "prerequisites": [],
+        "runsAfter": []
+      }
+    ],
+    "win11-arm64": [
+      {
+        "category": "windows-lcu",
+        "searches": [
+          "{month} Cumulative Update for Windows 11, version 24H2",
+          "{month} Cumulative Update for Windows 11, version 25H2",
+          "{month} Cumulative Update for Windows 11, version 26H2"
+        ],
+        "includeTitlePattern": "^\\d{4}-\\d{2} Cumulative Update for Windows 11, version (24H2|25H2|26H2) for arm64-based Systems \\(KB\\d+\\) \\(\\d+\\.\\d+\\)$",
+        "excludeTitlePattern": "Preview|Dynamic|Hotpatch|Server|\\.NET|26H1|x64-based",
+        "pick": "highestUbr",
+        "prerequisites": ["windows-checkpoint"],
+        "runsAfter": []
+      },
+      {
+        "category": "dotnet",
+        "searches": [
+          "{month} Cumulative Update for .NET Framework Windows 11 version 24H2",
+          "{month} Cumulative Update for .NET Framework Windows 11 version 25H2",
+          "{month} Cumulative Update for .NET Framework Windows 11 version 26H2"
+        ],
+        "includeTitlePattern": "^\\d{4}-\\d{2} Cumulative Update for \\.NET Framework 3\\.5 and 4\\.8\\.1 for Windows 11, version (24H2|25H2|26H2) for arm64 \\(KB\\d+\\)$",
+        "excludeTitlePattern": "Preview|Server|26H1",
+        "pick": "latest",
+        "prerequisites": [],
+        "runsAfter": []
+      },
+      {
+        "category": "defender-platform",
+        "searches": ["KB4052623"],
+        "includeTitlePattern": "^Update for Microsoft Defender Antivirus antimalware platform - KB4052623 \\(Version 4\\.18\\.\\d+\\.\\d+\\) - Current Channel \\(Broad\\)$",
+        "excludeTitlePattern": "Preview|Staged|Beta",
+        "pick": "highestVersion",
+        "fileNamePattern": "^updateplatform\\.arm64fre_[0-9a-f]{40}\\.exe$",
+        "prerequisites": [],
+        "runsAfter": []
+      }
+    ],
+    "win10-x64": [
+      {
+        "category": "windows-lcu",
+        "searches": ["{month} Cumulative Update for Windows 10 Version 22H2"],
+        "includeTitlePattern": "^\\d{4}-\\d{2} Cumulative Update for Windows 10 Version 22H2 for x64-based Systems \\(KB\\d+\\)$",
+        "excludeTitlePattern": "Preview|Dynamic|Hotpatch|Server|\\.NET|21H2|x86|ARM64",
+        "pick": "highestUbrFromReleaseInformation",
+        "prerequisites": ["windows-ssu"],
+        "runsAfter": []
+      },
+      {
+        "category": "dotnet",
+        "searches": ["{month} Cumulative Update for .NET Framework Windows 10 Version 22H2"],
+        "includeTitlePattern": "^\\d{4}-\\d{2} Cumulative Update for \\.NET Framework 3\\.5, 4\\.8 and 4\\.8\\.1 for Windows 10 Version 22H2 for x64 \\(KB\\d+\\)$",
+        "excludeTitlePattern": "Preview|Server|21H2|ARM64",
+        "pick": "latest",
+        "prerequisites": [],
+        "runsAfter": []
+      },
+      {
+        "category": "defender-platform",
+        "searches": ["KB4052623"],
+        "includeTitlePattern": "^Update for Microsoft Defender Antivirus antimalware platform - KB4052623 \\(Version 4\\.18\\.\\d+\\.\\d+\\) - Current Channel \\(Broad\\)$",
+        "excludeTitlePattern": "Preview|Staged|Beta",
+        "pick": "highestVersion",
+        "fileNamePattern": "^updateplatform\\.amd64fre_[0-9a-f]{40}\\.exe$",
+        "prerequisites": [],
+        "runsAfter": []
+      }
+    ]
+  }
+}
