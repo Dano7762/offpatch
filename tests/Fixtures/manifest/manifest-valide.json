@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-14T09:12:00Z",
+  "toolVersion": "0.1.0",
+  "items": [
+    {
+      "id": "win11-x64-checkpoint-KB5043080",
+      "category": "windows-checkpoint",
+      "target": { "os": "win11", "arch": "x64", "minBuild": 26100, "maxBuild": 26399 },
+      "kb": "KB5043080",
+      "title": "2024-09 Cumulative Update for Windows 11 Version 24H2 for x64-based Systems (KB5043080)",
+      "releaseDate": "2024-09-10",
+      "order": 19,
+      "requiresReboot": true,
+      "prerequisites": [],
+      "runsAfter": [],
+      "files": [
+        {
+          "path": "files/1111111111111111111111111111111111111111111111111111111111111111/windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu",
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "size": 533761740
+        }
+      ],
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5043080"
+    },
+    {
+      "id": "win11-x64-lcu-KB5129195",
+      "category": "windows-lcu",
+      "target": { "os": "win11", "arch": "x64", "minBuild": 26100, "maxBuild": 26399 },
+      "kb": "KB5129195",
+      "title": "2026-09 Cumulative Update for Windows 11, version 25H2 for x64-based Systems (KB5129195) (26200.9457)",
+      "releaseDate": "2026-09-14",
+      "baseBuilds": [26100, 26200, 26300],
+      "resultingUbr": 9457,
+      "order": 20,
+      "requiresReboot": true,
+      "prerequisites": ["win11-x64-checkpoint-KB5043080"],
+      "runsAfter": [],
+      "files": [
+        {
+          "path": "files/2222222222222222222222222222222222222222222222222222222222222222/windows11.0-kb5129195-x64_ed361878ec2b56a7dfdb8f256565263a7fdc8eaa.msu",
+          "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "size": 4639422594,
+          "package": { "name": "Package_for_RollupFix", "version": "26100.9457.1.0" }
+        },
+        {
+          "path": "files/1111111111111111111111111111111111111111111111111111111111111111/windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu",
+          "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "size": 533761740
+        }
+      ],
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5129195"
+    },
+    {
+      "id": "win10-x64-dotnet-KB5126146",
+      "category": "dotnet",
+      "target": { "os": "win10", "arch": "x64", "minBuild": 19045, "maxBuild": 19045 },
+      "kb": "KB5126146",
+      "title": "2026-09 Cumulative Update for .NET Framework 3.5, 4.8 and 4.8.1 for Windows 10 Version 22H2 for x64 (KB5126146)",
+      "releaseDate": "2026-09-08",
+      "order": 40,
+      "requiresReboot": false,
+      "files": [
+        {
+          "path": "files/3333333333333333333333333333333333333333333333333333333333333333/windows10.0-kb5126046-x64-ndp48_28db9902cf368f5a674c016e0bd3f1d63ab8578d.msu",
+          "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "size": 81842924,
+          "netRelease": { "min": 528040, "max": 533319 }
+        },
+        {
+          "path": "files/4444444444444444444444444444444444444444444444444444444444444444/windows10.0-kb5126421-x64-ndp481_4b3c37c4b9070e458ca50ca2c012ee287c83deec.msu",
+          "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "size": 81247370,
+          "netRelease": { "min": 533320 }
+        }
+      ],
+      "sourceUrl": "https://www.catalog.update.microsoft.com/Search.aspx?q=KB5126146"
+    },
+    {
+      "id": "office-current-16.0.20430.20140",
+      "category": "office-source",
+      "channel": "Current",
+      "version": "16.0.20430.20140",
+      "languages": ["fr-fr", "en-us"],
+      "folder": "office/current",
+      "order": 50,
+      "requiresReboot": false,
+      "files": [
+        {
+          "path": "office/current/Office/Data/v64.cab",
+          "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "size": 1024
+        }
+      ]
+    }
+  ]
+}
