@@ -48,11 +48,12 @@ Describe 'OffPatch-Cli.ps1' {
         @(Get-ChildItem -Path (Join-Path $tool 'ProgramData\OffPatch\logs') -Filter 'session_*.log').Count | Should -Be 1
     }
 
-    It 'ouvre le journal du dépôt pour DepotUpdate -ListOnly' {
+    # DepotUpdate -ListOnly interroge le catalogue : testé sans réseau dans DepotPlan.Tests.ps1, et en ligne par le contrat.
+    It 'ouvre le journal du dépôt pour DepotUpdate et signale le téléchargement pas encore disponible' {
         $tool = Get-ToolCopy
-        $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'DepotUpdate', '-ListOnly')
+        $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'DepotUpdate')
         $r.ExitCode | Should -Be 2
-        $r.Output | Should -Match 'DepotUpdate \(-ListOnly\)'
+        $r.Output | Should -Match 'DepotUpdate \(t.l.chargement\) pas encore disponible'
         $log = @(Get-ChildItem -Path (Join-Path $tool 'logs') -Filter 'depot_*.log')
         $log.Count | Should -Be 1
         Get-Content -Path $log[0].FullName -Raw -Encoding UTF8 | Should -Match '\[INFO\] OffPatch, opération Depot'

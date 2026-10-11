@@ -4,9 +4,10 @@
     les tests.
 
 .DESCRIPTION
-    Squelette (phase 1) : charge le module, ouvre le journal, charge et valide la configuration, puis lance l'action
-    demandée. Les actions sont branchées au fil des phases ; une action pas encore disponible le dit et sort avec le
-    code 2. OffPatch installe uniquement des mises à jour : aucun paramètre de clé de produit, de profil ou de
+    Charge le module, ouvre le journal, charge et valide la configuration, puis lance l'action demandée. Les actions
+    sont branchées au fil des phases ; une action pas encore disponible le dit et sort avec le code 2. Disponible :
+    DepotUpdate -ListOnly (liste de ce qui serait téléchargé, liens contrôlés, espace libre ; code 1 si un lien est
+    refusé). OffPatch installe uniquement des mises à jour : aucun paramètre de clé de produit, de profil ou de
     retrait (cahier des charges 2, 3.3).
     Codes de sortie : 0 réussite, 1 erreur (configuration invalide, échec), 2 action pas encore disponible.
 
@@ -43,6 +44,21 @@ try {
 }
 
 switch ($Action) {
+    'DepotUpdate' {
+        if (-not $ListOnly) {
+            Write-Host 'OffPatch : action DepotUpdate (téléchargement) pas encore disponible ; utiliser -ListOnly.'
+            exit 2
+        }
+        try {
+            $result = Invoke-OpDepotUpdate -ListOnly -Root $context.Root
+            foreach ($line in Format-OpDepotPlan -Result $result) { Write-Host $line }
+        } catch {
+            Write-Host "OffPatch : $($_.Exception.Message)"
+            exit 1
+        }
+        if ($result.ErrorCount -gt 0) { exit 1 }
+        exit 0
+    }
     default {
         $detail = ''
         if ($Action -eq 'DepotUpdate' -and $ListOnly) { $detail = ' (-ListOnly)' }

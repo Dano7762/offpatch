@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.24 du 6 octobre 2026.
+Version 1.25 du 11 octobre 2026.
 
 ## 1. Contexte
 
@@ -180,7 +180,8 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
       "x64": "https://go.microsoft.com/fwlink/?LinkID=121721&arch=x64",
       "arm64": "https://go.microsoft.com/fwlink/?LinkID=121721&arch=arm64"
     },
-    "officeDeploymentToolPage": "https://www.microsoft.com/en-us/download/details.aspx?id=49117"
+    "officeDeploymentToolPage": "https://www.microsoft.com/en-us/download/details.aspx?id=49117",
+    "windows10ReleaseInformation": "https://learn.microsoft.com/en-us/windows/release-health/release-information"
   },
   "allowedDomains": [
     "www.catalog.update.microsoft.com",
@@ -195,7 +196,7 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
 }
 ```
 
-`downloadPages` regroupe les liens Microsoft hors catalogue : définitions Defender par architecture (redirection vers `definitionupdates.microsoft.com`, R-06) et page de l'Office Deployment Tool, d'où l'outil tire le lien versionné du fichier (`download.microsoft.com`, R-07). Les hôtes atteints restent soumis à `allowedDomains` ; le contrat en ligne hebdomadaire lit ces liens ici.
+`downloadPages` regroupe les liens Microsoft hors catalogue : définitions Defender par architecture (redirection vers `definitionupdates.microsoft.com`, R-06) et page de l'Office Deployment Tool, d'où l'outil tire le lien versionné du fichier (`download.microsoft.com`, R-07), page release-information de Windows 10, qui donne l'UBR de chaque cumulative Windows 10 pour la sélection (6.2, R-01). `windows10ReleaseInformation` est obligatoire dès qu'une entrée de `catalog-queries.json` utilise la règle `highestUbrFromReleaseInformation`. Les hôtes atteints restent soumis à `allowedDomains` ; le contrat en ligne hebdomadaire lit ces liens ici.
 
 Les valeurs chiffrées sont des valeurs de départ. `minFreeSpaceGB` (en Gio) vaut le pic d'espace consommé sur C: par l'installation d'une cumulative Windows 11 mesuré sur runner, sans redémarrage (10,7 Gio, le plus fort de trois essais), multiplié par 1,5 et arrondi au-dessus : la mesure est un minimum, puisque la phase de redémarrage n'est pas comptée (R-12). La liste `allowedDomains` contient les noms d'hôte réellement atteints, redirections comprises, mesurés en R-13. Règle : nom d'hôte exact, sans joker ni suffixe, `https` seulement. Un lien `http` renvoyé par une source (catalogue, redirection) est réécrit en `https` sur le même hôte ; rien n'est jamais téléchargé en `http`. Un hôte absent de la liste fait refuser le téléchargement, avec un message qui donne l'hôte, l'URL complète et la ligne exacte à ajouter à `allowedDomains`. Elle s'applique aux téléchargements faits par OffPatch lui-même (catalogue, mpam-fe.exe, plateforme Defender, éléments épinglés, ODT). Elle ne s'applique pas au trafic propre de l'ODT pendant `setup.exe /download`, qui contacte ses propres domaines (CDN Office, mais aussi par exemple `ecs.office.com` ou `mrodevicemgr.officeapps.live.com`) : OffPatch ne le contrôle pas, il se contente de le journaliser. L'interface modifie ce fichier quand je change les cibles dans l'onglet Dépôt ; les langues des sources Office sont dans `config/office/sources.json` (6.3).
 
@@ -231,9 +232,11 @@ Pour chaque cible et chaque catégorie : les recherches à envoyer au catalogue,
 - `{month}` est remplacé par le mois au format `AAAA-MM`, pour chacun des `monthsToSearch` derniers mois (2 : le mois courant et le précédent).
 - `pick`, règle de sélection parmi les titres retenus :
   - `highestUbr` (cumulatives Windows 11) : regroupement par KB, puis KB dont l'UBR, dernier nombre du titre, est le plus élevé ; une seule copie des fichiers par architecture, quelle que soit la version citée dans le titre (R-01) ;
-  - `highestUbrFromReleaseInformation` (cumulative Windows 10) : même règle, l'UBR étant tiré de la correspondance KB → build de la page release-information ; si aucun KB candidat n'y figure, repli sur `latestMonth`, avec un avertissement (R-01) ;
+  - `highestUbrFromReleaseInformation` (cumulative Windows 10) : même règle, l'UBR étant tiré de la correspondance KB → build de la page release-information (`downloadPages.windows10ReleaseInformation`, 6.1). La page est lue une fois par mise à jour du dépôt, ligne par ligne de ses tableaux (cellule de build `19045.<UBR>`, lien `KB<n>`), en ne gardant que la build de base donnée par le champ `releaseInformationBuild` de l'entrée (19045) : la page couvre aussi d'autres builds, dont 19044 (LTSC) avec les mêmes KB. Si aucun KB candidat n'y figure, ou si la page est inaccessible ou non reconnue, repli sur `latestMonth`, avec un avertissement, et l'UBR reste inconnu (R-01) ;
   - `latestMonth` (.NET) : tri sur le préfixe `AAAA-MM` du titre ; la date affichée par le catalogue ne sert qu'à départager deux entrées du même mois, avec un avertissement dans le journal (elle dépend de l'entrée : une entrée ajoutée plus tard pour une nouvelle version porte une date plus récente pour le même fichier, R-01) ;
   - `highestVersion` (plateforme Defender) : version la plus élevée citée dans le titre.
+- Toutes les règles regroupent d'abord les entrées retenues par KB (par KB et version pour `highestVersion`) : un même KB publié pour plusieurs versions de Windows devient un seul élément, dont `baseBuilds` réunit les builds des titres (Windows 11) ou vaut `releaseInformationBuild` (Windows 10). Deux KB à égalité sont départagés par la date du catalogue, avec un avertissement ; une catégorie sans aucune entrée retenue est signalée par un avertissement.
+- `releaseInformationBuild` (obligatoire avec `highestUbrFromReleaseInformation`) : build de base lue sur la page release-information.
 - `fileNamePattern` (facultatif) : choix du fichier d'une entrée qui en contient plusieurs, par exemple l'exécutable de la plateforme Defender pour l'architecture de la cible.
 
 Quand Microsoft change la formulation d'un titre, on corrige ce fichier sans toucher au code.
@@ -325,6 +328,14 @@ Ensuite :
 - Écrire le manifeste de façon atomique, appliquer la purge, afficher un résumé des nouveautés du mois.
 
 L'option `-ListOnly` fait tout sauf les téléchargements : elle affiche ce qui serait récupéré. Un téléchargement interrompu peut être relancé sans tout reprendre.
+
+Règles de la liste (étapes 2 à 4, communes à `-ListOnly` et au téléchargement) :
+
+- Fichiers d'une entrée du catalogue : `fileNamePattern` choisit le fichier quand il est défini. Quand un fichier porte le KB retenu (`kb<numéro>` dans son nom), les autres fichiers de l'entrée sont des prérequis joints et forment un élément `windows-checkpoint` de la même cible, identifié par le KB lu dans leur nom (R-02, aucun numéro en dur). Quand aucun fichier ne porte le KB retenu (cumulative .NET Windows 10, deux fichiers `ndp48` et `ndp481`), tous les fichiers restent dans l'élément.
+- Éléments épinglés : ceux dont l'identifiant commence par le nom de la cible ; l'enablement package seulement si `windows.includeEnablementPackage` est vrai.
+- Identifiants des éléments : `<cible>-<catégorie sans « windows- »>-<KB>` (`win11-x64-lcu-KB…`, `win11-x64-checkpoint-KB…`, `win10-x64-dotnet-KB…`) ; pour la plateforme Defender, dont le KB ne change pas, la version remplace le KB (`win11-x64-defender-platform-4.18.…`) ; un élément épinglé garde son identifiant de `pinned-items.json`.
+- Un fichier est déjà au dépôt quand le manifeste contient un fichier du même nom, ce nom portant le SHA-1 publié par Microsoft ; il n'est alors ni résolu ni retéléchargé.
+- Les autres liens sont résolus par requêtes HEAD (6.1) ; la taille annoncée par le serveur final (`Content-Length`) sert au calcul de l'espace. Un fichier partagé par plusieurs éléments (plateforme Defender commune à `win11-x64` et `win10-x64`) n'est compté qu'une fois. Un lien refusé ou inaccessible est signalé sur sa ligne sans arrêter la liste ; la CLI sort alors avec le code 1.
 
 ### 7.2 Manifeste
 
@@ -720,3 +731,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.22 (6 octobre 2026) : clé de produit : forme contrôlée avant l'ODT (alphabet `BCDFGHJKMPQRTVWXY2346789`, saisie refusée sinon dans l'interface et la CLI), rapport « clé enregistrée, activation non vérifiée, à réaliser en ligne » ; l'ODT écrit la clé en clair dans son journal principal (UTF-16, TEMP de l'utilisateur) et ignore `<Logging Path>` : journaux de l'ODT masqués sur place dans leur encodage d'origine dès la fin de l'étape, avant toute copie, dans un bloc `finally` (tous les chemins de sortie de l'étape) (8.5, 11). Suite de R-08.
 - 1.23 (6 octobre 2026) : recentrage sur les mises à jour (décision de David). OffPatch n'installe jamais Windows ni Office, ne gère aucune clé de produit et ne retire aucun produit (2, 3.3, 3.4). Office : mise à jour de l'Office Click-to-Run déjà installé depuis la source locale de son canal, sinon `NotApplicable` « aucun Office Click-to-Run » ; canal lu dans le registre Click-to-Run (`CDNBaseUrl`, identifiants mesurés sur runner) (8.3, 8.5). Retirés : profils d'installation (`profiles.json` remplacé par `config/office/sources.json`, sources par canal et par langue, avec les identifiants de canal installé ; langues sorties de `settings.json`), saisie et contrôle de la clé, PIDKEY et masquage des journaux de l'ODT, `<Remove>` et `<RemoveMSI />`, messages d'activation, avertissement Office sous Windows 10, choix d'édition dans l'interface et le récapitulatif (6.1, 6.3, 8.2, 8.5, 8.6, 8.8, 9, 11). Conservés : sources par canal et par langue, purge selon `v64.cab`, mise à jour par `setup.exe /configure` depuis la source locale, règle « langue absente de la source », vérification de la source avant l'ODT, délai de 30 min, version lue sur `WINWORD.EXE`, masquage générique de `Write-OpLog`. Modèle `update.xml.template` (6.3) ; tests T1, T2, T6 revus et cas P11, P12 (12) ; matrice de traçabilité (ligne `office-source`) mise à jour ; Office reste la dernière étape du plan. Licence conservée par la mise à jour : à valider sur intervention réelle. Suite de R-08.
 - 1.24 (6 octobre 2026) : Office 2016 et 2019 (boîte et LTSC) détectés et non mis à jour, `NotApplicable` « Office 2016/2019 : fin de support Microsoft (octobre 2025) », recommandation au rapport de passer à une version prise en charge ; règle contrôlée avant celle du canal (Office 2019 en boîte partage l'identifiant du canal Current) ; motif de reconnaissance dans `config/office/sources.json` (`endOfSupport`), Office 2016 à établir sur intervention réelle (3.3, 8.3, 8.5, 8.8) ; cas P13 et matrice de traçabilité (12). Licence conservée par la mise à jour, mesurée sur runner avec la GVLK publiée par Microsoft (mêmes 5 derniers caractères de clé avant et après) (3.3). Suite de R-08.
+- 1.25 (11 octobre 2026) : mise en œuvre de la sélection dans le catalogue (phase 2). `downloadPages.windows10ReleaseInformation` dans `settings.json`, obligatoire avec la règle `highestUbrFromReleaseInformation` (6.1) ; champ `releaseInformationBuild` de l'entrée Windows 10, lecture de la page release-information par ligne de tableau filtrée sur la build de base, repli sur `latestMonth` aussi quand la page est inaccessible, regroupement par KB commun à toutes les règles, avertissements en cas d'égalité ou d'absence de résultat (6.2) ; règles de la liste de mise à jour du dépôt et de `-ListOnly` : prérequis joints, éléments épinglés par cible, identifiants des éléments, fichier déjà au dépôt reconnu par son nom, taille lue en HEAD, liens refusés (7.1). Suite de R-01 et R-02.

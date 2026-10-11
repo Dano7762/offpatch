@@ -10,7 +10,8 @@
           - l'hôte de chaque étape doit figurer tel quel dans AllowedDomain (nom exact, sans joker ni suffixe) ;
           - au-delà de MaxRedirects redirections, ou sur un code final autre que 2xx, la résolution échoue.
         Hôte inconnu : erreur qui donne l'hôte, l'URL complète et la ligne exacte à ajouter à allowedDomains.
-        Renvoie l'URL finale, à télécharger telle quelle, et la liste des hôtes traversés.
+        Renvoie l'URL finale, à télécharger telle quelle, la liste des hôtes traversés et la taille annoncée par
+        le serveur final (Content-Length, $null si absente).
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -48,9 +49,12 @@
         if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
             throw "Lien inaccessible (HTTP $($response.StatusCode)) : $($uri.AbsoluteUri)"
         }
+        $size = $null
+        if ($null -ne $response.PSObject.Properties['ContentLength']) { $size = $response.ContentLength }
         return [pscustomobject]@{
-            Url   = $uri.AbsoluteUri
-            Hosts = $hosts.ToArray()
+            Url       = $uri.AbsoluteUri
+            Hosts     = $hosts.ToArray()
+            SizeBytes = $size
         }
     }
     throw "Plus de $MaxRedirects redirections à partir de $Url : lien refusé."

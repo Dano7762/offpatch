@@ -77,11 +77,13 @@
             $ubrs = @($members | Where-Object { $null -ne $_.Ubr } | ForEach-Object { $_.Ubr } | Sort-Object -Unique)
             if ($ubrs.Count -gt 1) { $warnings.Add("$label : $($members[0].Kb) cité avec plusieurs UBR ($($ubrs -join ', ')) ; le plus élevé est retenu.") }
             $dates = @($members | Where-Object { $_.Item.LastUpdated } | ForEach-Object { $_.Item.LastUpdated } | Sort-Object -Descending)
+            # Titres sans mois (plateforme Defender) : liste vide, jamais indexée sous StrictMode.
+            $groupMonths = @($members | Where-Object { $null -ne $_.Month } | ForEach-Object { $_.Month } | Sort-Object -Descending)
             [pscustomobject]@{
                 Kb          = $members[0].Kb
                 Members     = @($members | Sort-Object -Property { $_.Item.Title })
                 Ubr         = $(if ($ubrs.Count -gt 0) { $ubrs[-1] } else { $null })
-                Month       = @($members | ForEach-Object { $_.Month } | Sort-Object -Descending)[0]
+                Month       = $(if ($groupMonths.Count -gt 0) { $groupMonths[0] } else { $null })
                 Version     = $members[0].Version
                 LastUpdated = $(if ($dates.Count -gt 0) { $dates[0] } else { $null })
             }

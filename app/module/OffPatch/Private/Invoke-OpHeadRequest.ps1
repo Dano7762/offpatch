@@ -42,9 +42,13 @@
                 Start-Sleep -Seconds ($DelaySeconds * $attempt)
                 continue
             }
+            # Taille annoncée par le serveur (Content-Length), $null si absente.
+            $length = $null
+            if ($response.ContentLength -ge 0) { $length = [int64]$response.ContentLength }
             return [pscustomobject]@{
-                StatusCode = $statusCode
-                Location   = $response.Headers['Location']
+                StatusCode    = $statusCode
+                Location      = $response.Headers['Location']
+                ContentLength = $length
             }
         } finally {
             if ($response) { $response.Close() }

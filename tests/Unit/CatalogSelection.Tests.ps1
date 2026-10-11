@@ -5,6 +5,8 @@
 param()
 
 BeforeAll {
+    # Comme dans le module (OffPatch.psm1) : un accès hors limites ou à une propriété absente doit échouer ici aussi.
+    Set-StrictMode -Version Latest
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     foreach ($name in 'ConvertFrom-OpCatalogSearchPage', 'ConvertFrom-OpReleaseInformationPage', 'Get-OpWindows10ReleaseInfo', 'Invoke-OpWebRequest',
         'Find-OpCatalogUpdate', 'Select-OpCatalogUpdate', 'Get-OpCatalogSelection', 'Write-OpLog', 'ConvertTo-OpMaskedText') {
