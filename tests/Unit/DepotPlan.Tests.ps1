@@ -11,7 +11,7 @@ BeforeAll {
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $module = Join-Path $root 'app\module\OffPatch'
     foreach ($name in 'ConvertFrom-OpCatalogDownloadDialog', 'Get-OpCatalogDownloadLink', 'Invoke-OpWebRequest', 'Get-OpCatalogSelection', 'Resolve-OpDownloadUrl',
-        'Get-OpDepotPlan', 'Get-OpFreeSpace', 'Write-OpLog', 'ConvertTo-OpMaskedText', 'Get-OpConfiguration', 'Read-OpJsonFile',
+        'Get-OpDepotPlan', 'Get-OpDefenderDefinitionPlan', 'Get-OpFileVersion', 'Get-OpFreeSpace', 'Write-OpLog', 'ConvertTo-OpMaskedText', 'Get-OpConfiguration', 'Read-OpJsonFile',
         'Test-OpConfiguration', 'Get-OpPath', 'Get-OpRoot', 'Read-OpManifest', 'Test-OpManifest') {
         . (Join-Path $module "Private\$name.ps1")
     }
@@ -46,6 +46,15 @@ Describe 'Get-OpDepotPlan' {
     BeforeAll {
         Mock Write-OpLog {}
         Mock Resolve-OpDownloadUrl { [pscustomobject]@{ Url = $Url; Hosts = @(([uri]$Url).Host); SizeBytes = [int64]1000 } }
+        # Définitions Defender : testées à part (Describe Get-OpDefenderDefinitionPlan).
+        Mock Get-OpDefenderDefinitionPlan {}
+    }
+
+    It 'ajoute les définitions Defender de chaque cible' {
+        Mock Get-OpCatalogSelection {}
+        Mock Get-OpDefenderDefinitionPlan { [pscustomobject]@{ Id = "$Target-defender"; Category = 'defender' } }
+        $plan = @(Get-OpDepotPlan -Configuration (Get-Configuration @('win11-x64', 'win11-arm64') $false) -Manifest $emptyManifest)
+        ($plan | ForEach-Object { $_.Id }) | Should -Be @('win11-x64-defender', 'win11-arm64-defender')
     }
 
     Context 'Cumulative Windows 11 et sa checkpoint jointe (fenêtre réelle de KB5129195)' {
@@ -147,6 +156,76 @@ Describe 'Get-OpDepotPlan' {
     }
 }
 
+Describe 'Get-OpDefenderDefinitionPlan' {
+    BeforeAll {
+        Mock Write-OpLog {}
+        # Forme de l'URL finale relevée en R-06.
+        function Get-FinalUrl([string]$Arch, [string]$Version = '1.459.553.0') {
+            "https://definitionupdates.microsoft.com/packages/content/mpam-fe.exe?packageType=Signatures&packageVersion=$Version&arch=$Arch&engineVersion=1.1.26080.3"
+        }
+    }
+
+    It 'résout le lien de l''architecture et lit la version dans l''URL finale' {
+        Mock Resolve-OpDownloadUrl { [pscustomobject]@{ Url = (Get-FinalUrl 'arm64'); Hosts = @('go.microsoft.com', 'definitionupdates.microsoft.com'); SizeBytes = [int64]222341064 } }
+        $c = Get-Configuration @('win11-arm64')
+        $item = Get-OpDefenderDefinitionPlan -Configuration $c -Manifest $emptyManifest -Target 'win11-arm64'
+        $item.Id | Should -Be 'win11-arm64-defender-1.459.553.0'
+        $item.Category | Should -Be 'defender'
+        $item.Version | Should -Be ([version]'1.459.553.0')
+        $item.RunsAfter | Should -Be @('defender-platform')
+        $item.Files[0].FileName | Should -Be 'mpam-fe.exe'
+        $item.Files[0].SizeBytes | Should -Be 222341064
+        $item.Files[0].InDepot | Should -BeFalse
+        $item.Files[0].Error | Should -BeNullOrEmpty
+        Should -Invoke Resolve-OpDownloadUrl -Times 1 -Exactly -ParameterFilter { $Url -eq $c.Settings.downloadPages.defenderDefinitions.arm64 }
+    }
+
+    It 'reconnaît une version déjà au dépôt pour la même architecture seulement' {
+        Mock Resolve-OpDownloadUrl { [pscustomobject]@{ Url = (Get-FinalUrl 'amd64'); Hosts = @('definitionupdates.microsoft.com'); SizeBytes = [int64]1 } }
+        $manifest = [pscustomobject]@{ schemaVersion = 1; items = @(
+                [pscustomobject]@{ id = 'a'; category = 'defender'; version = '1.459.553.0'; target = [pscustomobject]@{ os = 'win11'; arch = 'arm64' } }
+                [pscustomobject]@{ id = 'b'; category = 'defender'; version = '1.459.400.0'; target = [pscustomobject]@{ os = 'win11'; arch = 'x64' } }
+            ) }
+        (Get-OpDefenderDefinitionPlan -Configuration (Get-Configuration @('win11-x64')) -Manifest $manifest -Target 'win11-x64').Files[0].InDepot | Should -BeFalse
+        $manifest.items[1].version = '1.459.553.0'
+        (Get-OpDefenderDefinitionPlan -Configuration (Get-Configuration @('win11-x64')) -Manifest $manifest -Target 'win11-x64').Files[0].InDepot | Should -BeTrue
+    }
+
+    It 'porte l''erreur quand le lien est refusé' {
+        Mock Resolve-OpDownloadUrl { throw 'Hôte non autorisé : exemple.net.' }
+        $item = Get-OpDefenderDefinitionPlan -Configuration (Get-Configuration @('win10-x64')) -Manifest $emptyManifest -Target 'win10-x64'
+        $item.Id | Should -Be 'win10-x64-defender'
+        $item.Files[0].Error | Should -BeLike '*Hôte non autorisé*'
+    }
+
+    It 'porte l''erreur quand l''URL finale ne donne pas la version' {
+        Mock Resolve-OpDownloadUrl { [pscustomobject]@{ Url = 'https://definitionupdates.microsoft.com/packages/content/mpam-fe.exe?arch=amd64'; Hosts = @(); SizeBytes = $null } }
+        (Get-OpDefenderDefinitionPlan -Configuration (Get-Configuration @('win11-x64')) -Manifest $emptyManifest -Target 'win11-x64').Files[0].Error |
+            Should -BeLike 'Version des définitions absente*'
+    }
+
+    It 'porte l''erreur quand l''URL finale désigne une autre architecture' {
+        Mock Resolve-OpDownloadUrl { [pscustomobject]@{ Url = (Get-FinalUrl 'amd64'); Hosts = @(); SizeBytes = $null } }
+        (Get-OpDefenderDefinitionPlan -Configuration (Get-Configuration @('win11-arm64')) -Manifest $emptyManifest -Target 'win11-arm64').Files[0].Error |
+            Should -BeLike '*architecture arm64*'
+    }
+}
+
+Describe 'Get-OpFileVersion' {
+    It 'lit la version d''un exécutable du système' {
+        $exe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $v = Get-OpFileVersion -Path $exe
+        $v | Should -BeOfType [version]
+        $v.Major | Should -Be (Get-Item -LiteralPath $exe).VersionInfo.FileMajorPart
+    }
+
+    It 'renvoie $null pour un fichier sans version' {
+        $file = Join-Path $TestDrive 'sans-version.exe'
+        [System.IO.File]::WriteAllBytes($file, [byte[]](1..16))
+        Get-OpFileVersion -Path $file | Should -BeNullOrEmpty
+    }
+}
+
 Describe 'Invoke-OpDepotUpdate' {
     BeforeAll {
         Mock Write-OpLog {}
@@ -154,8 +233,8 @@ Describe 'Invoke-OpDepotUpdate' {
         New-Item -ItemType Directory -Force -Path $tool | Out-Null
         Copy-Item -Path (Join-Path $root 'config') -Destination $tool -Recurse
         Copy-Item -Path (Join-Path $root 'offpatch.root') -Destination $tool
-        function Get-PlanFile([string]$Name, [object]$Size, [bool]$InDepot = $false, [string]$Failure = $null) {
-            [pscustomobject]@{ FileName = $Name; Url = "https://h/$Name"; Sha1 = $null; SizeBytes = $Size; Hosts = @('h'); InDepot = $InDepot; Error = $Failure }
+        function Get-PlanFile([string]$Name, [object]$Size, [bool]$InDepot = $false, [string]$Failure = $null, [string]$Url = "https://h/$Name") {
+            [pscustomobject]@{ FileName = $Name; Url = $Url; Sha1 = $null; SizeBytes = $Size; Hosts = @('h'); InDepot = $InDepot; Error = $Failure }
         }
         function Get-PlanItem([string]$Id, [object[]]$Files) {
             [pscustomobject]@{ Id = $Id; Target = 'win11-x64'; Category = 'windows-lcu'; Kb = 'KB1'; ResultingUbr = 1; Version = $null; Files = $Files; Warnings = @() }
@@ -184,6 +263,18 @@ Describe 'Invoke-OpDepotUpdate' {
             $r.ErrorCount | Should -Be 1
             $r.EnoughSpace | Should -BeTrue
             @($r.Items).Count | Should -Be 3
+        }
+
+        It 'compte deux fois un même nom servi par deux liens (mpam-fe.exe x64 et ARM64)' {
+            Mock Get-OpFreeSpace { [long]1000000 }
+            Mock Get-OpDepotPlan {
+                Get-PlanItem 'x64' @(Get-PlanFile 'mpam-fe.exe' 200 $false $null 'https://h/mpam-fe.exe?arch=amd64')
+                Get-PlanItem 'arm64' @(Get-PlanFile 'mpam-fe.exe' 300 $false $null 'https://h/mpam-fe.exe?arch=arm64')
+                Get-PlanItem 'x64-bis' @(Get-PlanFile 'mpam-fe.exe' 200 $false $null 'https://h/mpam-fe.exe?arch=amd64')
+            }
+            $r = Invoke-OpDepotUpdate -ListOnly -Root $tool
+            $r.DownloadCount | Should -Be 2
+            $r.DownloadBytes | Should -Be 500
         }
 
         It 'signale un espace insuffisant' {
@@ -244,5 +335,16 @@ Describe 'Format-OpDepotPlan' {
         $text | Should -Match 'Avertissement : à vérifier'
         $text | Should -Match 'il manque 3,00 Go'
         $text | Should -Match 'Aucun fichier téléchargé'
+    }
+
+    It 'affiche la version des définitions Defender, élément sans KB' {
+        $result = [pscustomobject]@{
+            Items = @([pscustomobject]@{
+                    Id = 'win11-x64-defender-1.459.553.0'; Target = 'win11-x64'; Category = 'defender'; Kb = $null; ResultingUbr = $null; Version = [version]'1.459.553.0'; Warnings = @()
+                    Files = @([pscustomobject]@{ FileName = 'mpam-fe.exe'; SizeBytes = [long]222853576; InDepot = $false; Error = $null })
+                })
+            DownloadBytes = [long]222853576; DownloadCount = 1; UnknownSizeCount = 0; FreeBytes = $null; EnoughSpace = $null; ErrorCount = 0
+        }
+        (Format-OpDepotPlan -Result $result) -join "`n" | Should -Match '\[à télécharger\] defender \(version 1\.459\.553\.0\) : mpam-fe\.exe, 212,5 Mo'
     }
 }

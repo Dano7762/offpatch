@@ -10,7 +10,8 @@
             défini ; quand un fichier porte le KB retenu, les autres fichiers de l'entrée sont ses prérequis joints
             (cumulative checkpoint, R-02) et deviennent un élément de la catégorie windows-checkpoint ;
           - éléments épinglés de pinned-items.json dont l'identifiant commence par la cible (l'enablement package
-            seulement si windows.includeEnablementPackage est vrai).
+            seulement si windows.includeEnablementPackage est vrai) ;
+          - définitions Defender (mpam-fe.exe) de l'architecture de la cible, par Get-OpDefenderDefinitionPlan.
         Un fichier est « au dépôt » quand le manifeste contient déjà un fichier du même nom : le nom porte le SHA-1
         publié par Microsoft. Les autres liens sont résolus par Resolve-OpDownloadUrl (requêtes HEAD, hôtes contrôlés
         par allowedDomains, taille annoncée), un lien par URL. Un lien refusé ou inaccessible n'arrête pas la liste :
@@ -143,5 +144,7 @@
             if ($null -ne $pinned.PSObject.Properties['runsAfter']) { $item.RunsAfter = @($pinned.runsAfter) }
             $item
         }
+
+        Get-OpDefenderDefinitionPlan -Configuration $Configuration -Manifest $Manifest -Target $target
     }
 }

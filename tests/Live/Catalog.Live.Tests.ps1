@@ -11,7 +11,7 @@ BeforeAll {
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     foreach ($name in 'ConvertFrom-OpCatalogSearchPage', 'ConvertFrom-OpCatalogDownloadDialog', 'Invoke-OpWebRequest', 'Find-OpCatalogUpdate',
         'Get-OpCatalogDownloadLink', 'Invoke-OpHeadRequest', 'Resolve-OpDownloadUrl', 'ConvertFrom-OpReleaseInformationPage',
-        'Get-OpWindows10ReleaseInfo', 'Select-OpCatalogUpdate', 'Get-OpCatalogSelection', 'Write-OpLog', 'ConvertTo-OpMaskedText') {
+        'Get-OpWindows10ReleaseInfo', 'Select-OpCatalogUpdate', 'Get-OpCatalogSelection', 'Get-OpDefenderDefinitionPlan', 'Write-OpLog', 'ConvertTo-OpMaskedText') {
         . (Join-Path $root "app\module\OffPatch\Private\$name.ps1")
     }
     $settings = Get-Content -Path (Join-Path $root 'config\settings.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -92,6 +92,26 @@ Describe 'Hôtes des téléchargements du moment' -Tag 'Live' {
             $failures | Should -BeNullOrEmpty
         } catch {
             Save-LiveDiagnostic -Test 'hôtes des liens' -Message $_.Exception.Message
+            throw
+        }
+    }
+}
+
+# Définitions Defender (R-06) : l'URL finale du lien officiel doit toujours porter la version (packageVersion) et
+# l'architecture (arch), seul moyen de savoir si le dépôt est à jour sans télécharger mpam-fe.exe.
+Describe 'Version des définitions Defender' -Tag 'Live' {
+    It 'le lien de chaque architecture donne la version dans son URL finale' {
+        try {
+            $configuration = [pscustomobject]@{ Settings = $settings }
+            $empty = [pscustomobject]@{ schemaVersion = 1; items = @() }
+            foreach ($arch in $settings.downloadPages.defenderDefinitions.PSObject.Properties.Name) {
+                $item = Get-OpDefenderDefinitionPlan -Configuration $configuration -Manifest $empty -Target "win11-$arch"
+                Write-Host ('{0} : version {1}, {2} octets' -f $arch, $item.Version, $item.Files[0].SizeBytes)
+                $item.Files[0].Error | Should -BeNullOrEmpty
+                $item.Version | Should -Not -BeNullOrEmpty
+            }
+        } catch {
+            Save-LiveDiagnostic -Test 'version des définitions Defender' -Message $_.Exception.Message
             throw
         }
     }

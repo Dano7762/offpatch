@@ -47,7 +47,8 @@
         throw
     }
 
-    # Fichiers à télécharger, comptés une fois (une checkpoint peut être jointe à plusieurs éléments).
+    # Fichiers à télécharger, comptés une fois (une checkpoint jointe à plusieurs éléments, mpam-fe.exe x64 commun à
+    # win11-x64 et win10-x64).
     $seen = @{}
     $bytes = [long]0
     $unknown = 0
@@ -64,8 +65,9 @@
                 continue
             }
             Write-OpLog "Dépôt, $($item.Id) : $($f.FileName) à télécharger ($(@($f.Hosts) -join ' -> '))."
-            if ($seen.ContainsKey($f.FileName.ToLowerInvariant())) { continue }
-            $seen[$f.FileName.ToLowerInvariant()] = $true
+            # Repère : l'URL finale, pas le nom (mpam-fe.exe porte le même nom pour x64 et ARM64).
+            if ($seen.ContainsKey($f.Url)) { continue }
+            $seen[$f.Url] = $true
             if ($null -eq $f.SizeBytes) { $unknown++ } else { $bytes += $f.SizeBytes }
         }
     }

@@ -31,9 +31,11 @@
     foreach ($group in @($Result.Items | Group-Object -Property Target)) {
         "Cible $($group.Name)"
         foreach ($item in $group.Group) {
-            $detail = $item.Kb
-            if ($null -ne $item.ResultingUbr) { $detail += ", UBR $($item.ResultingUbr)" }
-            if ($null -ne $item.Version) { $detail += ", version $($item.Version)" }
+            $parts = @()
+            if ($item.Kb) { $parts += $item.Kb }
+            if ($null -ne $item.ResultingUbr) { $parts += "UBR $($item.ResultingUbr)" }
+            if ($null -ne $item.Version) { $parts += "version $($item.Version)" }
+            $detail = $parts -join ', '
             foreach ($f in $item.Files) {
                 $state = 'à télécharger'
                 if ($f.Error) { $state = 'REFUSÉ' } elseif ($f.InDepot) { $state = 'au dépôt' }
@@ -54,5 +56,5 @@
         if ($Result.EnoughSpace -eq $false) { 'Espace insuffisant : il manque ' + (Format-Size ($Result.DownloadBytes - $Result.FreeBytes)) + ', la mise à jour s''arrêterait avant tout téléchargement.' }
     }
     if ($Result.ErrorCount -gt 0) { "$($Result.ErrorCount) lien(s) refusé(s) ou inaccessible(s) : voir ci-dessus." }
-    'Aucun fichier téléchargé (-ListOnly). Définitions Defender (mpam-fe.exe) et sources Office : pas encore prises en charge.'
+    'Aucun fichier téléchargé (-ListOnly). Sources Office : pas encore prises en charge.'
 }
