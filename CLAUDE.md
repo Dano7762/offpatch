@@ -18,7 +18,7 @@ Réponds-moi en français.
 ## Règles de sécurité (non négociables)
 
 - Ne jamais exécuter sur la machine de développement une opération qui modifie le système : DISM en ligne, wusa, mpam-fe.exe, `setup.exe /configure`, création de tâche planifiée, écriture dans HKLM, redémarrage. Ces chemins de code se testent avec des mocks Pester.
-- Les tests réels passent par GitHub Actions, sur le dépôt privé `Dano7762/offpatch`, dans ces limites strictes :
+- Les tests réels passent par GitHub Actions, sur le dépôt `Dano7762/offpatch` (public depuis le 2026-10-06 : tout ce qui est poussé est visible de tous), dans ces limites strictes :
   - les opérations qui modifient le système ne sont autorisées que dans des jobs sur runners hébergés par GitHub (jetables) ; jamais sur un runner auto-hébergé, jamais sur ma machine ;
   - les workflows lourds (téléchargement de cumulatives, installation) se déclenchent uniquement à la main (`workflow_dispatch`) ; seul `ci.yml` (analyse statique et tests, sans accès réseau) tourne à chaque push ; `catalog-contract.yml` (contrat en ligne avec le catalogue, lecture seule) tourne chaque mercredi et à la demande ;
   - aucun secret ni clé de produit dans les workflows, les scripts de `tests/runner/` ou les artefacts. Seule exception (décision de David du 2026-10-06) : une clé publique de test publiée par Microsoft, comme la GVLK d'Office LTSC (page Learn « GVLKs for KMS and Active Directory-based activation of Office »), dans un script d'essai de `tests/runner/` uniquement, jamais dans le code d'OffPatch ni dans un workflow ;
@@ -27,7 +27,7 @@ Réponds-moi en français.
 - Aucune opération DISM d'analyse ou de maintenance du magasin de composants (`/AnalyzeComponentStore`, `/StartComponentCleanup`, `/ResetBase`…) quand un redémarrage est en attente, ni dans les essais ni dans l'exécuteur d'OffPatch : elle peut bloquer des heures (R-12).
 - Ce que les runners ne permettent pas (redémarrage, mode auto, Windows 11 x64 client, Windows 10 ESU, support sans checkpoint) est validé sur intervention réelle, en commençant par l'action `Plan` en lecture seule.
 - Les fonctions en lecture seule (détection, interrogation du catalogue) peuvent tourner sur la machine de développement.
-- Pour tester le téléchargement, utiliser `-ListOnly` (interroge le catalogue sans rien télécharger) ou la cible la plus légère (définitions Defender). Ne télécharger une cumulative complète ou une source Office que si je le demande.
+- Pour tester le téléchargement, utiliser `-ListOnly` (interroge le catalogue sans rien télécharger) ou le plus petit élément épinglé de `config/pinned-items.json` (enablement package, environ 180 Ko). Ne télécharger une cumulative complète ou une source Office que si je le demande.
 - Toute fonction qui modifie le système ou le dépôt déclare `[CmdletBinding(SupportsShouldProcess)]` et respecte `-WhatIf`.
 - OffPatch installe uniquement des mises à jour : il n'installe jamais Windows ni Office, ne gère aucune clé de produit, ne touche à aucune activation et ne retire aucun produit.
 - Téléchargements uniquement depuis les domaines listés dans `config/settings.json` (`allowedDomains`).
@@ -53,6 +53,8 @@ Réponds-moi en français.
 - `app/OffPatch-Cli.ps1` expose les mêmes opérations sans interface. Il sert à la reprise après redémarrage, au débogage et aux tests.
 - Identifiants (fonctions, variables, clés JSON) en anglais. Commentaires, libellés d'interface, messages de journal et rapports en français.
 - Aide intégrée (`.SYNOPSIS`, `.DESCRIPTION`, `.EXAMPLE`) pour chaque fonction publique.
+- Configuration : `config/settings.json`, `catalog-queries.json`, `pinned-items.json`, `office/sources.json`, validés par `Test-OpConfiguration` ; tout nouveau champ y est contrôlé et décrit au chapitre 6 du cahier des charges.
+- Tests : `tests/Unit` (sans réseau, mocks), `tests/Live` (tag `Live`, catalogue en ligne), `tests/Fixtures` (pages réelles, rafraîchies par `tests/Fixtures/catalog/Save-CatalogFixture.ps1`), `tests/runner` (scripts des workflows).
 
 ## Commandes
 
@@ -85,10 +87,21 @@ Avant chaque push, sans exception : tests Pester (hors tag `Live`, comme `ci.yml
 
 Les fichiers se modifient avec l'outil d'édition natif, pas avec des scripts Python générés. Si un script est indispensable, il va dans `scratch/`. Relire les lignes modifiées avant chaque push.
 
+## Pièges connus
+
+- L'outil Write crée les fichiers sans BOM : remettre le BOM UTF-8 à tout nouveau `.ps1`/`.psm1`/`.psd1`.
+- Tests qui chargent des fonctions par dot-source : `Set-StrictMode -Version Latest` dans `BeforeAll`, comme le module, sinon un bug de StrictMode passe les tests et casse en réel.
+- `Should -Invoke` sur des appels faits dans `BeforeAll` : ajouter `-Scope Context`.
+- Mock d'une cmdlet à paramètre typé (BitsTransfer) : `Mock Remove-BitsTransfer -RemoveParameterType BitsJob {}`.
+- Le test « rien en dur » (`Socle.Tests.ps1`) lit aussi les commentaires de `app/` : aucun numéro de KB ni URL, même en exemple (`KB<n>`).
+- La CLI ne voit que les fonctions de `Public/` : tout ce qu'elle appelle doit être public.
+- Sortie de `powershell.exe` dans Git Bash en CP850 : `| iconv -f CP850 -t UTF-8` ; dans les motifs des tests de la CLI, `.` à la place des lettres accentuées.
+- Tests HTTP : `HttpListener` sur `http://localhost:<port>/` fonctionne sans droits d'administrateur (`Download.Tests.ps1`).
+
 ## Git
 
-- Exclus du dépôt git : `depot/`, `rapports/`, `logs/`, `scratch/`, les binaires de `tools/`.
-- Dépôt distant : `Dano7762/offpatch` (privé), branche `master`.
+- Exclus du dépôt git : `depot/`, `rapports/`, `logs/`, `scratch/`, `graphify-out/`, les binaires de `tools/`.
+- Dépôt distant : `Dano7762/offpatch` (public, licence MIT), branche `master`.
 - `tests/runner/` contient les scripts exécutés sur les runners GitHub. Mêmes conventions que `app/` (PowerShell 5.1, UTF-8 avec BOM, PSScriptAnalyzer). Jamais livrés avec l'outil.
 - Un commit par tâche terminée, message en français préfixé par la phase : `P2: sélection des cumulatives Windows 11 dans le catalogue`.
 
