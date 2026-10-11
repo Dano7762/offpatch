@@ -85,6 +85,7 @@
         "includeTitlePattern": "^\\d{4}-\\d{2} Cumulative Update for Windows 10 Version 22H2 for x64-based Systems \\(KB\\d+\\)$",
         "excludeTitlePattern": "Preview|Dynamic|Hotpatch|Server|\\.NET|21H2|x86|ARM64",
         "pick": "highestUbrFromReleaseInformation",
+        "releaseInformationBuild": 19045,
         "prerequisites": ["windows-ssu"],
         "runsAfter": []
       },

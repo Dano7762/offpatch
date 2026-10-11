@@ -63,6 +63,9 @@ Describe 'Test-OpConfiguration' {
         @{ Attendu = 'une langue Office mal formée'; Alter = { param($c) $c.OfficeSources.sources[0].languages = @('français') }; Message = '*langue*français*' }
         @{ Attendu = 'un motif de titre invalide'; Alter = { param($c) $c.CatalogQueries.targets.'win11-x64'[0].includeTitlePattern = '(non fermé' }; Message = '*includeTitlePattern*' }
         @{ Attendu = 'une règle de sélection inconnue'; Alter = { param($c) $c.CatalogQueries.targets.'win11-x64'[0].pick = 'latest' }; Message = '*règle de sélection*latest*' }
+        @{ Attendu = 'une sélection par release-information sans build de base'; Alter = { param($c) $c.CatalogQueries.targets.'win10-x64'[0].PSObject.Properties.Remove('releaseInformationBuild') }; Message = '*releaseInformationBuild*' }
+        @{ Attendu = 'une sélection par release-information sans adresse de la page'; Alter = { param($c) $c.Settings.downloadPages.PSObject.Properties.Remove('windows10ReleaseInformation') }; Message = '*windows10ReleaseInformation absent*' }
+        @{ Attendu = 'une page release-information hors allowedDomains'; Alter = { param($c) $c.Settings.downloadPages.windows10ReleaseInformation = 'https://exemple.net/release' }; Message = '*exemple.net*allowedDomains*' }
         @{ Attendu = 'une dépendance vers une catégorie inconnue'; Alter = { param($c) $c.CatalogQueries.targets.'win10-x64'[0].prerequisites = @('windows-ssu-old') }; Message = '*windows-ssu-old*' }
         @{ Attendu = 'un élément épinglé dont le SHA-1 ne correspond pas au nom'; Alter = { param($c) $c.PinnedItems.items[0].sha1 = ('0' * 40) }; Message = "*empreinte du nom de fichier*" }
         @{ Attendu = 'un élément épinglé hors allowedDomains'; Alter = { param($c) $c.PinnedItems.items[0].url = 'https://exemple.net/a_' + $c.PinnedItems.items[0].sha1 + '.msu' }; Message = '*hôte du lien*' }

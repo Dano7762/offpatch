@@ -10,7 +10,8 @@ param()
 BeforeAll {
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     foreach ($name in 'ConvertFrom-OpCatalogSearchPage', 'ConvertFrom-OpCatalogDownloadDialog', 'Invoke-OpWebRequest', 'Find-OpCatalogUpdate',
-        'Get-OpCatalogDownloadLink', 'Invoke-OpHeadRequest', 'Resolve-OpDownloadUrl') {
+        'Get-OpCatalogDownloadLink', 'Invoke-OpHeadRequest', 'Resolve-OpDownloadUrl', 'ConvertFrom-OpReleaseInformationPage',
+        'Get-OpWindows10ReleaseInfo', 'Select-OpCatalogUpdate', 'Get-OpCatalogSelection', 'Write-OpLog', 'ConvertTo-OpMaskedText') {
         . (Join-Path $root "app\module\OffPatch\Private\$name.ps1")
     }
     $settings = Get-Content -Path (Join-Path $root 'config\settings.json') -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -91,6 +92,30 @@ Describe 'Hôtes des téléchargements du moment' -Tag 'Live' {
             $failures | Should -BeNullOrEmpty
         } catch {
             Save-LiveDiagnostic -Test 'hôtes des liens' -Message $_.Exception.Message
+            throw
+        }
+    }
+}
+
+# Sélection du mois (cahier des charges 6.2) : pour chaque cible de settings.json, chaque entrée de
+# catalog-queries.json doit retenir un KB, et la cumulative Windows 10 son UBR publié sur release-information.
+Describe 'Sélection du mois' -Tag 'Live' {
+    It 'chaque catégorie de chaque cible retient un élément' {
+        try {
+            $configuration = [pscustomobject]@{
+                Settings       = $settings
+                CatalogQueries = Get-Content -Path (Join-Path $root 'config\catalog-queries.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+            }
+            $missing = @(foreach ($target in $settings.targets) {
+                    foreach ($s in Get-OpCatalogSelection -Configuration $configuration -Target $target) {
+                        Write-Host ('{0} / {1} : {2} {3} {4}' -f $target, $s.Category, $s.Kb, $s.ResultingUbr, $s.Version)
+                        if (-not $s.Kb) { "$target / $($s.Category) : aucun élément retenu" }
+                        elseif ($s.Pick -match '^highestUbr' -and $null -eq $s.ResultingUbr) { "$target / $($s.Category) : UBR inconnu ($($s.Warnings -join ' '))" }
+                    }
+                })
+            $missing | Should -BeNullOrEmpty
+        } catch {
+            Save-LiveDiagnostic -Test 'sélection du mois' -Message $_.Exception.Message
             throw
         }
     }

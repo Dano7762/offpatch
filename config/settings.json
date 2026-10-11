@@ -30,7 +30,8 @@
       "x64": "https://go.microsoft.com/fwlink/?LinkID=121721&arch=x64",
       "arm64": "https://go.microsoft.com/fwlink/?LinkID=121721&arch=arm64"
     },
-    "officeDeploymentToolPage": "https://www.microsoft.com/en-us/download/details.aspx?id=49117"
+    "officeDeploymentToolPage": "https://www.microsoft.com/en-us/download/details.aspx?id=49117",
+    "windows10ReleaseInformation": "https://learn.microsoft.com/en-us/windows/release-health/release-information"
   },
   "allowedDomains": [
     "www.catalog.update.microsoft.com",

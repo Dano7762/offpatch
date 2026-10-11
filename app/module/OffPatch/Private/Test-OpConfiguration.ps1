@@ -59,6 +59,7 @@
     if (Test-Property $s 'downloadPages') {
         foreach ($p in @($s.downloadPages.defenderDefinitions.PSObject.Properties)) { $links.Add([string]$p.Value) }
         $links.Add([string]$s.downloadPages.officeDeploymentToolPage)
+        if (Test-Property $s.downloadPages 'windows10ReleaseInformation') { $links.Add([string]$s.downloadPages.windows10ReleaseInformation) }
         foreach ($t in $targets) {
             $arch = ($t -split '-')[1]
             if (-not (Test-Property $s.downloadPages.defenderDefinitions $arch)) { $errors.Add("settings.json : downloadPages.defenderDefinitions n'a pas de lien pour l'architecture $arch (cible $t).") }
@@ -85,6 +86,10 @@
             }
             if ((Test-Property $entry 'fileNamePattern') -and -not (Test-Regex $entry.fileNamePattern)) { $errors.Add("$label : fileNamePattern invalide.") }
             if ($picks -notcontains $entry.pick) { $errors.Add("$label : règle de sélection « $($entry.pick) » inconnue ($($picks -join ', ')).") }
+            if ($entry.pick -eq 'highestUbrFromReleaseInformation') {
+                if (-not (Test-Property $entry 'releaseInformationBuild') -or [int]$entry.releaseInformationBuild -lt 10000) { $errors.Add("$label : releaseInformationBuild absent ou invalide (build de base lue sur la page release-information).") }
+                if (-not (Test-Property $s.downloadPages 'windows10ReleaseInformation')) { $errors.Add("$label : settings.json, downloadPages.windows10ReleaseInformation absent (page release-information).") }
+            }
             foreach ($dep in @($entry.prerequisites) + @($entry.runsAfter)) {
                 if ($dep -and $categories -notcontains $dep) { $errors.Add("$label : dépendance vers une catégorie inconnue « $dep ».") }
             }
