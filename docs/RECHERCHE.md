@@ -535,7 +535,7 @@ Impact : `allowedDomains`.
   - Règle : **nom d'hôte exact**, sans joker ni suffixe, `https` seulement, contrôlé pour l'URL de départ **et pour chaque redirection** avant de la suivre ; hôte inconnu : téléchargement refusé avec un message qui nomme l'hôte et l'URL. Raison : une comparaison par suffixe (`microsoft.com`) accepterait n'importe quel sous-domaine ; avec des noms exacts, un changement de CDN chez Microsoft fait échouer le téléchargement de façon visible, et la correction tient en une ligne de configuration après vérification. `depot-x64` relève déjà les hôtes atteints par chaque fichier.
 - Décision (David, 2026-10-06) :
   - Les 8 hôtes exacts ci-dessus ; `catalog.update.microsoft.com`, `download.windowsupdate.com` et `officecdn.microsoft.com` retirés. Nom d'hôte exact, `https` seulement.
-  - Redirections résolues sans redirection automatique, chaque hôte validé, puis téléchargement de l'URL finale. Limite documentée en 11 : BITS suit lui-même une redirection survenant au moment du transfert ; la garantie principale reste Authenticode et l'empreinte de la racine, la liste des domaines est une défense en profondeur.
+  - Redirections résolues sans redirection automatique, chaque hôte validé, puis téléchargement de l'URL finale. Limite documentée en 11 : BITS suit lui-même une redirection survenant au moment du transfert ; la garantie principale reste Authenticode et l'empreinte de la racine, la liste des domaines est une défense en profondeur. Limite levée le 2026-10-11 : redirections refusées pendant le transfert par les deux moteurs (R-16).
   - Lien `http` renvoyé par une source : réécrit en `https` sur le même hôte, jamais de téléchargement en `http`.
   - Message de refus : hôte, URL complète et ligne exacte à ajouter à `allowedDomains`.
   - Mise en œuvre : `Resolve-OpDownloadUrl` et `Invoke-OpHeadRequest` (module, privées), 10 tests sur requêtes simulées (`tests/Unit/Resolve-OpDownloadUrl.Tests.ps1`) ; `catalog-contract.yml` résout chaque semaine les liens réels du moment (cumulatives Windows 11 x64 et ARM64, Windows 10, .NET, plateforme Defender, éléments épinglés, mpam-fe.exe x64 et ARM64, page et fichier de l'ODT) et échoue si un hôte sort de la liste. Premier passage local le 2026-10-06 : 18 liens, tous conformes. Les liens de mpam-fe.exe et de la page de l'ODT sont écrits dans le test en attendant leur place dans `config/` (phase 2).
@@ -631,3 +631,27 @@ Impact : option `pauseWindowsUpdateDuringSession`.
   - Constat validé, avec une simplification : option `pauseWindowsUpdateDuringSession` retirée (6.1, 8.2, 8.6), ainsi que la règle de rétablissement au lancement ; l'arrêt simple tient moins de 5 minutes, le bénéfice ne justifie pas le code. Notée en évolution (14) si une méthode qui expire d'elle-même apparaît.
   - Contrôle préalable : PC connecté à un réseau → mode Avion recommandé (il survit aux redémarrages), rappel dans le récapitulatif du mode auto. En fin de session, PC hors ligne → l'écran de fin et le rapport rappellent de désactiver le mode Avion ou de rebrancher le réseau.
   - Exécuteur DISM : sur le code d'une installation déjà en cours (1618 / 0x80070652, R-14), attente de 5 minutes et une seule nouvelle tentative ; jugement en deux temps ensuite.
+
+## R-16 Téléchargement par BITS et repli HttpClient
+
+Question : comment télécharger les fichiers du dépôt avec reprise (BITS, `Start-BitsTransfer`), sans suivre une redirection non contrôlée pendant le transfert, et quand passer au repli `HttpClient` ?
+
+Impact : `Invoke-OpBitsDownload`, `Invoke-OpHttpDownload`, `Save-OpDownload` (phase 2), cahier des charges 7.1 et 11.
+
+- Statut : Tranché (2026-10-11, point ouvert et traité en phase 2)
+- Sources (consultées le 2026-10-11) :
+  - https://learn.microsoft.com/en-us/powershell/module/bitstransfer/start-bitstransfer (mise à jour du 2025-05-14) : `-Asynchronous`, `-Suspended`, `-SecurityFlags`, `-RetryInterval` (minimum 60 s), `-RetryTimeout`, priorité `Foreground` par défaut ; un travail laissé dans la file BITS reprend au redémarrage du service.
+  - https://learn.microsoft.com/en-us/windows/win32/api/bits2_5/nf-bits2_5-ibackgroundcopyjobhttpoptions-setsecurityflags (mise à jour du 2025-11-25) : `BG_HTTP_REDIRECT_POLICY_DISALLOW` (0x0200) « places the job in the fatal error state when the server redirects your request ».
+  - https://learn.microsoft.com/en-us/windows/win32/bits/life-cycle-of-a-bits-job (mise à jour du 2025-03-11) : états, fichier disponible seulement après `Complete`, travail en `TRANSIENT_ERROR` réessayé par BITS, travail en `ERROR` à reprendre ou annuler, annulation automatique après 90 jours.
+  - https://learn.microsoft.com/en-us/windows/win32/bits/users-and-network-connections (mise à jour du 2025-03-11) : « BITS transfers files only when the job owner is logged on » ; ouverture de session interactive exigée (écran d'accueil, bureau à distance, changement rapide d'utilisateur, PowerShell distant depuis Windows 10 1607), `RunAs` ne compte pas ; travail suspendu à la fermeture de session.
+  - Essais sur la machine de développement (Windows 11 26200, module BitsTransfer 2.0, `scratch/dl-test.ps1` et `scratch/dl-redirect.ps1`, fichier le plus léger : KB5121794 x64, 177 535 octets).
+- Conclusion :
+  - **`Start-BitsTransfer -SecurityFlags RedirectPolicyDisallow` est ignoré** : le travail créé porte `RedirectPolicyAllowSilent` et le lien `go.microsoft.com` des définitions Defender a été suivi jusqu'au bout (mpam-fe.exe reçu). Posé ensuite par `Set-BitsTransfer` sur le travail créé suspendu, le drapeau est relu `RedirectPolicyDisallow` et la même redirection met le travail en erreur : « État HTTP 302 », contexte `RemoteFile`, 0 octet reçu, aucun fichier.
+  - `HttpClient` avec `AllowAutoRedirect` à faux reçoit le 302 et refuse le transfert ; le serveur local de test confirme la reprise par `Range` (réponse 206) et le cas d'un serveur sans reprise (200).
+  - KB5121794 x64 téléchargé par BITS et par HttpClient : SHA-1 égal à celui du nom de fichier.
+  - Énumérations du module : `JobState` (Queued, Connecting, Transferring, Suspended, Error, TransientError, Transferred, Acknowledged, Canceled), `SecurityFlags` (RedirectPolicyDisallow = 0x200).
+- Décision :
+  - BITS d'abord : travail asynchrone nommé « OffPatch <fichier> », créé suspendu, refus des redirections posé par `Set-BitsTransfer` et relu avant le lancement. S'il ne peut pas être posé, BITS est déclaré indisponible.
+  - Reprise : un travail du même nom, même URL et même fichier, laissé par un lancement interrompu, est repris au lieu d'être recréé ; un travail du même nom vers une autre URL est supprimé. Sans progrès pendant 5 min, le travail est conservé et l'opération s'arrête avec un message de reprise.
+  - Repli HttpClient (fichier `<nom>.part`, reprise par `Range`, redirections refusées) quand BITS est indisponible : module absent, travail non créé, refus des redirections non appliqué, ou travail resté 60 s en file d'attente sans aucun octet (propriétaire sans session interactive). Une autre erreur de BITS (404, redirection refusée) n'entraîne pas de repli.
+  - Conséquence pour le cahier des charges (11) : la limite « BITS suit lui-même une redirection » disparaît ; aucune redirection n'est suivie pendant un transfert, avec l'un ou l'autre moteur.
