@@ -12,8 +12,8 @@
         est téléchargé, contrôlé et rangé (Save-OpDepotFile), une seule fois s'il est partagé, puis chaque élément
         complet est inscrit au manifeste, réécrit de façon atomique après chaque élément : une interruption ne perd
         que l'élément en cours, et le lancement suivant reprend là. Un élément dont un fichier est refusé ou échoue
-        n'est pas inscrit ; les autres continuent. Les éléments déjà au manifeste sont gardés (la purge est une
-        étape distincte).
+        n'est pas inscrit ; les autres continuent. Enfin, la purge (Invoke-OpDepotPurge) retire ce que la rétention
+        ne garde plus et liste les fichiers orphelins sans les supprimer ; son résultat est dans la propriété Purge.
         Renvoie un objet : ListOnly, Items (éléments de Get-OpDepotPlan), DownloadBytes (fichiers à télécharger,
         comptés une fois), DownloadCount, UnknownSizeCount, FreeBytes (volume du dépôt, $null si illisible),
         EnoughSpace, ErrorCount (liens refusés, puis éléments non inscrits), NewItems (éléments ajoutés au manifeste
@@ -174,5 +174,9 @@
     $result.ErrorCount = $errorCount
     $result.NewItems = $new.ToArray()
     Write-OpLog ("Mise à jour du dépôt terminée : {0} nouveauté(s), {1} erreur(s)." -f $new.Count, $errorCount)
+
+    # Purge après la vérification du mois nouveau (7.3) : un mois qui a échoué n'est pas au manifeste, l'ancien reste
+    # donc parmi les plus récents. Les orphelins sont seulement listés.
+    $result | Add-Member -NotePropertyName Purge -NotePropertyValue (Invoke-OpDepotPurge -Root $Root -Confirm:$false)
     $result
 }

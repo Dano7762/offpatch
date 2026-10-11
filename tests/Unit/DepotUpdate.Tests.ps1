@@ -11,10 +11,12 @@ BeforeAll {
     $module = Join-Path $root 'app\module\OffPatch'
     foreach ($name in 'ConvertTo-OpManifestItem', 'Read-OpMsuPackage', 'Save-OpDepotFile', 'Save-OpDownload', 'Confirm-OpDownloadIntegrity',
         'Test-OpFileSignature', 'Get-OpFileVersion', 'Invoke-OpProcess', 'Get-OpDepotPlan', 'Get-OpFreeSpace', 'Write-OpLog', 'ConvertTo-OpMaskedText',
-        'Get-OpConfiguration', 'Read-OpJsonFile', 'Test-OpConfiguration', 'Get-OpPath', 'Get-OpRoot', 'Read-OpManifest', 'Test-OpManifest', 'Save-OpManifest') {
+        'Get-OpConfiguration', 'Read-OpJsonFile', 'Test-OpConfiguration', 'Get-OpPath', 'Get-OpRoot', 'Read-OpManifest', 'Test-OpManifest', 'Save-OpManifest',
+        'Get-OpDepotPurgePlan') {
         . (Join-Path $module "Private\$name.ps1")
     }
     . (Join-Path $module 'Public\Invoke-OpDepotUpdate.ps1')
+    . (Join-Path $module 'Public\Invoke-OpDepotPurge.ps1')
     . (Join-Path $module 'Public\Format-OpDepotPlan.ps1')
 
     $configuration = [pscustomobject]@{
@@ -229,6 +231,9 @@ Describe 'Invoke-OpDepotUpdate (téléchargement)' {
         $text | Should -Match 'Nouveautés inscrites au manifeste : 3'
         $text | Should -Match '\+ win11-x64-lcu-KB1 : windows-lcu \(KB1, UBR 9457\)'
         $text | Should -Match '2 erreur\(s\)'
+        # Purge en fin de mise à jour : rien à retirer, et les fichiers simulés (absents du disque) ne sont pas orphelins.
+        @($r.Purge.RemovedItems).Count | Should -Be 0
+        $text | Should -Match 'Purge : rien à retirer'
     }
 
     It 'reprend les entrées déjà au manifeste et ne compte pas comme nouveauté un élément déjà inscrit' {

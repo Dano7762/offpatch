@@ -79,5 +79,14 @@
         }
     }
     if ($Result.ErrorCount -gt 0) { "$($Result.ErrorCount) erreur(s) : liens refusés ou éléments non inscrits, voir le journal." }
+    if ($null -ne $Result.PSObject.Properties['Purge'] -and $Result.Purge) {
+        $p = $Result.Purge
+        if (@($p.RemovedItems).Count -gt 0) { 'Purge : {0} élément(s) retiré(s) ({1}), {2} libérés.' -f @($p.RemovedItems).Count, (@($p.RemovedItems) -join ', '), (Format-Size $p.FreedBytes) }
+        else { 'Purge : rien à retirer.' }
+        if (@($p.Orphans).Count -gt 0) {
+            "Fichiers orphelins (absents du manifeste, non supprimés) : $(@($p.Orphans).Count)"
+            foreach ($o in @($p.Orphans)) { '  ? {0}, {1}' -f $o.Path, (Format-Size $o.Size) }
+        }
+    }
     'Sources Office : pas encore prises en charge.'
 }

@@ -96,6 +96,7 @@ Les fichiers se modifient avec l'outil d'édition natif, pas avec des scripts Py
 - Le test « rien en dur » (`Socle.Tests.ps1`) lit aussi les commentaires de `app/` : aucun numéro de KB ni URL, même en exemple (`KB<n>`).
 - La CLI ne voit que les fonctions de `Public/` : tout ce qu'elle appelle doit être public.
 - Sortie de `powershell.exe` dans Git Bash en CP850 : `| iconv -f CP850 -t UTF-8` ; dans les motifs des tests de la CLI, `.` à la place des lettres accentuées.
+- Aide intégrée : une ligne qui commence par un point (« .NET … ») est lue comme un mot-clé inconnu et invalide toute l'aide de la fonction (`Socle.Tests.ps1` échoue sur `.SYNOPSIS`). Reformuler pour que la ligne commence autrement.
 - `expand.exe -F:<motif>` est ignoré sur un cabinet d'un seul fichier (décompressé sous son propre nom) : un .msu ou un .cab de test fabriqué avec makecab doit contenir au moins deux fichiers (`DepotUpdate.Tests.ps1`). Dans Git Bash, `expand` désigne l'outil GNU : appeler `%SystemRoot%\System32\expand.exe`.
 - Tests HTTP : `HttpListener` sur `http://localhost:<port>/` fonctionne sans droits d'administrateur (`Download.Tests.ps1`).
 
