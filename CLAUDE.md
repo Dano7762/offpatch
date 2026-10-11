@@ -56,17 +56,23 @@ Réponds-moi en français.
 
 ## Commandes
 
-Le terminal de Claude Code peut être Git Bash : passer par `powershell.exe`.
+Le terminal de Claude Code peut être Git Bash : passer par `powershell.exe`. Commandes à lancer depuis la racine du dépôt.
+
+Outils de développement : Pester 5.9.1 et PSScriptAnalyzer 1.25.0, les versions figées de `ci.yml`. Windows fournit d'office Pester 3.4, incompatible avec les tests et chargé par défaut : chaque commande ci-dessous demande donc la version exacte, et cherche d'abord dans `scratch/modules` (hors git), puis dans les modules installés. Sur un nouveau poste, une seule fois après le clonage, sans droits d'administrateur ni dépendance au dossier Documents (si Windows demande le fournisseur NuGet, accepter) :
+
+```bash
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '[Net.ServicePointManager]::SecurityProtocol = "Tls12"; New-Item -ItemType Directory -Force ./scratch/modules | Out-Null; Save-Module -Name Pester -RequiredVersion 5.9.1 -Path ./scratch/modules -Repository PSGallery; Save-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Path ./scratch/modules -Repository PSGallery'
+```
 
 ```bash
 # Tests unitaires (sans le contrat en ligne, comme ci.yml)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '$c = New-PesterConfiguration; $c.Run.Path = "./tests"; $c.Filter.ExcludeTag = "Live"; $c.Output.Verbosity = "Detailed"; Invoke-Pester -Configuration $c'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command 'if (Test-Path ./scratch/modules) { $env:PSModulePath = (Resolve-Path ./scratch/modules).Path + ";" + $env:PSModulePath }; Import-Module Pester -RequiredVersion 5.9.1 -ErrorAction Stop; $c = New-PesterConfiguration; $c.Run.Path = "./tests"; $c.Filter.ExcludeTag = "Live"; $c.Output.Verbosity = "Detailed"; Invoke-Pester -Configuration $c'
 
 # Contrat en ligne avec le catalogue (lecture seule), lancé à part
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '$c = New-PesterConfiguration; $c.Run.Path = "./tests/Live"; $c.Filter.Tag = "Live"; $c.Output.Verbosity = "Detailed"; Invoke-Pester -Configuration $c'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command 'if (Test-Path ./scratch/modules) { $env:PSModulePath = (Resolve-Path ./scratch/modules).Path + ";" + $env:PSModulePath }; Import-Module Pester -RequiredVersion 5.9.1 -ErrorAction Stop; $c = New-PesterConfiguration; $c.Run.Path = "./tests/Live"; $c.Filter.Tag = "Live"; $c.Output.Verbosity = "Detailed"; Invoke-Pester -Configuration $c'
 
-# Analyse statique
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Invoke-ScriptAnalyzer -Path ./app -Recurse -Settings ./PSScriptAnalyzerSettings.psd1"
+# Analyse statique (app et tests, comme ci.yml)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command 'if (Test-Path ./scratch/modules) { $env:PSModulePath = (Resolve-Path ./scratch/modules).Path + ";" + $env:PSModulePath }; Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -ErrorAction Stop; foreach ($p in "./app", "./tests") { Invoke-ScriptAnalyzer -Path $p -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 }'
 
 # Opérations sans interface (exemples)
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./app/OffPatch-Cli.ps1 -Action DepotUpdate -ListOnly
