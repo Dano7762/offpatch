@@ -48,12 +48,16 @@ Describe 'OffPatch-Cli.ps1' {
         @(Get-ChildItem -Path (Join-Path $tool 'ProgramData\OffPatch\logs') -Filter 'session_*.log').Count | Should -Be 1
     }
 
-    # DepotUpdate -ListOnly interroge le catalogue : testé sans réseau dans DepotPlan.Tests.ps1, et en ligne par le contrat.
-    It 'ouvre le journal du dépôt pour DepotUpdate et signale le téléchargement pas encore disponible' {
+    # DepotUpdate interroge le catalogue puis télécharge : testé sans réseau dans DepotPlan.Tests.ps1 et
+    # DepotUpdate.Tests.ps1, et en ligne par le contrat. Ici, configuration invalide : arrêt avant tout accès réseau.
+    It 'ouvre le journal du dépôt pour DepotUpdate, puis s''arrête sur une configuration invalide (code 1)' {
         $tool = Get-ToolCopy
+        $settingsPath = Join-Path $tool 'config\settings.json'
+        $text = [IO.File]::ReadAllText($settingsPath) -replace '"maxAutoReboots": 5', '"maxAutoReboots": 0'
+        [IO.File]::WriteAllText($settingsPath, $text, (New-Object System.Text.UTF8Encoding $false))
         $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'DepotUpdate')
-        $r.ExitCode | Should -Be 2
-        $r.Output | Should -Match 'DepotUpdate \(t.l.chargement\) pas encore disponible'
+        $r.ExitCode | Should -Be 1
+        Test-Path -Path (Join-Path $tool 'depot') | Should -BeFalse
         $log = @(Get-ChildItem -Path (Join-Path $tool 'logs') -Filter 'depot_*.log')
         $log.Count | Should -Be 1
         Get-Content -Path $log[0].FullName -Raw -Encoding UTF8 | Should -Match '\[INFO\] OffPatch, opération Depot'

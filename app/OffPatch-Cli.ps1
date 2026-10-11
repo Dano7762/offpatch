@@ -7,8 +7,9 @@
     Charge le module, ouvre le journal, charge et valide la configuration, puis lance l'action demandée. Les actions
     sont branchées au fil des phases ; une action pas encore disponible le dit et sort avec le code 2. Disponible :
     DepotUpdate -ListOnly (liste de ce qui serait téléchargé, liens contrôlés, espace libre ; code 1 si un lien est
-    refusé). OffPatch installe uniquement des mises à jour : aucun paramètre de clé de produit, de profil ou de
-    retrait (cahier des charges 2, 3.3).
+    refusé) et DepotUpdate (téléchargement, contrôle, manifeste, résumé des nouveautés ; code 1 si un lien est
+    refusé ou si un élément n'a pas pu être inscrit). OffPatch installe uniquement des mises à jour : aucun
+    paramètre de clé de produit, de profil ou de retrait (cahier des charges 2, 3.3).
     Codes de sortie : 0 réussite, 1 erreur (configuration invalide, échec), 2 action pas encore disponible.
 
 .PARAMETER Action
@@ -45,12 +46,8 @@ try {
 
 switch ($Action) {
     'DepotUpdate' {
-        if (-not $ListOnly) {
-            Write-Host 'OffPatch : action DepotUpdate (téléchargement) pas encore disponible ; utiliser -ListOnly.'
-            exit 2
-        }
         try {
-            $result = Invoke-OpDepotUpdate -ListOnly -Root $context.Root
+            $result = Invoke-OpDepotUpdate -ListOnly:$ListOnly -Root $context.Root -WhatIf:$WhatIfPreference
             foreach ($line in Format-OpDepotPlan -Result $result) { Write-Host $line }
         } catch {
             Write-Host "OffPatch : $($_.Exception.Message)"

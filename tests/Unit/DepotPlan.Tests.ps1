@@ -241,10 +241,6 @@ Describe 'Invoke-OpDepotUpdate' {
         }
     }
 
-    It 'refuse de télécharger sans -ListOnly (tâches suivantes de la phase 2)' {
-        { Invoke-OpDepotUpdate -Root $tool } | Should -Throw -ExpectedMessage '*-ListOnly*'
-    }
-
     Context 'Résumé' {
         BeforeAll {
             Mock Get-OpDepotPlan {

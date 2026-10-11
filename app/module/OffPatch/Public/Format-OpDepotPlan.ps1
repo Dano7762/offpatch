@@ -1,16 +1,17 @@
 ﻿function Format-OpDepotPlan {
     <#
     .SYNOPSIS
-        Met en forme, en lignes de texte, le résultat d'Invoke-OpDepotUpdate -ListOnly (affichage de la CLI).
+        Met en forme, en lignes de texte, le résultat d'Invoke-OpDepotUpdate, avec ou sans -ListOnly (affichage de la CLI).
 
     .DESCRIPTION
         Fonction pure. Une section par cible, une ligne par fichier : état (à télécharger, au dépôt, refusé),
         catégorie, KB, UBR ou version, nom du fichier et taille ; puis un résumé : nombre de fichiers et taille à
         télécharger, espace libre du volume du dépôt, manque d'espace éventuel. Les tailles sont en Mo et Go
-        (base 1024), au format français.
+        (base 1024), au format français. Après un téléchargement (sans -ListOnly), résumé des nouveautés : chaque
+        élément ajouté au manifeste, avec sa catégorie, son KB, son UBR ou sa version et sa taille.
 
     .PARAMETER Result
-        Objet renvoyé par Invoke-OpDepotUpdate -ListOnly.
+        Objet renvoyé par Invoke-OpDepotUpdate.
 
     .EXAMPLE
         Format-OpDepotPlan -Result (Invoke-OpDepotUpdate -ListOnly)
@@ -55,6 +56,28 @@
         'Espace libre du volume du dépôt : ' + (Format-Size $Result.FreeBytes) + '.'
         if ($Result.EnoughSpace -eq $false) { 'Espace insuffisant : il manque ' + (Format-Size ($Result.DownloadBytes - $Result.FreeBytes)) + ', la mise à jour s''arrêterait avant tout téléchargement.' }
     }
-    if ($Result.ErrorCount -gt 0) { "$($Result.ErrorCount) lien(s) refusé(s) ou inaccessible(s) : voir ci-dessus." }
-    'Aucun fichier téléchargé (-ListOnly). Sources Office : pas encore prises en charge.'
+    $listOnly = ($null -eq $Result.PSObject.Properties['ListOnly']) -or $Result.ListOnly
+    if ($listOnly) {
+        if ($Result.ErrorCount -gt 0) { "$($Result.ErrorCount) lien(s) refusé(s) ou inaccessible(s) : voir ci-dessus." }
+        'Aucun fichier téléchargé (-ListOnly). Sources Office : pas encore prises en charge.'
+        return
+    }
+
+    # Résumé des nouveautés du mois (7.1) : éléments ajoutés au manifeste par ce lancement.
+    $new = @($Result.NewItems)
+    if ($new.Count -eq 0) { 'Aucune nouveauté : le dépôt était déjà à jour.' }
+    else {
+        "Nouveautés inscrites au manifeste : $($new.Count)"
+        foreach ($n in $new) {
+            $size = [long]0
+            foreach ($f in @($n.files)) { $size += [long]$f.size }
+            $parts = @()
+            if ($null -ne $n.PSObject.Properties['kb']) { $parts += $n.kb }
+            if ($null -ne $n.PSObject.Properties['resultingUbr']) { $parts += "UBR $($n.resultingUbr)" }
+            if ($null -ne $n.PSObject.Properties['version']) { $parts += "version $($n.version)" }
+            '  + {0} : {1} ({2}), {3}' -f $n.id, $n.category, ($parts -join ', '), (Format-Size $size)
+        }
+    }
+    if ($Result.ErrorCount -gt 0) { "$($Result.ErrorCount) erreur(s) : liens refusés ou éléments non inscrits, voir le journal." }
+    'Sources Office : pas encore prises en charge.'
 }
