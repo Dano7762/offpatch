@@ -83,6 +83,7 @@
         Ubr                    = $identity.Ubr
         Architecture           = $identity.Architecture
         Target                 = $target
+        ProductType            = $identity.ProductType
         Is64BitOperatingSystem = [Environment]::Is64BitOperatingSystem
         Is64BitProcess         = [Environment]::Is64BitProcess
         Esu                    = $esu

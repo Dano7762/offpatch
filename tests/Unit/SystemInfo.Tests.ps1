@@ -11,7 +11,7 @@ BeforeAll {
     $esuIds = @((Get-OpConfiguration -Root $root).Settings.windows.esuActivationIds)
 
     function Initialize-TestIdentity([string]$Family, [int]$Build, [string]$Architecture) {
-        $script:identity = [pscustomobject]@{ Family = $Family; CurrentBuild = $Build; Ubr = 7000; DisplayVersion = '22H2'; EditionId = 'Professional'; Caption = "Microsoft $Family Professionnel"; Architecture = $Architecture }
+        $script:identity = [pscustomobject]@{ Family = $Family; CurrentBuild = $Build; Ubr = 7000; DisplayVersion = '22H2'; EditionId = 'Professional'; Caption = "Microsoft $Family Professionnel"; Architecture = $Architecture; ProductType = 1 }
     }
 }
 

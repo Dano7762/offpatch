@@ -14,7 +14,7 @@ Describe 'Get-OpWindowsIdentity' {
             Mock Get-ItemProperty {
                 [pscustomobject]@{ ProductName = 'Windows 10 Pro'; CurrentBuild = '26200'; UBR = 9457; DisplayVersion = '25H2'; EditionID = 'Professional' }
             }
-            Mock Get-CimInstance { [pscustomobject]@{ Caption = 'Microsoft Windows 11 Professionnel' } }
+            Mock Get-CimInstance { [pscustomobject]@{ Caption = 'Microsoft Windows 11 Professionnel'; ProductType = 1 } }
             $identity = Get-OpWindowsIdentity
         }
 
@@ -37,7 +37,7 @@ Describe 'Get-OpWindowsIdentity' {
             Mock Get-ItemProperty {
                 [pscustomobject]@{ ProductName = 'Windows 10 Pro'; CurrentBuild = '19045'; UBR = 7727; DisplayVersion = '22H2'; EditionID = 'Professional' }
             }
-            Mock Get-CimInstance { [pscustomobject]@{ Caption = 'Microsoft Windows 10 Professionnel' } }
+            Mock Get-CimInstance { [pscustomobject]@{ Caption = 'Microsoft Windows 10 Professionnel'; ProductType = 1 } }
             (Get-OpWindowsIdentity).Family | Should -Be 'Windows10'
         }
     }
@@ -45,7 +45,7 @@ Describe 'Get-OpWindowsIdentity' {
     Context 'Limite à la build 22000' {
         It 'classe la build 22000 en Windows 11' {
             Mock Get-ItemProperty { [pscustomobject]@{ ProductName = 'Windows 10 Pro'; CurrentBuild = '22000'; UBR = 1; EditionID = 'Professional' } }
-            Mock Get-CimInstance { [pscustomobject]@{ Caption = 'Microsoft Windows 11 Professionnel' } }
+            Mock Get-CimInstance { [pscustomobject]@{ Caption = 'Microsoft Windows 11 Professionnel'; ProductType = 1 } }
             (Get-OpWindowsIdentity).Family | Should -Be 'Windows11'
         }
     }
@@ -59,7 +59,7 @@ Describe 'Get-OpWindowsIdentity : architecture du système' {
     ) {
         Mock Get-ItemProperty { [pscustomobject]@{ CurrentBuild = '26100'; UBR = 1; EditionID = 'Professional' } }
         Mock Get-ItemProperty -ParameterFilter { $Path -like '*\Session Manager\Environment' } { [pscustomobject]@{ PROCESSOR_ARCHITECTURE = $Raw } }
-        Mock Get-CimInstance { [pscustomobject]@{ Caption = 'Microsoft Windows 11 Professionnel' } }
+        Mock Get-CimInstance { [pscustomobject]@{ Caption = 'Microsoft Windows 11 Professionnel'; ProductType = 1 } }
         (Get-OpWindowsIdentity).Architecture | Should -Be $Expected
     }
 }

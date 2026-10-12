@@ -658,3 +658,20 @@ Impact : `Invoke-OpBitsDownload`, `Invoke-OpHttpDownload`, `Save-OpDownload` (ph
   - Reprise : un travail du même nom, même URL et même fichier, laissé par un lancement interrompu, est repris au lieu d'être recréé ; un travail du même nom vers une autre URL est supprimé. Sans progrès pendant 5 min, le travail est conservé et l'opération s'arrête avec un message de reprise.
   - Repli HttpClient (fichier `<nom>.part`, reprise par `Range`, redirections refusées) quand BITS est indisponible : module absent, travail non créé, refus des redirections non appliqué, ou travail resté 60 s en file d'attente sans aucun octet (propriétaire sans session interactive). Une autre erreur de BITS (404, redirection refusée) n'entraîne pas de repli.
   - Conséquence pour le cahier des charges (11) : la limite « BITS suit lui-même une redirection » disparaît ; aucune redirection n'est suivie pendant un transfert, avec l'un ou l'autre moteur.
+
+## R-17 Indicateurs des contrôles préalables
+
+Question : quelles sources lues hors ligne permettent de détecter un redémarrage en attente et un PC connecté à un réseau (cahier des charges 8.2) ?
+
+Impact : `Get-OpPendingReboot`, `Get-OpNetworkConnection`, `Test-OpPreflight`.
+
+- Statut : Tranché (2026-10-12)
+- Sources (consultées le 2026-10-12) :
+  - https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexa : avec `MOVEFILE_DELAY_UNTIL_REBOOT`, « The function stores the locations of the files to be renamed at restart in the following registry value: HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\PendingFileRenameOperations » (REG_MULTI_SZ).
+  - https://devblogs.microsoft.com/scripting/determine-pending-reboot-statuspowershell-style-part-1/ (blog Microsoft « Scripting Guy », 2013) : clé `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired` (« signifies that a reboot is required ») ; clé `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending` (« This key will only exist if the system is pending a reboot »). Aucune page Learn de référence ne documente ces deux clés ; la clé CBS est en outre mesurée sur runner, présente après chaque code 3010 de DISM (R-14).
+  - https://learn.microsoft.com/en-us/powershell/module/netconnection/get-netconnectionprofile : « gets a connection profile associated with one or more physical network adapters. A connection profile represents a network connection » ; connectivité IPv4 et IPv6 : Disconnected, NoTraffic, Subnet, LocalNetwork, Internet.
+- Décision :
+  - Redémarrage en attente si l'un des trois indicateurs est présent : clé CBS `RebootPending`, clé Windows Update `RebootRequired`, valeur `PendingFileRenameOperations` non vide. Un logiciel tiers peut laisser des renommages en attente sans redémarrage nécessaire (antivirus) : c'est un avertissement qui propose de redémarrer, jamais un blocage.
+  - PC connecté : au moins un profil de `Get-NetConnectionProfile` avec une connectivité IPv4 ou IPv6 Subnet, LocalNetwork ou Internet.
+  - Essai en lecture seule sur la machine de développement (Windows 11 25H2 .9550) : aucun indicateur de redémarrage, protection du système inactive (les deux indicateurs de 8.2 à faux), un profil Wi-Fi « Internet ».
+- À valider sur intervention réelle : mode Avion (aucun profil attendu), PC juste après une cumulative non redémarrée (indicateurs CBS et Windows Update).

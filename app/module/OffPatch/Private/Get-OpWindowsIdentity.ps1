@@ -7,6 +7,7 @@
         Lecture seule. La famille se déduit de CurrentBuild (22000 et plus = Windows 11), jamais de ProductName :
         sur Windows 11, ProductName vaut encore « Windows 10 … » (R-09). Le libellé affiché vient de
         Win32_OperatingSystem.Caption. Architecture du système : x64, arm64 (ou la valeur Windows en minuscules).
+        ProductType de Win32_OperatingSystem : 1 poste de travail, 2 contrôleur de domaine, 3 serveur.
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -39,5 +40,6 @@
         EditionId      = $registry.EditionID
         Caption        = $os.Caption
         Architecture   = $architecture
+        ProductType    = [int]$os.ProductType
     }
 }
