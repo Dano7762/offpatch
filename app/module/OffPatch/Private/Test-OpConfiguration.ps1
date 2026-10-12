@@ -40,6 +40,11 @@
         if (-not (Test-Property $s.retention.windowsMonths $t)) { $errors.Add("settings.json : retention.windowsMonths n'a pas de valeur pour la cible $t.") }
         elseif ([int]$s.retention.windowsMonths.$t -lt 1) { $errors.Add("settings.json : retention.windowsMonths.$t doit valoir au moins 1.") }
     }
+    # Identifiants d'activation de l'ESU Windows 10 entreprise (R-04), un par année, dans l'ordre.
+    $esuIds = @()
+    if (Test-Property $s.windows 'esuActivationIds') { $esuIds = @($s.windows.esuActivationIds) }
+    foreach ($id in $esuIds) { if ([string]$id -notmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') { $errors.Add("settings.json : identifiant ESU invalide « $id » (GUID en minuscules).") } }
+    if ($targets -contains 'win10-x64' -and $esuIds.Count -eq 0) { $errors.Add('settings.json : windows.esuActivationIds absent ou vide, obligatoire avec la cible win10-x64.') }
     if ([int]$s.retention.officeVersions -lt 1) { $errors.Add('settings.json : retention.officeVersions doit valoir au moins 1.') }
     $client = $s.client
     foreach ($rule in @(@('minFreeSpaceGB', 1), @('maxAutoReboots', 1), @('rebootCountdownSeconds', 0), @('staleDepotWarningDays', 1), @('odtTimeoutMinutes', 1))) {

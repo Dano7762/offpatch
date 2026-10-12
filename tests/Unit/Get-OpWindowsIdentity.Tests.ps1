@@ -3,6 +3,7 @@
 param()
 
 BeforeAll {
+    Set-StrictMode -Version Latest
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     . (Join-Path $root 'app\module\OffPatch\Private\Get-OpWindowsIdentity.ps1')
 }
@@ -47,5 +48,18 @@ Describe 'Get-OpWindowsIdentity' {
             Mock Get-CimInstance { [pscustomobject]@{ Caption = 'Microsoft Windows 11 Professionnel' } }
             (Get-OpWindowsIdentity).Family | Should -Be 'Windows11'
         }
+    }
+}
+
+Describe 'Get-OpWindowsIdentity : architecture du système' {
+    It 'lit PROCESSOR_ARCHITECTURE dans l''environnement machine : <Raw> donne <Expected>' -ForEach @(
+        @{ Raw = 'AMD64'; Expected = 'x64' }
+        @{ Raw = 'ARM64'; Expected = 'arm64' }
+        @{ Raw = 'x86'; Expected = 'x86' }
+    ) {
+        Mock Get-ItemProperty { [pscustomobject]@{ CurrentBuild = '26100'; UBR = 1; EditionID = 'Professional' } }
+        Mock Get-ItemProperty -ParameterFilter { $Path -like '*\Session Manager\Environment' } { [pscustomobject]@{ PROCESSOR_ARCHITECTURE = $Raw } }
+        Mock Get-CimInstance { [pscustomobject]@{ Caption = 'Microsoft Windows 11 Professionnel' } }
+        (Get-OpWindowsIdentity).Architecture | Should -Be $Expected
     }
 }

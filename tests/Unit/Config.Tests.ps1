@@ -60,6 +60,8 @@ Describe 'Test-OpConfiguration' {
         @{ Attendu = 'un lien downloadPages en http'; Alter = { param($c) $c.Settings.downloadPages.defenderDefinitions.x64 = 'http://go.microsoft.com/fwlink/?LinkID=121721&arch=x64' }; Message = '*non https*' }
         @{ Attendu = 'une empreinte de racine invalide'; Alter = { param($c) $c.Settings.integrity.trustedRootThumbprints = @('1234') }; Message = '*empreinte de racine invalide*' }
         @{ Attendu = 'un point de restauration non booléen'; Alter = { param($c) $c.Settings.client.createRestorePointBeforeSession = 'oui' }; Message = '*createRestorePointBeforeSession*' }
+        @{ Attendu = 'un identifiant ESU mal formé'; Alter = { param($c) $c.Settings.windows.esuActivationIds = @('pas-un-guid') }; Message = '*identifiant ESU invalide*pas-un-guid*' }
+        @{ Attendu = 'la cible win10-x64 sans identifiant ESU'; Alter = { param($c) $c.Settings.windows.PSObject.Properties.Remove('esuActivationIds') }; Message = '*esuActivationIds*win10-x64*' }
         @{ Attendu = 'une langue Office mal formée'; Alter = { param($c) $c.OfficeSources.sources[0].languages = @('français') }; Message = '*langue*français*' }
         @{ Attendu = 'un motif de titre invalide'; Alter = { param($c) $c.CatalogQueries.targets.'win11-x64'[0].includeTitlePattern = '(non fermé' }; Message = '*includeTitlePattern*' }
         @{ Attendu = 'une règle de sélection inconnue'; Alter = { param($c) $c.CatalogQueries.targets.'win11-x64'[0].pick = 'latest' }; Message = '*règle de sélection*latest*' }

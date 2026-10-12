@@ -8,7 +8,7 @@
     PowerShellVersion    = '5.1'
     CompatiblePSEditions = @('Desktop')
     # Liste explicite : une entrée par fichier de Public/ (contrôlé par tests/Unit/Module.Tests.ps1).
-    FunctionsToExport    = @('Format-OpDepotPlan', 'Initialize-OpSession', 'Invoke-OpDepotPurge', 'Invoke-OpDepotUpdate')
+    FunctionsToExport    = @('Format-OpDepotPlan', 'Get-OpSystemInfo', 'Initialize-OpSession', 'Invoke-OpDepotPurge', 'Invoke-OpDepotUpdate')
     CmdletsToExport      = @()
     VariablesToExport    = @()
     AliasesToExport      = @()
