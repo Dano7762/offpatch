@@ -80,6 +80,16 @@ Describe 'Get-OpDepotPlan' {
             $checkpoint.Files[0].FileName | Should -Match '^windows11\.0-kb5043080-x64_'
         }
 
+        It 'reprend l''UBR de la checkpoint dans checkpointUbr (catalog-queries.json), sinon avertit' {
+            $checkpoint.ResultingUbr | Should -Be 1742
+            @($checkpoint.Warnings).Count | Should -Be 0
+            $c = Get-Configuration @('win11-x64') $false
+            $c.CatalogQueries.PSObject.Properties.Remove('checkpointUbr')
+            $other = @(Get-OpDepotPlan -Configuration $c -Manifest $emptyManifest | Where-Object { $_.Category -eq 'windows-checkpoint' })[0]
+            $other.ResultingUbr | Should -BeNullOrEmpty
+            $other.Warnings[0] | Should -BeLike '*KB5043080*checkpointUbr*'
+        }
+
         It 'résout chaque lien et relève la taille annoncée' {
             foreach ($f in @($lcu.Files) + @($checkpoint.Files)) {
                 $f.InDepot | Should -BeFalse

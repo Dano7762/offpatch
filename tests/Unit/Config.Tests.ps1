@@ -60,6 +60,7 @@ Describe 'Test-OpConfiguration' {
         @{ Attendu = 'un lien downloadPages en http'; Alter = { param($c) $c.Settings.downloadPages.defenderDefinitions.x64 = 'http://go.microsoft.com/fwlink/?LinkID=121721&arch=x64' }; Message = '*non https*' }
         @{ Attendu = 'une empreinte de racine invalide'; Alter = { param($c) $c.Settings.integrity.trustedRootThumbprints = @('1234') }; Message = '*empreinte de racine invalide*' }
         @{ Attendu = 'un point de restauration non booléen'; Alter = { param($c) $c.Settings.client.createRestorePointBeforeSession = 'oui' }; Message = '*createRestorePointBeforeSession*' }
+        @{ Attendu = 'un UBR de checkpoint invalide'; Alter = { param($c) $c.CatalogQueries.checkpointUbr = [pscustomobject]@{ 'KB5043080' = 'x' } }; Message = '*checkpointUbr*KB5043080*' }
         @{ Attendu = 'une build de base mal formée'; Alter = { param($c) $c.Settings.windows.supportedBuilds.win11 = @(26100, '26H2') }; Message = '*build de base invalide*26H2*' }
         @{ Attendu = 'une famille cible sans builds prises en charge'; Alter = { param($c) $c.Settings.windows.supportedBuilds.PSObject.Properties.Remove('win11') }; Message = '*supportedBuilds.win11*' }
         @{ Attendu = 'un identifiant ESU mal formé'; Alter = { param($c) $c.Settings.windows.esuActivationIds = @('pas-un-guid') }; Message = '*identifiant ESU invalide*pas-un-guid*' }

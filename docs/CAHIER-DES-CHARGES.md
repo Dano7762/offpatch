@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.29 du 12 octobre 2026.
+Version 1.30 du 12 octobre 2026.
 
 ## 1. Contexte
 
@@ -214,6 +214,7 @@ Pour chaque cible et chaque catégorie : les recherches à envoyer au catalogue,
 {
   "schemaVersion": 1,
   "monthsToSearch": 2,
+  "checkpointUbr": { "KB5043080": 1742 },
   "targets": {
     "win11-x64": [
       {
@@ -244,6 +245,8 @@ Pour chaque cible et chaque catégorie : les recherches à envoyer au catalogue,
 - Toutes les règles regroupent d'abord les entrées retenues par KB (par KB et version pour `highestVersion`) : un même KB publié pour plusieurs versions de Windows devient un seul élément, dont `baseBuilds` réunit les builds des titres (Windows 11) ou vaut `releaseInformationBuild` (Windows 10). Deux KB à égalité sont départagés par la date du catalogue, avec un avertissement ; une catégorie sans aucune entrée retenue est signalée par un avertissement.
 - `releaseInformationBuild` (obligatoire avec `highestUbrFromReleaseInformation`) : build de base lue sur la page release-information.
 - `fileNamePattern` (facultatif) : choix du fichier d'une entrée qui en contient plusieurs, par exemple l'exécutable de la plateforme Defender pour l'architecture de la cible.
+
+`checkpointUbr` : UBR atteint par chaque cumulative checkpoint, par KB. Le titre d'une checkpoint ne porte pas de build et la page release-information n'associe aucun KB à la sortie 26100.1742 (R-02) : la valeur vient du paquet relevé dans la liste DISM (`Package_for_RollupFix~…~26100.1742`). Elle est recopiée dans `resultingUbr` de l'élément `windows-checkpoint` (7.2) et sert à sa détection (8.3). Une checkpoint absente de la table est signalée à la mise à jour du dépôt ; sur le PC, son état est `Error` jusqu'à ce que la table soit complétée.
 
 Quand Microsoft change la formulation d'un titre, on corrige ce fichier sans toucher au code.
 
@@ -504,7 +507,7 @@ Pour chaque élément du manifeste applicable au PC, l'outil calcule un état :
 Méthodes de détection, établies en R-09. La famille (Windows 10 ou 11) se lit sur `CurrentBuild`, jamais sur `ProductName` (8.2). Pour les cumulatives, la détection repose sur l'UBR ; la liste des paquets DISM ne sert qu'au diagnostic (son nom de paquet porte la build 26100 même sur une 25H2, et une checkpoint y figure à l'état « Staged », R-02) :
 
 - Cumulative Windows : non applicable si la build courante ne figure pas dans `baseBuilds`. Sinon, à jour si l'UBR courant est supérieur ou égal à `resultingUbr`, à installer dans le cas contraire.
-- Checkpoint : présente si la build courante est une build de base de la branche (26100, 26200 ou 26300) et que l'UBR courant est supérieur ou égal à l'UBR de la checkpoint (1742 pour KB5043080).
+- Checkpoint : présente si la build courante est une build de base de la branche (26100, 26200 ou 26300) et que l'UBR courant est supérieur ou égal à l'UBR de la checkpoint (`resultingUbr`, tiré de `checkpointUbr`, 6.2 ; 1742 pour KB5043080).
 - SSU autonome Windows 10 (élément épinglé, 6.4) : à installer si la build est 19045 et que l'UBR courant est inférieur à `applyBelowUbr` (3271 pour KB5031539, prérequis des images sans KB5028244), non applicable sinon. Une réinstallation est sans effet : l'état se juge sur l'UBR, pas sur le code retour (R-02).
 - Enablement package (élément épinglé, 6.4) : non applicable si la build courante ne figure pas dans `appliesToBaseBuilds` (déjà en 26300, ou autre branche) ou si l'option est désactivée ; à installer sinon. Prérequis : UBR du PC supérieur ou égal à `minUbr` (voir les règles de prérequis ci-dessous).
 - .NET : à jour si la liste des paquets DISM contient un paquet de même nom que `package.name`, à l'état `Installed`, de version supérieure ou égale à `package.version` ; à installer sinon. Sous Windows 10, le fichier est choisi d'après la valeur `Release` de `HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full` (`netRelease`). `Get-HotFix` ne sert qu'au diagnostic : une cumulative plus récente fait disparaître le KB du dépôt de sa liste (R-05).
@@ -757,3 +760,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.27 (12 octobre 2026) : champ `downloadProductId` des sources Office et modèle `download.xml.template` (6.3) : `/download` exige un produit, que `sources.json` ne donnait plus depuis le retrait des profils (1.23). Valeurs reprises des essais R-07 et R-08.
 - 1.28 (12 octobre 2026) : champ `windows.esuActivationIds` de `settings.json` (6.1) : identifiants d'activation de l'ESU Windows 10 entreprise, sortis du code comme prévu par la décision de R-04, et contrôlés par `Test-OpConfiguration`.
 - 1.29 (12 octobre 2026) : champ `windows.supportedBuilds` de `settings.json` (6.1) : builds de base prises en charge par famille, lues par le contrôle préalable « cible reconnue » (8.2) au lieu d'être écrites dans le code (décision de David), contrôlées par `Test-OpConfiguration`.
+- 1.30 (12 octobre 2026) : table `checkpointUbr` de `catalog-queries.json` (6.2) : UBR des cumulatives checkpoint, que la page release-information ne donne pas (ligne 26100.1742 sans KB, relevé du 12 octobre 2026), recopié dans `resultingUbr` de l'élément `windows-checkpoint` ; détection de la checkpoint sur cette valeur (8.3). Suite de R-02.

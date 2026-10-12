@@ -129,8 +129,17 @@
                 }
                 $jid = '{0}-checkpoint-{1}' -f $target, $(if ($jkb.Success) { 'KB' + $jkb.Groups[1].Value } else { $j.Sha1 })
                 $title = "Prérequis joint à « $($selection.Title) »"
-                Get-PlanItem -Id $jid -Target $target -Category $category -Source 'catalog' -Kb $(if ($jkb.Success) { 'KB' + $jkb.Groups[1].Value } else { $null }) -Title $title `
+                $checkpoint = Get-PlanItem -Id $jid -Target $target -Category $category -Source 'catalog' -Kb $(if ($jkb.Success) { 'KB' + $jkb.Groups[1].Value } else { $null }) -Title $title `
                     -Files @(Get-PlanFile -Name $j.FileName -Url $j.Url -Sha1 $j.Sha1)
+                # UBR atteint par la checkpoint, qui sert à sa détection (8.3) : catalog-queries.json, checkpointUbr.
+                $ubrTable = $null
+                if ($null -ne $Configuration.CatalogQueries.PSObject.Properties['checkpointUbr']) { $ubrTable = $Configuration.CatalogQueries.checkpointUbr }
+                if ($checkpoint.Kb -and $ubrTable -and $null -ne $ubrTable.PSObject.Properties[$checkpoint.Kb]) { $checkpoint.ResultingUbr = [int]$ubrTable.($checkpoint.Kb) }
+                else {
+                    $checkpoint.Warnings = @("UBR de la checkpoint inconnu : ajouter $($checkpoint.Kb) à checkpointUbr dans catalog-queries.json (R-02), sinon elle ne pourra pas être détectée sur le PC.")
+                    Write-OpLog -Level WARN -Message "Catalogue, $target : $($checkpoint.Warnings[0])"
+                }
+                $checkpoint
             }
         }
 

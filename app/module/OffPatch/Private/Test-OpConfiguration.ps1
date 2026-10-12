@@ -90,6 +90,12 @@
     $q = $Configuration.CatalogQueries
     if ([int]$q.schemaVersion -ne 1) { $errors.Add("catalog-queries.json : schemaVersion $($q.schemaVersion) non pris en charge (attendu : 1).") }
     if ([int]$q.monthsToSearch -lt 1) { $errors.Add('catalog-queries.json : monthsToSearch doit valoir au moins 1.') }
+    # UBR atteint par chaque checkpoint (R-02), facultatif : sans valeur, la checkpoint est signalée au dépôt.
+    if (Test-Property $q 'checkpointUbr') {
+        foreach ($p in @($q.checkpointUbr.PSObject.Properties)) {
+            if ($p.Name -notmatch '^KB\d+$' -or [string]$p.Value -notmatch '^\d+$' -or [int]$p.Value -lt 1) { $errors.Add("catalog-queries.json : checkpointUbr « $($p.Name) » = « $($p.Value) » invalide (KB<n> et UBR entier positif).") }
+        }
+    }
     foreach ($t in $targets) {
         if (-not (Test-Property $q.targets $t)) { $errors.Add("catalog-queries.json : aucune recherche pour la cible $t.") ; continue }
         foreach ($entry in @($q.targets.$t)) {

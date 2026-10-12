@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "monthsToSearch": 2,
+  "checkpointUbr": { "KB5043080": 1742 },
   "targets": {
     "win11-x64": [
       {
