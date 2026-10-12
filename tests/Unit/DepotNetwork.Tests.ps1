@@ -43,6 +43,7 @@ BeforeAll {
 Describe 'Invoke-OpDepotUpdate, réseau simulé' {
     BeforeEach {
         Mock Write-OpLog {}
+        Mock Get-OpOdtPlan {} # ODT : Odt.Tests.ps1
         Mock Invoke-OpWebRequest {
             if ($Uri -like '*/DownloadDialog.aspx') { return $script:dialog }
             if ($Uri -like '*/Search.aspx?q=*Cumulative%20Update%20for%20Windows%2011*') { return $script:search }

@@ -1,3 +1,5 @@
 ﻿Capturé le 2026-10-05 20:15 UTC, entrée de la fenêtre : be656f78-0714-440c-a0be-b27b4f9e5d71
 
 release-information.html capturée le 2026-10-11 15:26 UTC (page du 2026-09-14 au plus tôt : KB5129236 en tête).
+
+odt-download-page.html capturée le 2026-10-12 (lien officedeploymenttool_20326-20112.exe).

@@ -10,7 +10,8 @@
       - search-full-last.html  : même recherche, dernière page (paramètre &p=, index à partir de 0) ;
       - search-noresult.html   : recherche sans résultat ;
       - dialog-kb5129195.html  : fenêtre de téléchargement de la première entrée x64 de KB5129195 ;
-      - release-information.html : page release-information de Windows 10 (adresse lue dans config/settings.json).
+      - release-information.html : page release-information de Windows 10 (adresse lue dans config/settings.json) ;
+      - odt-download-page.html : page de l'ODT du Centre de téléchargement (adresse lue dans config/settings.json).
 
 .EXAMPLE
     .\tests\Fixtures\catalog\Save-CatalogFixture.ps1
@@ -45,6 +46,9 @@ $settingsPath = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -P
 $releaseUri = (Get-Content -Path $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json).downloadPages.windows10ReleaseInformation
 $release = (Invoke-WebRequest -Uri $releaseUri -UseBasicParsing).Content
 [System.IO.File]::WriteAllText((Join-Path $Destination 'release-information.html'), $release, (New-Object System.Text.UTF8Encoding $false))
+$odtUri = (Get-Content -Path $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json).downloadPages.officeDeploymentToolPage
+$odt = (Invoke-WebRequest -Uri $odtUri -UseBasicParsing).Content
+[System.IO.File]::WriteAllText((Join-Path $Destination 'odt-download-page.html'), $odt, (New-Object System.Text.UTF8Encoding $false))
 
 $row = [regex]::Matches($kb, '(?s)<tr id="([0-9a-f\-]{36})_R\d+".*?</tr>') | Where-Object { $_.Value -match 'x64-based Systems' } | Select-Object -First 1
 $id = $row.Groups[1].Value

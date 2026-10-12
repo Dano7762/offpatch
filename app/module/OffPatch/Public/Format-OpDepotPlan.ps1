@@ -48,6 +48,15 @@
             foreach ($w in @($item.Warnings)) { '      Avertissement : ' + $w }
         }
     }
+    $odt = $null
+    if ($null -ne $Result.PSObject.Properties['Odt']) { $odt = $Result.Odt }
+    if ($odt) {
+        if ($odt.Error) { "ODT [REFUSÉ] : $($odt.Error)" }
+        elseif ($odt.UpToDate) { "ODT [à jour] : setup.exe $($odt.InstalledVersion)" }
+        elseif ($Result.OdtUpdated) { "ODT [mis à jour] : version $($odt.Version)" }
+        elseif (-not $Result.ListOnly) { "ODT [ÉCHEC] : version $($odt.Version) non installée dans tools\odt, voir le journal." }
+        else { 'ODT [à télécharger] : version {0}, {1}, {2}' -f $odt.Version, $odt.FileName, (Format-Size $odt.SizeBytes) }
+    }
     $summary = 'À télécharger : {0} fichier(s), {1}' -f $Result.DownloadCount, (Format-Size $Result.DownloadBytes)
     if ($Result.UnknownSizeCount -gt 0) { $summary += " (taille inconnue pour $($Result.UnknownSizeCount) fichier(s))" }
     $summary

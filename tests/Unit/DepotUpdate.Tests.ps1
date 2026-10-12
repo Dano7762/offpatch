@@ -10,7 +10,7 @@ BeforeAll {
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $module = Join-Path $root 'app\module\OffPatch'
     foreach ($name in 'ConvertTo-OpManifestItem', 'Read-OpMsuPackage', 'Save-OpDepotFile', 'Save-OpDownload', 'Confirm-OpDownloadIntegrity',
-        'Test-OpFileSignature', 'Get-OpFileVersion', 'Invoke-OpProcess', 'Get-OpDepotPlan', 'Get-OpFreeSpace', 'Write-OpLog', 'ConvertTo-OpMaskedText',
+        'Test-OpFileSignature', 'Get-OpFileVersion', 'Invoke-OpProcess', 'Get-OpDepotPlan', 'Get-OpOdtPlan', 'Save-OpOdt', 'Get-OpFreeSpace', 'Write-OpLog', 'ConvertTo-OpMaskedText',
         'Get-OpConfiguration', 'Read-OpJsonFile', 'Test-OpConfiguration', 'Get-OpPath', 'Get-OpRoot', 'Read-OpManifest', 'Test-OpManifest', 'Save-OpManifest',
         'Get-OpDepotPurgePlan') {
         . (Join-Path $module "Private\$name.ps1")
@@ -199,6 +199,7 @@ Describe 'Save-OpDepotFile' {
 Describe 'Invoke-OpDepotUpdate (téléchargement)' {
     BeforeAll {
         Mock Write-OpLog {}
+        Mock Get-OpOdtPlan {} # ODT : Odt.Tests.ps1
         Mock Get-OpFreeSpace { [long]1000000 }
         function Initialize-TestTool([string]$Name) {
             $tool = Join-Path $TestDrive $Name

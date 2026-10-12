@@ -11,7 +11,7 @@ BeforeAll {
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $module = Join-Path $root 'app\module\OffPatch'
     foreach ($name in 'ConvertFrom-OpCatalogDownloadDialog', 'Get-OpCatalogDownloadLink', 'Invoke-OpWebRequest', 'Get-OpCatalogSelection', 'Resolve-OpDownloadUrl',
-        'Get-OpDepotPlan', 'Get-OpDefenderDefinitionPlan', 'Get-OpFileVersion', 'Get-OpFreeSpace', 'Write-OpLog', 'ConvertTo-OpMaskedText', 'Get-OpConfiguration', 'Read-OpJsonFile',
+        'Get-OpDepotPlan', 'Get-OpDefenderDefinitionPlan', 'Get-OpOdtPlan', 'Get-OpFileVersion', 'Get-OpFreeSpace', 'Write-OpLog', 'ConvertTo-OpMaskedText', 'Get-OpConfiguration', 'Read-OpJsonFile',
         'Test-OpConfiguration', 'Get-OpPath', 'Get-OpRoot', 'Read-OpManifest', 'Test-OpManifest') {
         . (Join-Path $module "Private\$name.ps1")
     }
@@ -229,6 +229,7 @@ Describe 'Get-OpFileVersion' {
 Describe 'Invoke-OpDepotUpdate' {
     BeforeAll {
         Mock Write-OpLog {}
+        Mock Get-OpOdtPlan {} # ODT : Odt.Tests.ps1
         $tool = Join-Path $TestDrive 'outil'
         New-Item -ItemType Directory -Force -Path $tool | Out-Null
         Copy-Item -Path (Join-Path $root 'config') -Destination $tool -Recurse

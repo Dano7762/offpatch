@@ -12,12 +12,14 @@
         est téléchargé, contrôlé et rangé (Save-OpDepotFile), une seule fois s'il est partagé, puis chaque élément
         complet est inscrit au manifeste, réécrit de façon atomique après chaque élément : une interruption ne perd
         que l'élément en cours, et le lancement suivant reprend là. Un élément dont un fichier est refusé ou échoue
-        n'est pas inscrit ; les autres continuent. Enfin, la purge (Invoke-OpDepotPurge) retire ce que la rétention
+        n'est pas inscrit ; les autres continuent. Si une source Office est configurée, l'ODT de tools\odt est
+        comparé à la dernière version publiée (Get-OpOdtPlan) et remplacé s'il est plus ancien (Save-OpOdt) ; son
+        échec compte comme une erreur sans arrêter le reste. Enfin, la purge (Invoke-OpDepotPurge) retire ce que la rétention
         ne garde plus et liste les fichiers orphelins sans les supprimer ; son résultat est dans la propriété Purge.
         Renvoie un objet : ListOnly, Items (éléments de Get-OpDepotPlan), DownloadBytes (fichiers à télécharger,
         comptés une fois), DownloadCount, UnknownSizeCount, FreeBytes (volume du dépôt, $null si illisible),
         EnoughSpace, ErrorCount (liens refusés, puis éléments non inscrits), NewItems (éléments ajoutés au manifeste
-        par ce lancement, résumé des nouveautés).
+        par ce lancement, résumé des nouveautés), Odt (plan de Get-OpOdtPlan, $null sans source Office), OdtUpdated.
 
     .PARAMETER ListOnly
         Interroge le catalogue et contrôle les liens sans rien télécharger.
@@ -51,6 +53,9 @@
         $manifest = Read-OpManifest -Path $manifestPath
         Write-OpLog "Mise à jour du dépôt ($mode) : cibles $(@($configuration.Settings.targets) -join ', ')."
         $items = @(Get-OpDepotPlan -Configuration $configuration -Manifest $manifest -Now $Now)
+        # ODT : utile seulement si une source Office est configurée ; une erreur est portée par le plan.
+        $odt = $null
+        if (@($configuration.OfficeSources.sources).Count -gt 0) { $odt = Get-OpOdtPlan -Configuration $configuration -Root $Root }
     } catch {
         # Catalogue injoignable, page non reconnue, manifeste invalide : l'erreur est journalisée puis relancée.
         Write-OpLog -Level ERROR -Message "Mise à jour du dépôt ($mode) interrompue : $($_.Exception.Message)"
@@ -81,6 +86,18 @@
             if ($null -eq $f.SizeBytes) { $unknown++ } else { $bytes += $f.SizeBytes }
         }
     }
+    if ($odt) {
+        if ($odt.Error) {
+            $errorCount++
+            Write-OpLog -Level ERROR -Message "Dépôt, ODT refusé. $($odt.Error)"
+        } elseif ($odt.UpToDate) {
+            Write-OpLog "Dépôt, ODT à jour : setup.exe $($odt.InstalledVersion) (dernière version $($odt.Version))."
+        } else {
+            Write-OpLog "Dépôt, ODT $($odt.Version) à télécharger ($(@($odt.Hosts) -join ' -> '))."
+            $seen[$odt.Url] = $true
+            if ($null -eq $odt.SizeBytes) { $unknown++ } else { $bytes += $odt.SizeBytes }
+        }
+    }
 
     $free = Get-OpFreeSpace -Path (Get-OpPath -Name Depot -Root $Root)
     $enough = $null
@@ -102,6 +119,8 @@
         EnoughSpace      = $enough
         ErrorCount       = $errorCount
         NewItems         = @()
+        Odt              = $odt
+        OdtUpdated       = $false
     }
     if ($ListOnly) { return $result }
     if ($enough -eq $false) {
@@ -168,6 +187,16 @@
         if ($isNew) {
             $new.Add($manifestItem)
             Write-OpLog "Dépôt : nouveauté inscrite au manifeste, $($manifestItem.id)."
+        }
+    }
+
+    if ($odt -and -not $odt.Error -and -not $odt.UpToDate) {
+        try {
+            Save-OpOdt -Plan $odt -Configuration $configuration -Root $Root -Confirm:$false | Out-Null
+            $result.OdtUpdated = $true
+        } catch {
+            $errorCount++
+            Write-OpLog -Level ERROR -Message "Dépôt, ODT non mis à jour. $($_.Exception.Message)"
         }
     }
 
