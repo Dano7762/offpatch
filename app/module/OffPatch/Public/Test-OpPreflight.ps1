@@ -9,7 +9,8 @@
         Blocking), Message et Action (action proposée à l'interface ou au mode auto, $null sinon) :
           - Elevation : droits d'administrateur, bloquant ;
           - ProcessBitness : PowerShell 32 bits sur un Windows 64 bits, bloquant ;
-          - Target : système dans le périmètre (3.1), sinon bloquant avec le motif ; avertissement si la cible n'est
+          - Target : système dans le périmètre (3.1 ; builds de base de windows.supportedBuilds), sinon bloquant
+            avec le motif ; avertissement si la cible n'est
             pas dans settings.json (rien au dépôt pour ce PC) ;
           - Esu (Windows 10) : ESU actif, sinon avertissement, Action SkipWindowsInAuto (R-04) ;
           - PendingReboot : redémarrage en attente (CBS, Windows Update, renommages), avertissement, Action
@@ -64,18 +65,22 @@
         ConvertTo-Check 'ProcessBitness' 'PowerShell natif' 'Blocking' 'PowerShell 32 bits sur un Windows 64 bits : DISM et le registre seraient vus à travers la redirection 32 bits. Lancer OffPatch par Lancer-OffPatch.cmd.' $null
     } else { ConvertTo-Check 'ProcessBitness' 'PowerShell natif' 'Ok' 'PowerShell natif du système.' $null }
 
-    # Périmètre (3.1). ponytail: builds de base en dur ici ; à sortir dans la configuration à la prochaine version
-    # de Windows 11 prise en charge.
-    $win11Builds = 26100, 26200, 26300
+    # Périmètre (3.1) : builds de base prises en charge par famille, dans windows.supportedBuilds.
+    $family = $i.Family -replace '^Windows', 'win'
+    $name = $i.Family -replace '^Windows', 'Windows '
+    $supported = @()
+    $builds = $configuration.Settings.windows.supportedBuilds
+    if ($null -ne $builds.PSObject.Properties[$family]) { $supported = @($builds.$family | ForEach-Object { [int]$_ } | Sort-Object) }
     $label = "$($i.Caption) $($i.DisplayVersion), build $($i.CurrentBuild).$($i.Ubr), $($i.Architecture)"
     $reason = $null
     if ($i.ProductType -ne 1) { $reason = 'Windows Server' }
     elseif (@('x64', 'arm64') -notcontains $i.Architecture) { $reason = "architecture $($i.Architecture) non prise en charge" }
-    elseif ($i.Family -eq 'Windows10') {
-        if ($i.CurrentBuild -ne 19045) { $reason = 'Windows 10 antérieur à 22H2 (build 19045) ou édition LTSC' }
-        elseif ($i.Architecture -ne 'x64') { $reason = 'Windows 10 ARM64' }
-    } elseif ($win11Builds -notcontains $i.CurrentBuild) {
-        if ($i.CurrentBuild -lt $win11Builds[0]) { $reason = 'Windows 11 23H2 ou antérieur' } else { $reason = 'version de Windows 11 non prise en charge (par exemple 26H1)' }
+    elseif ($i.Family -eq 'Windows10' -and $i.Architecture -ne 'x64') { $reason = 'Windows 10 ARM64' }
+    elseif ($supported -notcontains $i.CurrentBuild) {
+        $list = 'aucune'
+        if ($supported.Count -gt 0) { $list = $supported -join ', ' }
+        if ($supported.Count -gt 0 -and $i.CurrentBuild -lt $supported[0]) { $reason = "$name antérieur aux versions prises en charge (builds $list)" }
+        else { $reason = "version de $name non prise en charge (builds $list)" }
     }
     if ($reason) { ConvertTo-Check 'Target' 'Système pris en charge' 'Blocking' "Hors périmètre : $reason ($label)." $null }
     elseif (@($configuration.Settings.targets) -notcontains $i.Target) { ConvertTo-Check 'Target' 'Système pris en charge' 'Warning' "Cible $($i.Target) absente de settings.json : le dépôt ne contient rien pour ce PC ($label)." $null }

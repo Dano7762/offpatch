@@ -40,6 +40,16 @@
         if (-not (Test-Property $s.retention.windowsMonths $t)) { $errors.Add("settings.json : retention.windowsMonths n'a pas de valeur pour la cible $t.") }
         elseif ([int]$s.retention.windowsMonths.$t -lt 1) { $errors.Add("settings.json : retention.windowsMonths.$t doit valoir au moins 1.") }
     }
+    # Builds de base prises en charge (3.1), par famille : obligatoires pour chaque famille des cibles.
+    $supported = $null
+    if (Test-Property $s.windows 'supportedBuilds') { $supported = $s.windows.supportedBuilds }
+    foreach ($family in @($targets | ForEach-Object { ([string]$_ -split '-')[0] } | Sort-Object -Unique)) {
+        if (@('win10', 'win11') -notcontains $family) { continue }
+        $list = @()
+        if (Test-Property $supported $family) { $list = @($supported.$family) }
+        if ($list.Count -eq 0) { $errors.Add("settings.json : windows.supportedBuilds.$family absent ou vide, obligatoire avec une cible $family.") }
+        foreach ($b in $list) { if ([string]$b -notmatch '^\d{5}$') { $errors.Add("settings.json : build de base invalide « $b » dans windows.supportedBuilds.$family (nombre de 5 chiffres).") } }
+    }
     # Identifiants d'activation de l'ESU Windows 10 entreprise (R-04), un par année, dans l'ordre.
     $esuIds = @()
     if (Test-Property $s.windows 'esuActivationIds') { $esuIds = @($s.windows.esuActivationIds) }

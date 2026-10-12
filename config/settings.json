@@ -3,6 +3,7 @@
   "targets": ["win11-x64", "win11-arm64", "win10-x64"],
   "windows": {
     "includeEnablementPackage": true,
+    "supportedBuilds": { "win10": [19045], "win11": [26100, 26200, 26300] },
     "esuActivationIds": ["f520e45e-7413-4a34-a497-d2765967d094", "1043add5-23b1-4afb-9a0f-64343c8f3f8d", "83d49986-add3-41d7-ba33-87c7bfb5c0fb"]
   },
   "office": {

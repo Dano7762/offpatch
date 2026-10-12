@@ -51,16 +51,28 @@ Describe 'Test-OpPreflight' {
     It 'refuse un système hors périmètre : <Case>' -ForEach @(
         @{ Case = 'Windows Server'; Family = 'Windows11'; Build = 26100; Arch = 'x64'; Type = 3; Expected = '*Windows Server*' }
         @{ Case = 'x86'; Family = 'Windows10'; Build = 19045; Arch = 'x86'; Type = 1; Expected = '*architecture x86*' }
-        @{ Case = 'Windows 10 21H2'; Family = 'Windows10'; Build = 19044; Arch = 'x64'; Type = 1; Expected = '*antérieur à 22H2*' }
+        @{ Case = 'Windows 10 21H2'; Family = 'Windows10'; Build = 19044; Arch = 'x64'; Type = 1; Expected = '*Windows 10 antérieur aux versions prises en charge (builds 19045)*' }
         @{ Case = 'Windows 10 ARM64'; Family = 'Windows10'; Build = 19045; Arch = 'arm64'; Type = 1; Expected = '*Windows 10 ARM64*' }
-        @{ Case = 'Windows 11 23H2'; Family = 'Windows11'; Build = 22631; Arch = 'x64'; Type = 1; Expected = '*23H2 ou antérieur*' }
-        @{ Case = 'Windows 11 26H1'; Family = 'Windows11'; Build = 28000; Arch = 'arm64'; Type = 1; Expected = '*non prise en charge*' }
+        @{ Case = 'Windows 11 23H2'; Family = 'Windows11'; Build = 22631; Arch = 'x64'; Type = 1; Expected = '*Windows 11 antérieur*(builds 26100, 26200, 26300)*' }
+        @{ Case = 'Windows 11 26H1'; Family = 'Windows11'; Build = 28000; Arch = 'arm64'; Type = 1; Expected = '*version de Windows 11 non prise en charge*' }
     ) {
         $info = Get-TestInfo
         $info.Family = $Family; $info.CurrentBuild = $Build; $info.Architecture = $Arch; $info.ProductType = $Type
         $check = Get-Check $info 'Target'
         $check.Result | Should -Be 'Blocking'
         $check.Message | Should -BeLike $Expected
+    }
+
+    It 'accepte une nouvelle version de Windows 11 ajoutée à windows.supportedBuilds, sans changer le code' {
+        $info = Get-TestInfo
+        $info.CurrentBuild = 26400
+        (Get-Check $info 'Target').Result | Should -Be 'Blocking'
+        Mock Get-OpConfiguration {
+            $c = [pscustomobject]@{ Settings = (Get-Content -LiteralPath (Join-Path $root 'config\settings.json') -Raw -Encoding UTF8 | ConvertFrom-Json) }
+            $c.Settings.windows.supportedBuilds.win11 = @(26100, 26200, 26300, 26400)
+            $c
+        }
+        (Get-Check $info 'Target').Result | Should -Be 'Ok'
     }
 
     It 'avertit quand la cible du PC n''est pas dans settings.json' {

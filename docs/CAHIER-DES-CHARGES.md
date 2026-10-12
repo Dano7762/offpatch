@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.28 du 12 octobre 2026.
+Version 1.29 du 12 octobre 2026.
 
 ## 1. Contexte
 
@@ -153,6 +153,7 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
   "targets": ["win11-x64", "win11-arm64", "win10-x64"],
   "windows": {
     "includeEnablementPackage": true,
+    "supportedBuilds": { "win10": [19045], "win11": [26100, 26200, 26300] },
     "esuActivationIds": ["f520e45e-7413-4a34-a497-d2765967d094", "1043add5-23b1-4afb-9a0f-64343c8f3f8d", "83d49986-add3-41d7-ba33-87c7bfb5c0fb"]
   },
   "office": {
@@ -198,6 +199,8 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
 ```
 
 `downloadPages` regroupe les liens Microsoft hors catalogue : définitions Defender par architecture (redirection vers `definitionupdates.microsoft.com`, R-06) et page de l'Office Deployment Tool, d'où l'outil tire le lien versionné du fichier (`download.microsoft.com`, R-07), page release-information de Windows 10, qui donne l'UBR de chaque cumulative Windows 10 pour la sélection (6.2, R-01). `windows10ReleaseInformation` est obligatoire dès qu'une entrée de `catalog-queries.json` utilise la règle `highestUbrFromReleaseInformation`. Les hôtes atteints restent soumis à `allowedDomains` ; le contrat en ligne hebdomadaire lit ces liens ici.
+
+`windows.supportedBuilds` : builds de base prises en charge par famille (3.1) : `win10` 19045 (22H2), `win11` 26100, 26200 et 26300 (24H2, 25H2, 26H2). Un PC dont la build courante n'y figure pas est refusé au contrôle préalable « cible reconnue » (8.2). Ajouter une version de Windows 11 se fait ici, sans changer le code. Obligatoire, non vide, pour chaque famille présente dans `targets`.
 
 `windows.esuActivationIds` : identifiants d'activation de l'ESU Windows 10 entreprise, années 1, 2 et 3 dans cet ordre, publiés par Microsoft et identiques sur tous les PC (R-04). Un PC Windows 10 a l'ESU « actif (entreprise, année N) » si la classe WMI `SoftwareLicensingProduct` porte l'un d'eux avec `LicenseStatus` 1 ; sinon son ESU est « indétectable » (8.2). Obligatoire, avec des GUID en minuscules, dès que `targets` contient `win10-x64`.
 
@@ -753,3 +756,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.26 (11 octobre 2026) : téléchargement (7.1, étape 4) : redirections refusées pendant le transfert par BITS (`RedirectPolicyDisallow` posé par `Set-BitsTransfer`, `Start-BitsTransfer -SecurityFlags` étant ignoré) et par `HttpClient`, reprise d'un travail BITS ou d'un fichier `.part`, critères de repli sur `HttpClient`, fichier de taille inattendue supprimé ; la limite « BITS suit lui-même une redirection » est levée (11). Suite de R-16.
 - 1.27 (12 octobre 2026) : champ `downloadProductId` des sources Office et modèle `download.xml.template` (6.3) : `/download` exige un produit, que `sources.json` ne donnait plus depuis le retrait des profils (1.23). Valeurs reprises des essais R-07 et R-08.
 - 1.28 (12 octobre 2026) : champ `windows.esuActivationIds` de `settings.json` (6.1) : identifiants d'activation de l'ESU Windows 10 entreprise, sortis du code comme prévu par la décision de R-04, et contrôlés par `Test-OpConfiguration`.
+- 1.29 (12 octobre 2026) : champ `windows.supportedBuilds` de `settings.json` (6.1) : builds de base prises en charge par famille, lues par le contrôle préalable « cible reconnue » (8.2) au lieu d'être écrites dans le code (décision de David), contrôlées par `Test-OpConfiguration`.

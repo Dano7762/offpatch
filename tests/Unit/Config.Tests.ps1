@@ -60,6 +60,8 @@ Describe 'Test-OpConfiguration' {
         @{ Attendu = 'un lien downloadPages en http'; Alter = { param($c) $c.Settings.downloadPages.defenderDefinitions.x64 = 'http://go.microsoft.com/fwlink/?LinkID=121721&arch=x64' }; Message = '*non https*' }
         @{ Attendu = 'une empreinte de racine invalide'; Alter = { param($c) $c.Settings.integrity.trustedRootThumbprints = @('1234') }; Message = '*empreinte de racine invalide*' }
         @{ Attendu = 'un point de restauration non booléen'; Alter = { param($c) $c.Settings.client.createRestorePointBeforeSession = 'oui' }; Message = '*createRestorePointBeforeSession*' }
+        @{ Attendu = 'une build de base mal formée'; Alter = { param($c) $c.Settings.windows.supportedBuilds.win11 = @(26100, '26H2') }; Message = '*build de base invalide*26H2*' }
+        @{ Attendu = 'une famille cible sans builds prises en charge'; Alter = { param($c) $c.Settings.windows.supportedBuilds.PSObject.Properties.Remove('win11') }; Message = '*supportedBuilds.win11*' }
         @{ Attendu = 'un identifiant ESU mal formé'; Alter = { param($c) $c.Settings.windows.esuActivationIds = @('pas-un-guid') }; Message = '*identifiant ESU invalide*pas-un-guid*' }
         @{ Attendu = 'la cible win10-x64 sans identifiant ESU'; Alter = { param($c) $c.Settings.windows.PSObject.Properties.Remove('esuActivationIds') }; Message = '*esuActivationIds*win10-x64*' }
         @{ Attendu = 'une langue Office mal formée'; Alter = { param($c) $c.OfficeSources.sources[0].languages = @('français') }; Message = '*langue*français*' }
