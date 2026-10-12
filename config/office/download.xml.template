@@ -1,0 +1,7 @@
+<Configuration>
+  <Add SourcePath="{{SourcePath}}" OfficeClientEdition="64" Channel="{{Channel}}">
+    <Product ID="{{ProductId}}">
+{{LanguageElements}}
+    </Product>
+  </Add>
+</Configuration>

@@ -9,7 +9,7 @@
         cible, valeurs du client, niveau du journal, empreintes de racine, hôtes exacts de allowedDomains, liens
         downloadPages en https sur un hôte autorisé, recherches du catalogue (catégories, motifs, règles de sélection,
         dépendances), éléments épinglés (lien, SHA-1, builds), sources Office (un canal par source, dossier, langues,
-        identifiants de canal installé uniques).
+        produit de téléchargement, identifiants de canal installé uniques).
     #>
     [CmdletBinding()]
     [OutputType([string[]])]
@@ -127,6 +127,7 @@
         if (-not $src.channel) { $errors.Add("$label : channel absent.") }
         elseif ($channels.ContainsKey($src.channel)) { $errors.Add("$label : canal $($src.channel) déjà couvert par une autre source.") } else { $channels[$src.channel] = $true }
         if ([string]$src.folder -notmatch '^office/[a-z0-9]+$') { $errors.Add("$label : folder doit être de la forme office/<nom>.") }
+        if (-not (Test-Property $src 'downloadProductId') -or [string]$src.downloadProductId -notmatch '^[A-Za-z0-9]+$') { $errors.Add("$label : downloadProductId absent ou invalide (product ID de l'ODT).") }
         $languages = @($src.languages)
         if ($languages.Count -eq 0) { $errors.Add("$label : aucune langue.") }
         foreach ($lang in $languages) { if ($lang -notmatch '^[a-z]{2}-[a-z]{2}$') { $errors.Add("$label : langue « $lang » invalide (forme xx-xx).") } }

@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.26 du 11 octobre 2026.
+Version 1.27 du 12 octobre 2026.
 
 ## 1. Contexte
 
@@ -254,6 +254,7 @@ Une entrée peut porter les champs de dépendance `prerequisites` et `runsAfter`
     {
       "id": "current",
       "channel": "Current",
+      "downloadProductId": "Home2024Retail",
       "folder": "office/current",
       "languages": ["fr-fr", "en-us"],
       "installedChannelIds": ["…"]
@@ -262,7 +263,21 @@ Une entrée peut porter les champs de dépendance `prerequisites` et `runsAfter`
 }
 ```
 
-Les langues se règlent par source. Par défaut, la source `current` porte `fr-fr` et `en-us` : les Office en boîte ou Microsoft 365 préinstallés par les fabricants sont souvent bilingues, et une langue installée absente de la source empêche leur mise à jour (8.5, R-08). L'anglais ajoute environ 350 Mo à la source Current (3 955 Mo au lieu de 3 605 Mo, mesuré le 5 octobre 2026). Les sources `perpetualvl2024` et `perpetualvl2021` portent `fr-fr` seul. `installedChannelIds` : identifiants de canal relevés dans `CDNBaseUrl` du registre Click-to-Run, mesurés sur runner (R-08).
+Les langues se règlent par source. Par défaut, la source `current` porte `fr-fr` et `en-us` : les Office en boîte ou Microsoft 365 préinstallés par les fabricants sont souvent bilingues, et une langue installée absente de la source empêche leur mise à jour (8.5, R-08). L'anglais ajoute environ 350 Mo à la source Current (3 955 Mo au lieu de 3 605 Mo, mesuré le 5 octobre 2026). Les sources `perpetualvl2024` et `perpetualvl2021` portent `fr-fr` seul. `installedChannelIds` : identifiants de canal relevés dans `CDNBaseUrl` du registre Click-to-Run, mesurés sur runner (R-08). `downloadProductId` : product ID demandé à l'ODT pour le `/download` de la source, que l'ODT exige ; il ne limite pas la source, qui met à jour tout produit du canal et de la langue (R-08). Valeurs mesurées sur runner (R-07, R-08) : `Home2024Retail` pour `current`, `ProPlus2024Volume` pour `perpetualvl2024` ; `ProPlus2021Volume` (liste officielle de l'ODT) pour `perpetualvl2021`.
+
+`download.xml.template` sert à générer le XML de `/download` de chaque source, avec le chemin absolu de son dossier dans le dépôt (7.1) :
+
+```xml
+<Configuration>
+  <Add SourcePath="{{SourcePath}}" OfficeClientEdition="64" Channel="{{Channel}}">
+    <Product ID="{{ProductId}}">
+{{LanguageElements}}
+    </Product>
+  </Add>
+</Configuration>
+```
+
+`{{LanguageElements}}` contient un `<Language ID="…" />` par langue de la source. Sans attribut `Version`, l'ODT télécharge la dernière version du canal et écrit `v64.cab`, dont dépend la purge (7.3, R-07).
 
 `update.xml.template` sert à générer, au moment de la mise à jour, un XML avec le chemin absolu de la source sur le support, les produits et les langues déjà installés (lus dans le registre Click-to-Run). Aucune clé de produit, aucun `<Remove>` :
 
@@ -733,3 +748,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.24 (6 octobre 2026) : Office 2016 et 2019 (boîte et LTSC) détectés et non mis à jour, `NotApplicable` « Office 2016/2019 : fin de support Microsoft (octobre 2025) », recommandation au rapport de passer à une version prise en charge ; règle contrôlée avant celle du canal (Office 2019 en boîte partage l'identifiant du canal Current) ; motif de reconnaissance dans `config/office/sources.json` (`endOfSupport`), Office 2016 à établir sur intervention réelle (3.3, 8.3, 8.5, 8.8) ; cas P13 et matrice de traçabilité (12). Licence conservée par la mise à jour, mesurée sur runner avec la GVLK publiée par Microsoft (mêmes 5 derniers caractères de clé avant et après) (3.3). Suite de R-08.
 - 1.25 (11 octobre 2026) : mise en œuvre de la sélection dans le catalogue (phase 2). `downloadPages.windows10ReleaseInformation` dans `settings.json`, obligatoire avec la règle `highestUbrFromReleaseInformation` (6.1) ; champ `releaseInformationBuild` de l'entrée Windows 10, lecture de la page release-information par ligne de tableau filtrée sur la build de base, repli sur `latestMonth` aussi quand la page est inaccessible, regroupement par KB commun à toutes les règles, avertissements en cas d'égalité ou d'absence de résultat (6.2) ; règles de la liste de mise à jour du dépôt et de `-ListOnly` : prérequis joints, éléments épinglés par cible, identifiants des éléments, fichier déjà au dépôt reconnu par son nom, taille lue en HEAD, liens refusés (7.1). Suite de R-01 et R-02.
 - 1.26 (11 octobre 2026) : téléchargement (7.1, étape 4) : redirections refusées pendant le transfert par BITS (`RedirectPolicyDisallow` posé par `Set-BitsTransfer`, `Start-BitsTransfer -SecurityFlags` étant ignoré) et par `HttpClient`, reprise d'un travail BITS ou d'un fichier `.part`, critères de repli sur `HttpClient`, fichier de taille inattendue supprimé ; la limite « BITS suit lui-même une redirection » est levée (11). Suite de R-16.
+- 1.27 (12 octobre 2026) : champ `downloadProductId` des sources Office et modèle `download.xml.template` (6.3) : `/download` exige un produit, que `sources.json` ne donnait plus depuis le retrait des profils (1.23). Valeurs reprises des essais R-07 et R-08.
