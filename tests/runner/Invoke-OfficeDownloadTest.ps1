@@ -8,7 +8,9 @@
       1. ODT : Get-OpOdtPlan puis Save-OpOdt (extraction élevée, R-07) dans tools\odt de la copie du dépôt ;
       2. source demandée (config\office\sources.json) : XML de Get-OpOfficeDownloadXml, Save-OpOfficeSource ;
       3. second passage dans le même dossier : la source doit être déclarée à jour ;
-      4. relevé : versions, durées, contenu de v64.hash, dossiers de Office\Data, journal du dépôt.
+      4. élément office-source du manifeste (contrôlé par Test-OpManifest), puis purge d'une ancienne version
+         fictive posée à côté de la vraie, et revérification des SHA-256 de la version courante ;
+      5. relevé : versions, durées, contenu de v64.hash, dossiers de Office\Data, journal du dépôt.
 
 .EXAMPLE
     .\Invoke-OfficeDownloadTest.ps1 -SourceId perpetualvl2021 -OutputDirectory $env:RUNNER_TEMP\office-download-out
@@ -55,6 +57,28 @@ $lines = & $module {
         if ($e.PSIsContainer) { foreach ($f in @(Get-ChildItem -LiteralPath $e.FullName -Recurse -File)) { $size += $f.Length } } else { $size = $e.Length }
         $lines.Add(('    {0} : {1} Mo' -f $e.Name, [math]::Round($size / 1MB, 1)))
     }
+    # Manifeste et purge (7.2, 7.3) : élément office-source de la vraie source, puis une ancienne version fictive
+    # (dossier et v64_<version>.cab) posée à côté, que la purge doit retirer sans toucher à la version courante.
+    $depot = Get-OpPath -Name Depot -Root $Root
+    $folder = @($configuration.OfficeSources.sources | Where-Object { $_.id -eq $Id })[0].folder
+    $item = ConvertTo-OpOfficeManifestItem -Result $r -Folder $folder -Depot $depot
+    $problems = @(Test-OpManifest -Manifest ([pscustomobject]@{ schemaVersion = 1; items = @($item) }))
+    if ($problems.Count -gt 0) { throw "Élément office-source invalide : $($problems -join ' ')" }
+    Save-OpManifest -Manifest ([pscustomobject]@{ schemaVersion = 1; toolVersion = $null; items = @($item) }) -Path (Get-OpPath -Name Manifest -Root $Root) -Confirm:$false
+    $total = [long]0
+    foreach ($f in $item.files) { $total += $f.size }
+    $lines.Add('')
+    $lines.Add(('- Manifeste : {0}, {1} fichier(s), {2} Mo, valide' -f $item.id, @($item.files).Count, [math]::Round($total / 1MB, 1)))
+    $old = Join-Path $data '16.0.1.1'
+    New-Item -ItemType Directory -Force -Path $old | Out-Null
+    Set-Content -Path (Join-Path $old 'stream.x64.fr-fr.dat') -Value 'ancienne version fictive' -Encoding ASCII
+    Set-Content -Path (Join-Path $data 'v64_16.0.1.1.cab') -Value 'ancien index fictif' -Encoding ASCII
+    $purge = Invoke-OpDepotPurge -Root $Root -Confirm:$false
+    if ((Test-Path -LiteralPath $old) -or (Test-Path -LiteralPath (Join-Path $data 'v64_16.0.1.1.cab'))) { throw 'Purge : l''ancienne version fictive est toujours là.' }
+    $changed = @($item.files | Where-Object { (Get-FileHash -LiteralPath (Join-Path $depot $_.path) -Algorithm SHA256).Hash.ToLowerInvariant() -ne $_.sha256 })
+    if ($changed.Count -gt 0) { throw "Purge : $($changed.Count) fichier(s) de la version courante modifié(s) ou absent(s)." }
+    $lines.Add(('- Purge : retiré {0} ({1}) ; SHA-256 de la version courante revérifiés après purge' -f (@($purge.RemovedItems) -join ', '), (@($purge.RemovedFiles) -join ', ')))
+
     $hashFolder = Join-Path $Out 'v64'
     New-Item -ItemType Directory -Force -Path $hashFolder | Out-Null
     & (Join-Path $env:SystemRoot 'System32\expand.exe') '-F:*' (Join-Path $data 'v64.cab') $hashFolder | Out-Null

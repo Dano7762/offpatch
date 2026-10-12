@@ -1,4 +1,5 @@
-# Téléchargement d'une source Office par les fonctions du module (Save-OpOdt, Save-OpOfficeSource), deux passages.
+# Téléchargement d'une source Office par les fonctions du module (Save-OpOdt, Save-OpOfficeSource), deux passages,
+# puis élément office-source du manifeste et purge d'une ancienne version fictive.
 # Déclenchement manuel uniquement. Télécharge plusieurs gigaoctets, n'installe rien.
 name: office-download
 

@@ -252,3 +252,69 @@ Describe 'Éléments office-source du manifeste et purge des anciennes versions'
         Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -like '*non purgée*16.0.2.2*' }
     }
 }
+
+Describe 'Dépôt Office de bout en bout, ODT simulé' {
+    # Seul setup.exe est simulé (Invoke-OpOfficeSetup) : il ajoute la version $script:odtVersion à la source du
+    # XML reçu et fait pointer v64.cab sur elle, comme l'ODT (R-07). Le reste est réel : XML, relevé de version,
+    # manifeste, purge.
+    BeforeAll {
+        Mock Write-OpLog {}
+        Mock Get-OpDepotPlan {}
+        Mock Get-OpFreeSpace { [long]100GB }
+        Mock Get-OpOdtPlan { [pscustomobject]@{ UpToDate = $true; Version = [version]'1.0'; InstalledVersion = [version]'1.0'; SetupPath = (Join-Path $Root 'tools\odt\setup.exe'); Error = $null } }
+        Mock Invoke-OpOfficeSetup {
+            $source = ([xml][IO.File]::ReadAllText($ConfigPath)).Configuration.Add.SourcePath
+            $data = Join-Path $source 'Office\Data'
+            $versions = @($script:odtVersion)
+            if (Test-Path -LiteralPath $data) { $versions += @(Get-ChildItem -LiteralPath $data -Directory | ForEach-Object { $_.Name }) }
+            Initialize-TestSource $source.Substring(([string]$TestDrive).Length + 1) $versions $script:odtVersion | Out-Null
+            [IO.File]::WriteAllText((Join-Path $data "$($script:odtVersion)\stream.x64.fr-fr.dat"), "flux $($script:odtVersion)")
+            [IO.File]::WriteAllText((Join-Path $data "v64_$($script:odtVersion).cab"), "cab $($script:odtVersion)")
+            [pscustomobject]@{ ExitCode = $script:odtExitCode; TimedOut = $false; OdtLogs = @() }
+        }
+        $script:tool = Initialize-TestTool 'e2e'
+        $script:manifestPath = Join-Path $tool 'depot\manifest.json'
+        $script:data = Join-Path $tool 'depot\office\current\Office\Data'
+        function Get-OfficeItem { @((Read-OpManifest -Path $manifestPath).items | Where-Object { $_.folder -eq 'office/current' }) }
+    }
+
+    It 'premier mois : chaque source est inscrite au manifeste avec le SHA-256 de ses fichiers' {
+        $script:odtVersion = '16.0.1.1'; $script:odtExitCode = 0
+        $r = Invoke-OpDepotUpdate -Root $tool -Confirm:$false
+        $r.ErrorCount | Should -Be 0
+        @($r.NewItems | ForEach-Object { $_.id }) | Should -Be @('office-current-16.0.1.1', 'office-perpetualvl2024-16.0.1.1', 'office-perpetualvl2021-16.0.1.1')
+        $item = @(Get-OfficeItem)
+        $item.Count | Should -Be 1
+        $item[0].languages | Should -Be @('fr-fr', 'en-us')
+        foreach ($f in $item[0].files) {
+            (Get-FileHash -LiteralPath (Join-Path (Join-Path $tool 'depot') $f.path) -Algorithm SHA256).Hash.ToLowerInvariant() | Should -Be $f.sha256
+        }
+    }
+
+    It 'mois suivant : nouvelle version inscrite à la place de l''ancienne, ancienne version purgée' {
+        $script:odtVersion = '16.0.2.2'
+        $r = Invoke-OpDepotUpdate -Root $tool -Confirm:$false
+        $r.ErrorCount | Should -Be 0
+        @(Get-OfficeItem | ForEach-Object { $_.id }) | Should -Be @('office-current-16.0.2.2')
+        $r.Purge.RemovedItems | Should -Contain 'office-current-16.0.1.1'
+        Test-Path -LiteralPath (Join-Path $data '16.0.1.1') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $data 'v64_16.0.1.1.cab') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $data '16.0.2.2\stream.x64.fr-fr.dat') | Should -BeTrue
+        (Format-OpDepotPlan -Result $r) -join "`n" | Should -Match 'office-current-16\.0\.2\.2 : office-source \(version 16\.0\.2\.2\)'
+    }
+
+    It 'source déjà à jour : rien de nouveau, rien de purgé' {
+        $r = Invoke-OpDepotUpdate -Root $tool -Confirm:$false
+        @($r.NewItems).Count | Should -Be 0
+        @($r.Purge.RemovedItems).Count | Should -Be 0
+        @(Get-OfficeItem | ForEach-Object { $_.id }) | Should -Be @('office-current-16.0.2.2')
+    }
+
+    It 'échec de l''ODT : la version du manifeste reste en place, l''erreur est comptée' {
+        $script:odtVersion = '16.0.3.3'; $script:odtExitCode = 17002
+        $r = Invoke-OpDepotUpdate -Root $tool -Confirm:$false
+        $r.ErrorCount | Should -Be 3
+        @(Get-OfficeItem | ForEach-Object { $_.id }) | Should -Be @('office-current-16.0.2.2')
+        Test-Path -LiteralPath (Join-Path $data '16.0.2.2\stream.x64.fr-fr.dat') | Should -BeTrue
+    }
+}
