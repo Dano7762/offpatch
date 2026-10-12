@@ -206,6 +206,7 @@ Describe 'Invoke-OpDepotUpdate et Format-OpDepotPlan : ODT' {
         Mock Get-OpFreeSpace { [long]100MB }
         Mock Invoke-OpDepotPurge { [pscustomobject]@{ RemovedItems = @(); FreedBytes = [long]0; Orphans = @() } }
         Mock Save-OpOdt { [pscustomobject]@{ Version = $Plan.Version; Path = $Plan.SetupPath } }
+        Mock Save-OpOfficeSource { [pscustomobject]@{ Id = $Source.Id; Channel = $Source.Channel; Version = [version]'16.0.1.1'; Updated = $false } } # OfficeSource.Tests.ps1
     }
 
     It '-ListOnly compte l''ODT à télécharger et l''affiche, sans le télécharger' {

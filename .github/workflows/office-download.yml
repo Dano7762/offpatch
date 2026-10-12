@@ -1,0 +1,38 @@
+# Téléchargement d'une source Office par les fonctions du module (Save-OpOdt, Save-OpOfficeSource), deux passages.
+# Déclenchement manuel uniquement. Télécharge plusieurs gigaoctets, n'installe rien.
+name: office-download
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_id:
+        description: 'Source de config/office/sources.json (current, perpetualvl2024, perpetualvl2021)'
+        required: true
+        default: 'perpetualvl2021'
+
+permissions:
+  contents: read
+
+jobs:
+  office:
+    runs-on: windows-2025
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Source Office
+        env:
+          OFFICE_SOURCE: ${{ inputs.source_id }}
+        run: ./tests/runner/Invoke-OfficeDownloadTest.ps1 -SourceId $env:OFFICE_SOURCE -OutputDirectory "$env:RUNNER_TEMP\office-download-out"
+
+      - name: Relevés
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: office-download-${{ inputs.source_id }}
+          path: ${{ runner.temp }}/office-download-out
+          retention-days: 30
+          if-no-files-found: warn

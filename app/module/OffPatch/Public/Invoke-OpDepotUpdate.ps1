@@ -14,12 +14,15 @@
         que l'élément en cours, et le lancement suivant reprend là. Un élément dont un fichier est refusé ou échoue
         n'est pas inscrit ; les autres continuent. Si une source Office est configurée, l'ODT de tools\odt est
         comparé à la dernière version publiée (Get-OpOdtPlan) et remplacé s'il est plus ancien (Save-OpOdt) ; son
-        échec compte comme une erreur sans arrêter le reste. Enfin, la purge (Invoke-OpDepotPurge) retire ce que la rétention
+        échec compte comme une erreur sans arrêter le reste. Chaque source Office est ensuite téléchargée ou
+        complétée par setup.exe /download (Save-OpOfficeSource), et la version obtenue relevée ; une source en échec
+        compte comme une erreur. Enfin, la purge (Invoke-OpDepotPurge) retire ce que la rétention
         ne garde plus et liste les fichiers orphelins sans les supprimer ; son résultat est dans la propriété Purge.
         Renvoie un objet : ListOnly, Items (éléments de Get-OpDepotPlan), DownloadBytes (fichiers à télécharger,
         comptés une fois), DownloadCount, UnknownSizeCount, FreeBytes (volume du dépôt, $null si illisible),
         EnoughSpace, ErrorCount (liens refusés, puis éléments non inscrits), NewItems (éléments ajoutés au manifeste
-        par ce lancement, résumé des nouveautés), Odt (plan de Get-OpOdtPlan, $null sans source Office), OdtUpdated.
+        par ce lancement, résumé des nouveautés), Odt (plan de Get-OpOdtPlan, $null sans source Office), OdtUpdated,
+        Office (un résultat de Save-OpOfficeSource par source, ou Id, Channel et Error en cas d'échec).
 
     .PARAMETER ListOnly
         Interroge le catalogue et contrôle les liens sans rien télécharger.
@@ -121,6 +124,7 @@
         NewItems         = @()
         Odt              = $odt
         OdtUpdated       = $false
+        Office           = @()
     }
     if ($ListOnly) { return $result }
     if ($enough -eq $false) {
@@ -199,6 +203,21 @@
             Write-OpLog -Level ERROR -Message "Dépôt, ODT non mis à jour. $($_.Exception.Message)"
         }
     }
+
+    # Sources Office : setup.exe /download par source, avec l'ODT de tools\odt, même ancien si sa mise à jour a échoué.
+    $office = New-Object System.Collections.Generic.List[object]
+    if ($odt) {
+        foreach ($src in @(Get-OpOfficeDownloadXml -Configuration $configuration -Root $Root)) {
+            try {
+                $office.Add((Save-OpOfficeSource -Source $src -SetupPath $odt.SetupPath -Root $Root -Confirm:$false))
+            } catch {
+                $errorCount++
+                Write-OpLog -Level ERROR -Message "Dépôt, source Office $($src.Id) non mise à jour. $($_.Exception.Message)"
+                $office.Add([pscustomobject]@{ Id = $src.Id; Channel = $src.Channel; Version = $null; Updated = $false; Error = $_.Exception.Message })
+            }
+        }
+    }
+    $result.Office = $office.ToArray()
 
     $result.ErrorCount = $errorCount
     $result.NewItems = $new.ToArray()

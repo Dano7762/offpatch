@@ -68,7 +68,8 @@
     $listOnly = ($null -eq $Result.PSObject.Properties['ListOnly']) -or $Result.ListOnly
     if ($listOnly) {
         if ($Result.ErrorCount -gt 0) { "$($Result.ErrorCount) lien(s) refusé(s) ou inaccessible(s) : voir ci-dessus." }
-        'Aucun fichier téléchargé (-ListOnly). Sources Office : pas encore prises en charge.'
+        'Aucun fichier téléchargé (-ListOnly).'
+        if ($odt) { 'Sources Office : téléchargées par setup.exe /download, taille connue seulement après le téléchargement.' }
         return
     }
 
@@ -97,5 +98,11 @@
             foreach ($o in @($p.Orphans)) { '  ? {0}, {1}' -f $o.Path, (Format-Size $o.Size) }
         }
     }
-    'Sources Office : pas encore prises en charge.'
+    if ($null -ne $Result.PSObject.Properties['Office']) {
+        foreach ($o in @($Result.Office)) {
+            if ($null -ne $o.PSObject.Properties['Error'] -and $o.Error) { "Source Office $($o.Id) [ÉCHEC] : $($o.Error)" }
+            elseif ($o.Updated) { "Source Office $($o.Id) [nouvelle version] : $($o.Version) ($($o.Channel))" }
+            else { "Source Office $($o.Id) [à jour] : $($o.Version) ($($o.Channel))" }
+        }
+    }
 }
