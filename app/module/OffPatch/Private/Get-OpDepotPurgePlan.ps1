@@ -31,7 +31,7 @@
         if ($null -ne $Object.PSObject.Properties[$Name]) { return [string]$Object.$Name }
         ''
     }
-    foreach ($group in @($items | Where-Object { $pinnedIds -notcontains $_.id } | Group-Object -Property { '{0}-{1}|{2}' -f $_.target.os, $_.target.arch, $_.category })) {
+    foreach ($group in @($items | Where-Object { $pinnedIds -notcontains $_.id -and $_.category -ne 'office-source' } | Group-Object -Property { '{0}-{1}|{2}' -f $_.target.os, $_.target.arch, $_.category })) {
         $first = $group.Group[0]
         $target = '{0}-{1}' -f $first.target.os, $first.target.arch
         $keep = $null

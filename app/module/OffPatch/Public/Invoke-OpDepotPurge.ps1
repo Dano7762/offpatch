@@ -6,10 +6,12 @@
     .DESCRIPTION
         Cahier des charges 7.3. Les éléments à retirer sont choisis par Get-OpDepotPurgePlan (cumulatives Windows et
         cumulatives .NET au-delà de retention.windowsMonths, anciennes versions Defender ; éléments épinglés jamais
-        retirés). Le
-        manifeste est réécrit d'abord, de façon atomique, puis les fichiers que plus aucun élément gardé ne référence
+        retirés). Le manifeste est réécrit d'abord, de façon atomique, puis les fichiers que plus aucun élément gardé ne référence
         sont supprimés : une interruption entre les deux ne laisse que des orphelins, jamais un manifeste qui cite un
         fichier absent.
+        Sources Office : pour chaque élément office-source, les autres versions de la source (dossier
+        Office\Data\<version>\ et v64_<version>.cab) sont supprimées, seulement si v64.cab désigne la version du
+        manifeste (R-07) ; elles s'ajoutent à RemovedItems (office-<source>-<version>) et à RemovedFiles.
         Orphelins : fichiers de depot/files/ et de la racine de depot/ que le manifeste ne cite pas (manifest.json,
         le dossier temporaire .tmp/ et les sources Office de office/ sont exclus). Ils sont listés ; avec
         -RemoveOrphans, ils ne sont supprimés qu'après confirmation (ou avec -Force).
@@ -81,6 +83,38 @@
         }
         $result.RemovedFiles = $removedFiles.ToArray()
         Write-OpLog ("Purge : {0} fichier(s) supprimé(s), {1:N0} octets libérés." -f $removedFiles.Count, $result.FreedBytes)
+    }
+
+    # Sources Office (7.3, R-07) : seule la version du manifeste est gardée, et seulement si v64.cab la désigne ;
+    # sinon (téléchargement interrompu, index illisible) rien n'est retiré de cette source.
+    foreach ($item in @($manifest.items | Where-Object { $_.category -eq 'office-source' })) {
+        $source = Join-Path $depot ($item.folder -replace '/', '\')
+        $data = Join-Path $source 'Office\Data'
+        try {
+            $index = Get-OpOfficeSourceVersion -Path $source -WorkFolder (Join-Path (Get-OpPath -Name DepotTemp -Root $Root) "purge-$($item.id)")
+        } catch {
+            Write-OpLog -Level WARN -Message "Purge : source Office $($item.folder) non purgée. $($_.Exception.Message)"
+            continue
+        }
+        if (-not $index -or [string]$index.Version -ne [string]$item.version) {
+            Write-OpLog -Level WARN -Message "Purge : source Office $($item.folder) non purgée, son index ne désigne pas la version $($item.version) du manifeste."
+            continue
+        }
+        foreach ($old in @($index.Versions | Where-Object { [string]$_ -ne [string]$item.version })) {
+            $paths = @((Join-Path $data "$old"), (Join-Path $data "v64_$old.cab") | Where-Object { Test-Path -LiteralPath $_ })
+            if (-not $PSCmdlet.ShouldProcess($data, "Suppression de la version $old de la source Office")) { continue }
+            $size = [long](@(Get-ChildItem -LiteralPath $paths -File -Recurse -Force | Measure-Object -Property Length -Sum)[0].Sum)
+            try {
+                Remove-Item -LiteralPath $paths -Recurse -Force -ErrorAction Stop
+            } catch {
+                Write-OpLog -Level WARN -Message "Purge : version $old de $($item.folder) non supprimée. $($_.Exception.Message)"
+                continue
+            }
+            $result.FreedBytes += $size
+            $result.RemovedItems = @($result.RemovedItems) + ($item.id -replace "$([regex]::Escape([string]$item.version))$", "$old")
+            $result.RemovedFiles = @($result.RemovedFiles) + @($paths | ForEach-Object { $_.Substring($depot.TrimEnd('\').Length + 1) -replace '\\', '/' })
+            Write-OpLog ("Purge : version {0} de la source Office {1} supprimée, {2:N0} octets libérés." -f $old, $item.folder, $size)
+        }
     }
 
     # Orphelins, d'après le manifeste tel qu'il est maintenant sur le disque (inchangé si -WhatIf).

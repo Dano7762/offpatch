@@ -207,6 +207,8 @@ Describe 'Invoke-OpDepotUpdate et Format-OpDepotPlan : ODT' {
         Mock Invoke-OpDepotPurge { [pscustomobject]@{ RemovedItems = @(); FreedBytes = [long]0; Orphans = @() } }
         Mock Save-OpOdt { [pscustomobject]@{ Version = $Plan.Version; Path = $Plan.SetupPath } }
         Mock Save-OpOfficeSource { [pscustomobject]@{ Id = $Source.Id; Channel = $Source.Channel; Version = [version]'16.0.1.1'; Updated = $false } } # OfficeSource.Tests.ps1
+        Mock ConvertTo-OpOfficeManifestItem { [pscustomobject]@{ id = "office-$($Result.Id)-$($Result.Version)"; category = 'office-source'; folder = $Folder; files = @() } }
+        Mock Save-OpManifest {}
     }
 
     It '-ListOnly compte l''ODT à télécharger et l''affiche, sans le télécharger' {

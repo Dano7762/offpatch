@@ -15,8 +15,9 @@
         n'est pas inscrit ; les autres continuent. Si une source Office est configurée, l'ODT de tools\odt est
         comparé à la dernière version publiée (Get-OpOdtPlan) et remplacé s'il est plus ancien (Save-OpOdt) ; son
         échec compte comme une erreur sans arrêter le reste. Chaque source Office est ensuite téléchargée ou
-        complétée par setup.exe /download (Save-OpOfficeSource), et la version obtenue relevée ; une source en échec
-        compte comme une erreur. Enfin, la purge (Invoke-OpDepotPurge) retire ce que la rétention
+        complétée par setup.exe /download (Save-OpOfficeSource), et la version obtenue relevée ; une version absente
+        du manifeste y est inscrite (élément office-source, SHA-256 de chaque fichier) à la place de la précédente ;
+        une source en échec compte comme une erreur. Enfin, la purge (Invoke-OpDepotPurge) retire ce que la rétention
         ne garde plus et liste les fichiers orphelins sans les supprimer ; son résultat est dans la propriété Purge.
         Renvoie un objet : ListOnly, Items (éléments de Get-OpDepotPlan), DownloadBytes (fichiers à télécharger,
         comptés une fois), DownloadCount, UnknownSizeCount, FreeBytes (volume du dépôt, $null si illisible),
@@ -209,7 +210,17 @@
     if ($odt) {
         foreach ($src in @(Get-OpOfficeDownloadXml -Configuration $configuration -Root $Root)) {
             try {
-                $office.Add((Save-OpOfficeSource -Source $src -SetupPath $odt.SetupPath -Root $Root -Confirm:$false))
+                $saved = Save-OpOfficeSource -Source $src -SetupPath $odt.SetupPath -Root $Root -Confirm:$false
+                # Élément office-source : remplace celui de la version précédente de la même source (7.2).
+                $folder = @($configuration.OfficeSources.sources | Where-Object { $_.id -eq $src.Id })[0].folder
+                if (-not @($manifest.items | Where-Object { $_.id -eq "office-$($src.Id)-$($saved.Version)" })) {
+                    $manifestItem = ConvertTo-OpOfficeManifestItem -Result $saved -Folder $folder -Depot (Get-OpPath -Name Depot -Root $Root)
+                    $manifest.items = @(@($manifest.items | Where-Object { -not ($_.category -eq 'office-source' -and $_.folder -eq $folder) }) + $manifestItem)
+                    Save-OpManifest -Manifest $manifest -Path $manifestPath -ToolVersion $toolVersion -Confirm:$false
+                    $new.Add($manifestItem)
+                    Write-OpLog "Dépôt : nouveauté inscrite au manifeste, $($manifestItem.id) ($(@($manifestItem.files).Count) fichier(s))."
+                }
+                $office.Add($saved)
             } catch {
                 $errorCount++
                 Write-OpLog -Level ERROR -Message "Dépôt, source Office $($src.Id) non mise à jour. $($_.Exception.Message)"

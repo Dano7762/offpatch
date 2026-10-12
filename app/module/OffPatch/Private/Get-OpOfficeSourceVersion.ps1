@@ -31,9 +31,9 @@
         return [pscustomobject]@{ Version = $versions[-1]; FromIndex = $false; Versions = $versions }
     }
     $expand = Join-Path $env:SystemRoot 'System32\expand.exe'
-    New-Item -ItemType Directory -Force -Path $WorkFolder -ErrorAction Stop | Out-Null
+    New-Item -ItemType Directory -Force -Path $WorkFolder -ErrorAction Stop -WhatIf:$false | Out-Null
     try {
-        $r = Invoke-OpProcess -FilePath $expand -ArgumentList '-F:v64.hash', $index, $WorkFolder -TimeoutSeconds 300 -Confirm:$false
+        $r = Invoke-OpProcess -FilePath $expand -ArgumentList '-F:v64.hash', $index, $WorkFolder -TimeoutSeconds 300 -Confirm:$false -WhatIf:$false
         $hash = Join-Path $WorkFolder 'v64.hash'
         if ($r.TimedOut -or $r.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $hash -PathType Leaf)) {
             throw "Index de la source Office illisible : v64.hash absent de $index (expand.exe, code $($r.ExitCode))."

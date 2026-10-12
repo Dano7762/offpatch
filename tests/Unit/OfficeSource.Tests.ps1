@@ -142,6 +142,8 @@ Describe 'Invoke-OpDepotUpdate et Format-OpDepotPlan : sources Office' {
 
     It 'télécharge chaque source configurée, compte un échec sans arrêter les autres et affiche le résultat' {
         $tool = Initialize-TestTool 'u1'
+        Mock ConvertTo-OpOfficeManifestItem { [pscustomobject]@{ id = "office-$($Result.Id)-$($Result.Version)"; category = 'office-source'; folder = $Folder; files = @() } }
+        Mock Save-OpManifest {}
         Mock Save-OpOfficeSource {
             if ($Source.Id -eq 'perpetualvl2021') { throw 'setup.exe /download a renvoyé le code 17002' }
             [pscustomobject]@{ Id = $Source.Id; Channel = $Source.Channel; Version = [version]'16.0.20430.20140'; Updated = ($Source.Id -eq 'current') }
@@ -165,5 +167,88 @@ Describe 'Invoke-OpDepotUpdate et Format-OpDepotPlan : sources Office' {
         $r = Invoke-OpDepotUpdate -Root $tool -Confirm:$false
         @($r.Office).Count | Should -Be 0
         Should -Invoke Save-OpOfficeSource -Times 0 -Exactly
+    }
+}
+
+Describe 'Éléments office-source du manifeste et purge des anciennes versions' {
+    BeforeAll {
+        Mock Write-OpLog {}
+        # Source current de l'outil : deux versions, chacune avec son dossier et son v64_<version>.cab, et v64.cab
+        # qui désigne $Index.
+        function Initialize-TestDepotSource([string]$Tool, [string]$Index) {
+            $name = "$(Split-Path -Leaf $Tool)\depot\office\current"
+            $src = Initialize-TestSource $name @('16.0.1.1', '16.0.2.2') $Index
+            foreach ($v in '16.0.1.1', '16.0.2.2') {
+                [IO.File]::WriteAllText((Join-Path $src "Office\Data\$v\stream.x64.fr-fr.dat"), "flux $v")
+                [IO.File]::WriteAllText((Join-Path $src "Office\Data\v64_$v.cab"), "cab $v")
+            }
+            $src
+        }
+        function Get-TestSaved([string]$Version) {
+            [pscustomobject]@{ Id = 'current'; Channel = 'Current'; Languages = @('fr-fr', 'en-us'); Version = [version]$Version; Updated = $true }
+        }
+    }
+
+    It 'construit un élément valide avec le SHA-256 de chaque fichier de la version courante seulement' {
+        $tool = Initialize-TestTool 'm1'
+        $src = Initialize-TestDepotSource $tool '16.0.2.2'
+        $item = ConvertTo-OpOfficeManifestItem -Result (Get-TestSaved '16.0.2.2') -Folder 'office/current' -Depot (Join-Path $tool 'depot')
+        $item.id | Should -Be 'office-current-16.0.2.2'
+        $item.version | Should -Be '16.0.2.2'
+        $item.order | Should -Be 50
+        @($item.files | ForEach-Object { $_.path }) | Should -Be @(
+            'office/current/Office/Data/16.0.2.2/stream.x64.fr-fr.dat', 'office/current/Office/Data/v64.cab', 'office/current/Office/Data/v64_16.0.2.2.cab')
+        $dat = Join-Path $src 'Office\Data\16.0.2.2\stream.x64.fr-fr.dat'
+        $item.files[0].sha256 | Should -Be (Get-FileHash -LiteralPath $dat -Algorithm SHA256).Hash.ToLowerInvariant()
+        $item.files[0].size | Should -Be (Get-Item -LiteralPath $dat).Length
+        @(Test-OpManifest -Manifest ([pscustomobject]@{ schemaVersion = 1; items = @($item) })) | Should -BeNullOrEmpty
+    }
+
+    It 'Invoke-OpDepotUpdate inscrit la version, remplace la précédente et ne recalcule rien si elle ne change pas' {
+        $tool = Initialize-TestTool 'm2'
+        Initialize-TestDepotSource $tool '16.0.2.2' | Out-Null
+        Mock Get-OpDepotPlan {}
+        Mock Get-OpFreeSpace { [long]100MB }
+        Mock Invoke-OpDepotPurge { [pscustomobject]@{ RemovedItems = @(); FreedBytes = [long]0; Orphans = @() } }
+        Mock Get-OpOdtPlan { [pscustomobject]@{ UpToDate = $true; Version = [version]'1.0'; InstalledVersion = [version]'1.0'; SetupPath = 'setup.exe'; Error = $null } }
+        Mock Get-OpOfficeDownloadXml { [pscustomobject]@{ Id = 'current'; Channel = 'Current'; Languages = @('fr-fr', 'en-us'); SourcePath = 'x'; Xml = '' } }
+        $manifestPath = Join-Path $tool 'depot\manifest.json'
+        Mock Save-OpOfficeSource { Get-TestSaved '16.0.1.1' }
+        Invoke-OpDepotUpdate -Root $tool -Confirm:$false | Out-Null
+        Mock Save-OpOfficeSource { Get-TestSaved '16.0.2.2' }
+        $r = Invoke-OpDepotUpdate -Root $tool -Confirm:$false
+        $r.ErrorCount | Should -Be 0
+        @($r.NewItems | ForEach-Object { $_.id }) | Should -Be @('office-current-16.0.2.2')
+        @((Read-OpManifest -Path $manifestPath).items | ForEach-Object { $_.id }) | Should -Be @('office-current-16.0.2.2')
+        $r = Invoke-OpDepotUpdate -Root $tool -Confirm:$false
+        @($r.NewItems).Count | Should -Be 0
+    }
+
+    It 'la purge supprime les autres versions quand v64.cab désigne celle du manifeste' {
+        $tool = Initialize-TestTool 'm3'
+        $src = Initialize-TestDepotSource $tool '16.0.2.2'
+        $item = ConvertTo-OpOfficeManifestItem -Result (Get-TestSaved '16.0.2.2') -Folder 'office/current' -Depot (Join-Path $tool 'depot')
+        Save-OpManifest -Manifest ([pscustomobject]@{ schemaVersion = 1; toolVersion = $null; items = @($item) }) -Path (Join-Path $tool 'depot\manifest.json')
+        Invoke-OpDepotPurge -Root $tool -WhatIf | Out-Null
+        Test-Path -LiteralPath (Join-Path $src 'Office\Data\16.0.1.1') | Should -BeTrue
+        $r = Invoke-OpDepotPurge -Root $tool -Confirm:$false
+        $r.RemovedItems | Should -Be @('office-current-16.0.1.1')
+        $r.RemovedFiles | Should -Be @('office/current/Office/Data/16.0.1.1', 'office/current/Office/Data/v64_16.0.1.1.cab')
+        $r.FreedBytes | Should -Be ('flux 16.0.1.1'.Length + 'cab 16.0.1.1'.Length)
+        Test-Path -LiteralPath (Join-Path $src 'Office\Data\16.0.1.1') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $src 'Office\Data\v64_16.0.1.1.cab') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $src 'Office\Data\16.0.2.2\stream.x64.fr-fr.dat') | Should -BeTrue
+        @($r.Orphans).Count | Should -Be 0
+    }
+
+    It 'la purge ne touche pas une source dont v64.cab désigne une autre version que le manifeste' {
+        $tool = Initialize-TestTool 'm4'
+        $src = Initialize-TestDepotSource $tool '16.0.1.1'
+        $item = ConvertTo-OpOfficeManifestItem -Result (Get-TestSaved '16.0.2.2') -Folder 'office/current' -Depot (Join-Path $tool 'depot')
+        Save-OpManifest -Manifest ([pscustomobject]@{ schemaVersion = 1; toolVersion = $null; items = @($item) }) -Path (Join-Path $tool 'depot\manifest.json')
+        $r = Invoke-OpDepotPurge -Root $tool -Confirm:$false
+        @($r.RemovedItems).Count | Should -Be 0
+        Test-Path -LiteralPath (Join-Path $src 'Office\Data\16.0.1.1') | Should -BeTrue
+        Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -like '*non purgée*16.0.2.2*' }
     }
 }
