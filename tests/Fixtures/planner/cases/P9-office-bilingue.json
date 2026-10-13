@@ -1,0 +1,14 @@
+{
+  "description": "Office installé en fr-fr et en-us, source current du dépôt en fr-fr seul : Office non applicable, langue absente de la source.",
+  "systemInfo": { "Target": "win11-x64", "CurrentBuild": 26200, "Ubr": 9550, "Office": { "Products": ["O365HomePremRetail"], "Languages": ["fr-fr", "en-us"], "ChannelId": "492350f6-3a01-4f97-b9c0-c7c6ddf67d60", "CdnChannelId": "492350f6-3a01-4f97-b9c0-c7c6ddf67d60", "UpdateChannelId": "492350f6-3a01-4f97-b9c0-c7c6ddf67d60", "ChannelMismatch": false, "Version": "16.0.19127.20000", "VersionToReport": "16.0.19127.20000" } },
+  "expected": [
+    { "step": "win11-x64-defender-platform-4.18.25090.3", "state": "UpToDate" },
+    { "step": "win11-x64-defender-1.439.200.0", "state": "UpToDate" },
+    { "step": "win11-x64-checkpoint-2024-09", "state": "UpToDate" },
+    { "step": "win11-x64-lcu-2026-10", "state": "UpToDate" },
+    { "step": "win11-x64-lcu-2026-09", "state": "UpToDate" },
+    { "step": "win11-x64-ekb-26H2", "state": "Pending", "rebootAfter": true },
+    { "step": "win11-x64-dotnet-2026-10", "state": "UpToDate" },
+    { "step": "office-current-16.0.19231.20100", "state": "NotApplicable", "reason": "Langue absente de la source current : en-us." }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Windows 11 26H2 à jour : aucune étape Windows, enablement package non applicable.",
+  "systemInfo": { "Target": "win11-x64", "CurrentBuild": 26300, "Ubr": 9550, "Office": null },
+  "expected": [
+    { "step": "win11-x64-defender-platform-4.18.25090.3", "state": "UpToDate" },
+    { "step": "win11-x64-defender-1.439.200.0", "state": "UpToDate" },
+    { "step": "win11-x64-checkpoint-2024-09", "state": "UpToDate" },
+    { "step": "win11-x64-lcu-2026-10", "state": "UpToDate" },
+    { "step": "win11-x64-lcu-2026-09", "state": "UpToDate" },
+    { "step": "win11-x64-ekb-26H2", "state": "NotApplicable", "reason": "Build 26300 non concernée*" },
+    { "step": "win11-x64-dotnet-2026-10", "state": "UpToDate" },
+    { "step": "office-source", "state": "NotApplicable" }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Office sur un canal absent du dépôt : conservé, non applicable.",
+  "systemInfo": { "Target": "win11-x64", "CurrentBuild": 26200, "Ubr": 9550, "Office": { "Products": ["O365HomePremRetail"], "Languages": ["fr-fr"], "ChannelId": "11111111-2222-3333-4444-555555555555", "CdnChannelId": "11111111-2222-3333-4444-555555555555", "UpdateChannelId": "11111111-2222-3333-4444-555555555555", "ChannelMismatch": false, "Version": "16.0.19127.20000", "VersionToReport": "16.0.19127.20000" } },
+  "expected": [
+    { "step": "win11-x64-defender-platform-4.18.25090.3", "state": "UpToDate" },
+    { "step": "win11-x64-defender-1.439.200.0", "state": "UpToDate" },
+    { "step": "win11-x64-checkpoint-2024-09", "state": "UpToDate" },
+    { "step": "win11-x64-lcu-2026-10", "state": "UpToDate" },
+    { "step": "win11-x64-lcu-2026-09", "state": "UpToDate" },
+    { "step": "win11-x64-ekb-26H2", "state": "Pending", "rebootAfter": true },
+    { "step": "win11-x64-dotnet-2026-10", "state": "UpToDate" },
+    { "step": "office-source", "state": "NotApplicable", "reason": "Canal absent du dépôt (identifiant 11111111-2222-3333-4444-555555555555)." }
+  ]
+}

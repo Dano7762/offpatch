@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-14T09:12:00Z",
+  "toolVersion": "0.1.0",
+  "items": [
+    {
+      "id": "win11-x64-defender-platform-4.18.25090.3",
+      "category": "defender-platform",
+      "target": { "os": "win11", "arch": "x64" },
+      "version": "4.18.25090.3",
+      "order": 10,
+      "requiresReboot": false,
+      "prerequisites": [],
+      "runsAfter": [],
+      "files": [
+        { "path": "files/8888888888888888888888888888888888888888888888888888888888888888/updateplatform.amd64fre.exe", "sha256": "8888888888888888888888888888888888888888888888888888888888888888", "size": 1 }
+      ]
+    },
+    {
+      "id": "win11-x64-defender-1.439.200.0",
+      "category": "defender",
+      "target": { "os": "win11", "arch": "x64" },
+      "version": "1.439.200.0",
+      "order": 11,
+      "requiresReboot": false,
+      "prerequisites": [],
+      "runsAfter": ["defender-platform"],
+      "files": [
+        { "path": "files/9999999999999999999999999999999999999999999999999999999999999999/mpam-fe.exe", "sha256": "9999999999999999999999999999999999999999999999999999999999999999", "size": 1 }
+      ]
+    },
+    {
+      "id": "win11-x64-checkpoint-2024-09",
+      "category": "windows-checkpoint",
+      "target": { "os": "win11", "arch": "x64", "minBuild": 26100, "maxBuild": 26399 },
+      "releaseDate": "2024-09-10",
+      "resultingUbr": 1742,
+      "order": 19,
+      "requiresReboot": true,
+      "prerequisites": [],
+      "runsAfter": [],
+      "files": [
+        { "path": "files/1111111111111111111111111111111111111111111111111111111111111111/checkpoint.msu", "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "size": 1 }
+      ]
+    },
+    {
+      "id": "win11-x64-lcu-2026-10",
+      "category": "windows-lcu",
+      "target": { "os": "win11", "arch": "x64", "minBuild": 26100, "maxBuild": 26399 },
+      "releaseDate": "2026-10-13",
+      "baseBuilds": [26100, 26200, 26300],
+      "resultingUbr": 9550,
+      "order": 20,
+      "requiresReboot": true,
+      "prerequisites": ["win11-x64-checkpoint-2024-09"],
+      "runsAfter": [],
+      "files": [
+        { "path": "files/5555555555555555555555555555555555555555555555555555555555555555/lcu-2026-10.msu", "sha256": "5555555555555555555555555555555555555555555555555555555555555555", "size": 1 }
+      ]
+    },
+    {
+      "id": "win11-x64-lcu-2026-09",
+      "category": "windows-lcu",
+      "target": { "os": "win11", "arch": "x64", "minBuild": 26100, "maxBuild": 26399 },
+      "releaseDate": "2026-09-08",
+      "baseBuilds": [26100, 26200, 26300],
+      "resultingUbr": 9457,
+      "order": 20,
+      "requiresReboot": true,
+      "prerequisites": ["win11-x64-checkpoint-2024-09"],
+      "runsAfter": [],
+      "files": [
+        { "path": "files/2222222222222222222222222222222222222222222222222222222222222222/lcu-2026-09.msu", "sha256": "2222222222222222222222222222222222222222222222222222222222222222", "size": 1 }
+      ]
+    },
+    {
+      "id": "win11-x64-ekb-26H2",
+      "category": "windows-ekb",
+      "target": { "os": "win11", "arch": "x64" },
+      "baseBuilds": [26100, 26200],
+      "minUbr": 9550,
+      "resultingBuild": 26300,
+      "order": 30,
+      "requiresReboot": true,
+      "prerequisites": [],
+      "runsAfter": ["windows-lcu"],
+      "files": [
+        { "path": "files/6666666666666666666666666666666666666666666666666666666666666666/ekb.msu", "sha256": "6666666666666666666666666666666666666666666666666666666666666666", "size": 1 }
+      ]
+    },
+    {
+      "id": "win11-x64-dotnet-2026-10",
+      "category": "dotnet",
+      "target": { "os": "win11", "arch": "x64", "minBuild": 26100, "maxBuild": 26399 },
+      "releaseDate": "2026-10-13",
+      "order": 40,
+      "requiresReboot": false,
+      "prerequisites": [],
+      "runsAfter": [],
+      "files": [
+        { "path": "files/7777777777777777777777777777777777777777777777777777777777777777/ndp481.msu", "sha256": "7777777777777777777777777777777777777777777777777777777777777777", "size": 1, "package": { "name": "Package_for_DotNetRollup_481", "version": "10.0.9310.1" } }
+      ]
+    },
+    {
+      "id": "win10-x64-defender-platform-4.18.25090.3",
+      "category": "defender-platform",
+      "target": { "os": "win10", "arch": "x64" },
+      "version": "4.18.25090.3",
+      "order": 10,
+      "requiresReboot": false,
+      "prerequisites": [],
+      "runsAfter": [],
+      "files": [
+        { "path": "files/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/updateplatform.amd64fre.exe", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "size": 1 }
+      ]
+    },
+    {
+      "id": "win10-x64-defender-1.439.200.0",
+      "category": "defender",
+      "target": { "os": "win10", "arch": "x64" },
+      "version": "1.439.200.0",
+      "order": 11,
+      "requiresReboot": false,
+      "prerequisites": [],
+      "runsAfter": ["defender-platform"],
+      "files": [
+        { "path": "files/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/mpam-fe.exe", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "size": 1 }
+      ]
+    },
+    {
+      "id": "win10-x64-ssu-pinned",
+      "category": "windows-ssu",
+      "target": { "os": "win10", "arch": "x64", "minBuild": 19045, "maxBuild": 19045 },
+      "baseBuilds": [19045],
+      "applyBelowUbr": 3271,
+      "order": 18,
+      "requiresReboot": false,
+      "prerequisites": [],
+      "runsAfter": [],
+      "files": [
+        { "path": "files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/ssu.msu", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 1 }
+      ]
+    },
+    {
+      "id": "win10-x64-lcu-2026-10",
+      "category": "windows-lcu",
+      "target": { "os": "win10", "arch": "x64", "minBuild": 19045, "maxBuild": 19045 },
+      "releaseDate": "2026-10-13",
+      "baseBuilds": [19045],
+      "resultingUbr": 6456,
+      "order": 20,
+      "requiresReboot": true,
+      "prerequisites": ["windows-ssu"],
+      "runsAfter": [],
+      "files": [
+        { "path": "files/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/lcu-win10.msu", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 1 }
+      ]
+    },
+    {
+      "id": "win10-x64-dotnet-2026-10",
+      "category": "dotnet",
+      "target": { "os": "win10", "arch": "x64", "minBuild": 19045, "maxBuild": 19045 },
+      "releaseDate": "2026-10-13",
+      "order": 40,
+      "requiresReboot": false,
+      "prerequisites": [],
+      "runsAfter": [],
+      "files": [
+        { "path": "files/3333333333333333333333333333333333333333333333333333333333333333/windows10.0-x64-ndp48.msu", "sha256": "3333333333333333333333333333333333333333333333333333333333333333", "size": 1, "netRelease": { "min": 528040, "max": 533319 }, "package": { "name": "Package_for_DotNetRollup", "version": "10.0.4800.1" } },
+        { "path": "files/4444444444444444444444444444444444444444444444444444444444444444/windows10.0-x64-ndp481.msu", "sha256": "4444444444444444444444444444444444444444444444444444444444444444", "size": 1, "netRelease": { "min": 533320 }, "package": { "name": "Package_for_DotNetRollup_481", "version": "10.0.4810.1" } }
+      ]
+    },
+    {
+      "id": "office-current-16.0.19231.20100",
+      "category": "office-source",
+      "channel": "Current",
+      "version": "16.0.19231.20100",
+      "languages": ["fr-fr"],
+      "folder": "office/current",
+      "order": 50,
+      "requiresReboot": false,
+      "prerequisites": [],
+      "runsAfter": [],
+      "files": [
+        { "path": "office/current/Office/Data/v64.cab", "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "size": 1 }
+      ]
+    },
+    {
+      "id": "office-perpetualvl2024-16.0.17932.20500",
+      "category": "office-source",
+      "channel": "PerpetualVL2024",
+      "version": "16.0.17932.20500",
+      "languages": ["fr-fr"],
+      "folder": "office/perpetualvl2024",
+      "order": 50,
+      "requiresReboot": false,
+      "prerequisites": [],
+      "runsAfter": [],
+      "files": [
+        { "path": "office/perpetualvl2024/Office/Data/v64.cab", "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "size": 1 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "description": "Windows 11, Defender désactivé (antivirus tiers) : plateforme et définitions non applicables, jamais en erreur ; le reste du plan comme P3.",
+  "systemInfo": { "Target": "win11-x64", "CurrentBuild": 26200, "Ubr": 9550, "Office": null },
+  "defender": { "AMRunningMode": "Not running", "AMProductVersion": "4.18.25080.5", "AntivirusSignatureVersion": "1.439.100.0" },
+  "expected": [
+    { "step": "win11-x64-defender-platform-4.18.25090.3", "state": "NotApplicable", "reason": "Defender désactivé (AMRunningMode : Not running)." },
+    { "step": "win11-x64-defender-1.439.200.0", "state": "NotApplicable", "reason": "Defender désactivé*" },
+    { "step": "win11-x64-checkpoint-2024-09", "state": "UpToDate" },
+    { "step": "win11-x64-lcu-2026-10", "state": "UpToDate" },
+    { "step": "win11-x64-lcu-2026-09", "state": "UpToDate" },
+    { "step": "win11-x64-ekb-26H2", "state": "Pending", "rebootAfter": true },
+    { "step": "win11-x64-dotnet-2026-10", "state": "UpToDate" },
+    { "step": "office-source", "state": "NotApplicable" }
+  ]
+}
