@@ -4,13 +4,18 @@
     les tests.
 
 .DESCRIPTION
-    Charge le module, ouvre le journal, charge et valide la configuration, puis lance l'action demandée. Les actions
-    sont branchées au fil des phases ; une action pas encore disponible le dit et sort avec le code 2. Disponible :
-    DepotUpdate -ListOnly (liste de ce qui serait téléchargé, liens contrôlés, espace libre ; code 1 si un lien est
-    refusé) et DepotUpdate (téléchargement, contrôle, manifeste, résumé des nouveautés ; code 1 si un lien est
-    refusé ou si un élément n'a pas pu être inscrit). OffPatch installe uniquement des mises à jour : aucun
-    paramètre de clé de produit, de profil ou de retrait (cahier des charges 2, 3.3).
-    Codes de sortie : 0 réussite, 1 erreur (configuration invalide, échec), 2 action pas encore disponible.
+    Charge le module, ouvre le journal, charge et valide la configuration, puis lance l'action demandée :
+      - DepotUpdate -ListOnly : liste de ce qui serait téléchargé, liens contrôlés, espace libre ; code 1 si un lien
+        est refusé. DepotUpdate : téléchargement, contrôle, manifeste, résumé des nouveautés ; code 1 si un lien est
+        refusé ou si un élément n'a pas pu être inscrit ;
+      - Plan : relevé du PC, contrôles préalables et plan, en lecture seule ;
+      - InstallStep -StepId <id> : une étape du plan (refusée si elle n'est pas « À installer » ou si un contrôle
+        préalable est bloquant) ; code 1 si elle est refusée ou en erreur ; le redémarrage nécessaire est signalé,
+        jamais lancé ;
+      - Report : rapport d'intervention de la session (étapes exécutées et plan du moment), puis fin de session.
+    OffPatch installe uniquement des mises à jour : aucun paramètre de clé de produit, de profil ou de retrait
+    (cahier des charges 2, 3.3).
+    Codes de sortie : 0 réussite, 1 erreur (configuration invalide, étape refusée ou en échec).
 
 .PARAMETER Action
     DepotUpdate : mise à jour du dépôt (avec -ListOnly : interroge sans rien télécharger).
@@ -23,6 +28,9 @@
 
 .EXAMPLE
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\app\OffPatch-Cli.ps1 -Action DepotUpdate -ListOnly
+
+.EXAMPLE
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\app\OffPatch-Cli.ps1 -Action InstallStep -StepId <id>
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -56,11 +64,46 @@ switch ($Action) {
         if ($result.ErrorCount -gt 0) { exit 1 }
         exit 0
     }
-    default {
-        $detail = ''
-        if ($Action -eq 'DepotUpdate' -and $ListOnly) { $detail = ' (-ListOnly)' }
-        if ($Action -eq 'InstallStep' -and $StepId) { $detail = " (étape $StepId)" }
-        Write-Host "OffPatch : action $Action$detail pas encore disponible."
-        exit 2
+    'Plan' {
+        try {
+            $info = Get-OpSystemInfo -Root $context.Root
+            Write-Host "PC : $($info.ComputerName), $($info.Caption) $($info.DisplayVersion), build $($info.CurrentBuild).$($info.Ubr), cible $($info.Target)"
+            Write-Host 'Contrôles préalables :'
+            Write-Host (Test-OpPreflight -Root $context.Root -SystemInfo $info | Format-Table Label, Result, Message -AutoSize -Wrap | Out-String -Width 200).TrimEnd()
+            Write-Host 'Plan :'
+            Write-Host (Get-OpInstallPlan -Root $context.Root -SystemInfo $info | Format-Table Sequence, Category, Id, State, RebootAfter, Reason -AutoSize -Wrap | Out-String -Width 200).TrimEnd()
+        } catch {
+            Write-Host "OffPatch : $($_.Exception.Message)"
+            exit 1
+        }
+        exit 0
+    }
+    'InstallStep' {
+        if (-not $StepId) {
+            Write-Host 'OffPatch : -StepId est obligatoire avec InstallStep (identifiant affiché par -Action Plan).'
+            exit 1
+        }
+        try {
+            $result = Invoke-OpInstallStep -StepId $StepId -Root $context.Root -WhatIf:$WhatIfPreference
+        } catch {
+            Write-Host "OffPatch : $($_.Exception.Message)"
+            exit 1
+        }
+        if (-not $result) { exit 0 }
+        Write-Host "Étape $($result.Id) : $($result.State). $($result.Reason)"
+        $reboot = $result.RebootAfter -or ($result.PSObject.Properties['RebootRequired'] -and $result.RebootRequired)
+        if ($reboot) { Write-Host 'Redémarrage nécessaire avant l''étape suivante.' }
+        if ($result.State -eq 'Error') { exit 1 }
+        exit 0
+    }
+    'Report' {
+        try {
+            $path = Write-OpInstallReport -Root $context.Root -WhatIf:$WhatIfPreference
+            if ($path) { Write-Host "Rapport : $path" }
+        } catch {
+            Write-Host "OffPatch : $($_.Exception.Message)"
+            exit 1
+        }
+        exit 0
     }
 }

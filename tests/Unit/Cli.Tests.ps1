@@ -1,4 +1,4 @@
-﻿# OffPatch-Cli.ps1 (squelette, phase 1) : chargement, journal, configuration, codes de sortie, aucun paramètre de clé.
+﻿# OffPatch-Cli.ps1 : chargement, journal, configuration, actions Plan, InstallStep et Report, codes de sortie, aucune clé.
 # La CLI est lancée dans un PowerShell enfant sur une copie de l'outil (TestDrive), ProgramData redirigé dans TestDrive.
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification = 'Variables partagées entre blocs Pester, non vues par l''analyse.')]
 param()
@@ -40,12 +40,30 @@ Describe 'OffPatch-Cli.ps1' {
         @($parameters | Where-Object { $_ -match '(?i)key|cle\b|^pid|pidkey|profil|remove|retrait|edition' }).Count | Should -Be 0
     }
 
-    It 'ouvre le journal de session et signale une action pas encore disponible (code 2)' {
+    # Plan et Report sont en lecture seule sur le PC (relevé, détection) ; le rapport s'écrit dans la copie de l'outil.
+    It 'Plan ouvre le journal de session et affiche contrôles et plan, dépôt vide (code 0)' {
         $tool = Get-ToolCopy
         $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'Plan')
-        $r.ExitCode | Should -Be 2
-        $r.Output | Should -Match 'Plan pas encore disponible'
+        $r.ExitCode | Should -Be 0 -Because $r.Output
+        $r.Output | Should -Match 'Contr.les pr.alables'
+        $r.Output | Should -Match 'MissingFromDepot'
         @(Get-ChildItem -Path (Join-Path $tool 'ProgramData\OffPatch\logs') -Filter 'session_*.log').Count | Should -Be 1
+    }
+
+    It 'InstallStep sort en erreur (code 1) sans -StepId ou sur une étape absente du plan' {
+        $tool = Get-ToolCopy
+        $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'InstallStep')
+        $r.ExitCode | Should -Be 1
+        $r.Output | Should -Match 'StepId est obligatoire'
+        (Invoke-Cli -Tool $tool -Arguments @('-Action', 'InstallStep', '-StepId', 'inexistante')).ExitCode | Should -Be 1
+    }
+
+    It 'Report écrit le rapport dans rapports\ et sa copie dans ProgramData (code 0)' {
+        $tool = Get-ToolCopy
+        $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'Report')
+        $r.ExitCode | Should -Be 0 -Because $r.Output
+        @(Get-ChildItem -Path (Join-Path $tool 'rapports') -Filter '*.html').Count | Should -Be 1
+        @(Get-ChildItem -Path (Join-Path $tool 'ProgramData\OffPatch\logs') -Filter '*.html').Count | Should -Be 1
     }
 
     # DepotUpdate interroge le catalogue puis télécharge : testé sans réseau dans DepotPlan.Tests.ps1 et

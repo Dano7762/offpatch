@@ -41,7 +41,7 @@
 
     $office = Get-OpOfficeInstallation
     if (-not $office) { return (ConvertTo-StepResult 'NotApplicable' 'Aucun Office Click-to-Run.' $null $null $null @()) }
-    $before = $office.Version
+    $before = [string]$office.Version
     if ([string]$office.Platform -eq 'x86') { return (ConvertTo-StepResult 'NotApplicable' 'Office 32 bits : la source du dépôt est en 64 bits.' $null $before $before @()) }
     $source = @($Configuration.OfficeSources.sources | Where-Object { $_.folder -eq $Item.folder }) | Select-Object -First 1
     if (-not $source) { throw "Install-OpOfficeUpdate : aucune source de office\sources.json pour le dossier $($Item.folder)." }
@@ -78,7 +78,7 @@
     $run = Invoke-OpOfficeSetup -SetupPath $setup -ConfigPath $config -Mode configure -TimeoutMinutes $timeout -LogSearchDirectory @($env:TEMP) -SessionLogDirectory $LogDirectory -StepStart $start.AddMinutes(-1) -Confirm:$false
     $after = Get-OpOfficeInstallation
     $installed = $null
-    if ($after) { $installed = $after.Version }
+    if ($after) { $installed = [string]$after.Version }
     $logs = @($run.OdtLogs)
     if ($run.TimedOut) { return (ConvertTo-StepResult 'Error' "Délai dépassé ($timeout min) ; version relevée après arrêt de l'ODT : $installed." $null $before $installed $logs) }
     if ($run.ExitCode -ne 0) { return (ConvertTo-StepResult 'Error' "L'ODT a renvoyé le code $($run.ExitCode), voir ses journaux." $run.ExitCode $before $installed $logs) }
