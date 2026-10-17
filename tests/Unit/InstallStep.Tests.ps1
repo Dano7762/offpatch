@@ -108,5 +108,20 @@ Describe 'Invoke-OpInstallStep et Write-OpInstallReport' {
         $html = Get-Content -LiteralPath $path -Raw -Encoding UTF8
         $html | Should -Match 'motif def'
         $html | Should -Not -Match 'mode Avion'
+        $html | Should -Match 'Aucune étape exécutée : aucun point demandé'
+    }
+
+    It 'reprend les avertissements et erreurs des journaux de chaque appel (étapes et rapport)' {
+        $stepLog = Join-Path $script:root 'session_etape.log'
+        $reportLog = Join-Path $script:root 'session_rapport.log'
+        Set-Content -LiteralPath $stepLog -Value '2026-10-17 10:00:00 [WARN] avertissement de l''étape' -Encoding UTF8
+        Set-Content -LiteralPath $reportLog -Value '2026-10-17 11:00:00 [ERROR] erreur du rapport' -Encoding UTF8
+        $script:OpLog = [pscustomobject]@{ Path = $stepLog }
+        Invoke-OpInstallStep -StepId 'def' -Root $script:root | Out-Null
+        $script:OpLog = [pscustomobject]@{ Path = $reportLog }
+        $html = Get-Content -LiteralPath (Write-OpInstallReport -Root $script:root) -Raw -Encoding UTF8
+        $script:OpLog = $null
+        $html | Should -Match 'avertissement de l&#39;étape'
+        $html | Should -Match 'erreur du rapport'
     }
 }

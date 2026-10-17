@@ -10,7 +10,7 @@
           - Before, After : relevés de Get-OpSystemInfo au début et à la fin ;
           - Steps : une ligne par étape (Id, Category, State, Reason, ExitCode, Seconds, Installed, Available),
             plan et résultats des exécuteurs ;
-          - LogPath : journal de la session, dont les lignes [WARN] et [ERROR] sont reprises ;
+          - LogPath : journaux de la session (un ou plusieurs), dont les lignes [WARN] et [ERROR] sont reprises ;
           - Offline : vrai si le PC était hors ligne en fin de session ;
           - RestorePoint : Status (Created, Existing ou None), Description, CreationTime, Reason,
             ProtectionEnabled (protection du système activée par Checkpoint-Computer) ;
@@ -124,9 +124,9 @@
     [void]$html.AppendLine('</table>')
 
     [void]$html.AppendLine('<h2>Erreurs et avertissements</h2>')
-    $logPath = Get-Prop $Session 'LogPath'
-    $issues = @()
-    if ($logPath -and (Test-Path -LiteralPath $logPath -PathType Leaf)) { $issues = @(Get-Content -LiteralPath $logPath -Encoding UTF8 | Where-Object { $_ -match '\[(WARN|ERROR)\]' }) }
+    $issues = @(foreach ($logPath in @(Get-Prop $Session 'LogPath' | Where-Object { $_ })) {
+            if (Test-Path -LiteralPath $logPath -PathType Leaf) { Get-Content -LiteralPath $logPath -Encoding UTF8 | Where-Object { $_ -match '\[(WARN|ERROR)\]' } }
+        })
     if ($issues.Count -eq 0) { [void]$html.AppendLine('<p>Aucun.</p>') }
     else { [void]$html.AppendLine("<ul>$(($issues | ForEach-Object { "<li>$(ConvertTo-HtmlText $_)</li>" }) -join '')</ul>") }
 

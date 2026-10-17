@@ -55,7 +55,7 @@ try { $mp = Get-MpComputerStatus -ErrorAction Stop } catch { $mp = $null }
 $c2r = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration' -ErrorAction SilentlyContinue
 $summary.Add('## Essai T3 : Plan et Report sur Windows 11 ARM64')
 $summary.Add('')
-$summary.Add("- Windows : $($cv.ProductName) $($cv.DisplayVersion), build $($cv.CurrentBuild).$($cv.UBR), $env:PROCESSOR_ARCHITECTURE")
+$summary.Add("- Windows : $((Get-CimInstance -ClassName Win32_OperatingSystem).Caption) $($cv.DisplayVersion), build $($cv.CurrentBuild).$($cv.UBR), $env:PROCESSOR_ARCHITECTURE")
 if ($mp) { $summary.Add("- Defender : $($mp.AMRunningMode), plateforme $($mp.AMProductVersion), définitions $($mp.AntivirusSignatureVersion)") } else { $summary.Add('- Defender : Get-MpComputerStatus en échec') }
 if ($c2r) { $summary.Add("- Office Click-to-Run : $($c2r.ProductReleaseIds), $($c2r.VersionToReport), $($c2r.Platform)") } else { $summary.Add('- Office Click-to-Run : absent') }
 $summary.Add("- Dépôt téléchargé : $([bool]$Download)")

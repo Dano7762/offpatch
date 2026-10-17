@@ -8,7 +8,7 @@
         Pending (« À installer »), sinon elle est refusée avec son état et son motif. Un contrôle préalable bloquant
         (Test-OpPreflight) refuse aussi l'étape.
         À la première étape de la session, relevé du PC et point de restauration (New-OpRestorePoint) sont gardés
-        dans ProgramData\OffPatch\temp\cli-session.json, avec le résultat de chaque étape, pour le rapport
+        dans ProgramData\OffPatch\temp\cli-session.json, avec le résultat et le journal de chaque étape, pour le rapport
         (Write-OpInstallReport). Écriture atomique.
         Exécuteur selon la catégorie : Defender (plateforme, définitions), DISM (cumulatives, checkpoint, enablement
         package, SSU, .NET), ODT (source Office). Journaux de DISM et de l'ODT dans le sous-dossier de la session.
@@ -71,6 +71,11 @@
     Write-OpLog "Étape $StepId : $($result.State), $($result.Reason)"
 
     $session.Steps = @(@($session.Steps | Where-Object { $_ -and $_.Id -ne $StepId }) + $result)
+    # Chaque appel de la CLI a son journal : le rapport en reprend les avertissements et les erreurs.
+    $logPaths = @()
+    if ($session.PSObject.Properties['LogPaths']) { $logPaths = @($session.LogPaths | Where-Object { $_ }) }
+    if ($log -and $log.Path -and $logPaths -notcontains $log.Path) { $logPaths += $log.Path }
+    $session | Add-Member -NotePropertyName LogPaths -NotePropertyValue $logPaths -Force
     New-Item -ItemType Directory -Force -Path (Split-Path -Path $sessionPath -Parent) -ErrorAction Stop | Out-Null
     $tmp = "$sessionPath.tmp"
     [System.IO.File]::WriteAllText($tmp, ($session | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding $false))

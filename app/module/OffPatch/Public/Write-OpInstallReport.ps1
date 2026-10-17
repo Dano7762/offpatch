@@ -34,13 +34,15 @@
     $done = @()
     $start = Get-Date
     $before = $after
-    $restore = $null
+    $restore = [pscustomobject]@{ Status = 'None'; Reason = 'Aucune étape exécutée : aucun point demandé.' }
+    $logPaths = @()
     if ($session) {
         $done = @($session.Steps | Where-Object { $_ })
         $start = [datetime]$session.StartTime
         $before = $session.Before
         $restore = $session.RestorePoint
         if ($restore -and $restore.PSObject.Properties['CreationTime'] -and $restore.CreationTime) { $restore.CreationTime = [datetime]$restore.CreationTime }
+        if ($session.PSObject.Properties['LogPaths']) { $logPaths = @($session.LogPaths) }
     }
     $doneIds = @($done | ForEach-Object { $_.Id })
     $steps = @($done) + @($plan | Where-Object { -not $_.Id -or $doneIds -notcontains $_.Id })
@@ -48,8 +50,8 @@
     $offline = $false
     try { $offline = @(Get-OpNetworkConnection).Count -eq 0 } catch { Write-OpLog "État du réseau illisible : $($_.Exception.Message)" -Level WARN }
     $log = Get-Variable -Name OpLog -Scope Script -ValueOnly -ErrorAction SilentlyContinue
-    $logPath = $null
-    if ($log) { $logPath = $log.Path }
+    # Un journal par appel de la CLI : ceux des étapes, puis celui du rapport.
+    if ($log -and $log.Path -and $logPaths -notcontains $log.Path) { $logPaths += $log.Path }
     $manifest = Read-OpManifest -Path (Get-OpPath -Name Manifest -Root $Root)
 
     $report = [pscustomobject]@{
@@ -58,7 +60,7 @@
         Before       = $before
         After        = $after
         Steps        = $steps
-        LogPath      = $logPath
+        LogPath      = $logPaths
         Offline      = $offline
         RestorePoint = $restore
         ToolVersion  = [string](Get-Module -Name OffPatch | Select-Object -First 1 -ExpandProperty Version)
