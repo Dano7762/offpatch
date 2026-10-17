@@ -1,0 +1,39 @@
+# T3 : actions Plan et Report de la CLI sur un Windows 11 25H2 ARM64 réel (runner jetable), en lecture seule.
+# Sans `download`, le catalogue est seulement interrogé (-ListOnly) ; avec, le dépôt de la cible win11-arm64 est
+# téléchargé (cumulative comprise). Aucune installation. Déclenchement manuel uniquement.
+name: t3-plan
+
+on:
+  workflow_dispatch:
+    inputs:
+      download:
+        description: 'Télécharger le dépôt win11-arm64 (cumulative comprise) avant Plan'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  t3:
+    runs-on: windows-11-arm
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai T3
+        env:
+          T3_DOWNLOAD: ${{ inputs.download }}
+        run: ./tests/runner/Invoke-T3PlanTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\t3-out" -Download:($env:T3_DOWNLOAD -eq 'true')
+
+      - name: Sorties, manifeste, rapport et journaux
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: t3-plan-${{ inputs.download && 'depot' || 'sans-depot' }}
+          path: ${{ runner.temp }}/t3-out
+          retention-days: 30
+          if-no-files-found: warn

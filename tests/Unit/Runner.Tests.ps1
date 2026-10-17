@@ -144,3 +144,16 @@ Describe 'Invoke-OfficeDownloadTest.ps1' {
             Should -Throw
     }
 }
+
+Describe 'Invoke-T3PlanTest.ps1' {
+    BeforeEach { $savedFlag = $env:GITHUB_ACTIONS }
+    AfterEach { $env:GITHUB_ACTIONS = $savedFlag }
+
+    It 'refuse de s''exécuter hors d''un runner GitHub, avant de toucher à la configuration' {
+        $env:GITHUB_ACTIONS = 'false'
+        $settings = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'config\settings.json'
+        $before = Get-FileHash -LiteralPath $settings
+        { & (Join-Path $runner 'Invoke-T3PlanTest.ps1') -OutputDirectory $TestDrive -WhatIf } | Should -Throw -ExpectedMessage '*runner GitHub*'
+        (Get-FileHash -LiteralPath $settings).Hash | Should -Be $before.Hash
+    }
+}
