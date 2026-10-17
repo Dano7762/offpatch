@@ -45,7 +45,7 @@ try {
     Import-Module -Name (Join-Path $PSScriptRoot 'module\OffPatch\OffPatch.psd1') -Force -ErrorAction Stop
     $kind = 'Session'
     if ($Action -eq 'DepotUpdate') { $kind = 'Depot' }
-    $context = Initialize-OpSession -Kind $kind -Root (Split-Path -Parent $PSScriptRoot)
+    $context = Initialize-OpSession -Kind $kind -Root (Split-Path -Parent $PSScriptRoot) -Console
     Write-Host "Journal : $($context.Log.Path)"
 } catch {
     Write-Host "OffPatch : $($_.Exception.Message)"

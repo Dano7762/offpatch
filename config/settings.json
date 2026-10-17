@@ -25,7 +25,7 @@
     "level": "INFO"
   },
   "integrity": {
-    "trustedRootThumbprints": ["3B1EFD3A66EA28B16697394703A72CA340A05BD5"]
+    "trustedRootThumbprints": ["3B1EFD3A66EA28B16697394703A72CA340A05BD5", "8F43288AD272F3103B6FB1428485EA3014C0BCFE"]
   },
   "downloadPages": {
     "defenderDefinitions": {

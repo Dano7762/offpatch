@@ -7,7 +7,7 @@ param()
 BeforeAll {
     Set-StrictMode -Version Latest
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    foreach ($name in 'Write-OpLog', 'ConvertTo-OpMaskedText', 'Invoke-OpBitsDownload', 'Invoke-OpHttpDownload', 'Save-OpDownload') {
+    foreach ($name in 'Write-OpLog', 'Write-OpProgress', 'Format-OpSize', 'ConvertTo-OpMaskedText', 'Invoke-OpBitsDownload', 'Invoke-OpHttpDownload', 'Save-OpDownload') {
         . (Join-Path $root "app\module\OffPatch\Private\$name.ps1")
     }
     Import-Module -Name BitsTransfer -Verbose:$false

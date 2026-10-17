@@ -9,7 +9,8 @@
         de DISM et de l'ODT. Les dossiers sont créés si besoin. Le niveau minimal vient de settings.json
         (logging.level). Une file de messages (ConcurrentQueue) peut être fournie : chaque ligne écrite y est aussi
         déposée, pour l'interface (mise à jour par le Dispatcher, jamais depuis le thread de traitement).
-        Renvoie un objet décrivant le journal (Path, ToolLogDirectory, Level, Queue).
+        Console : l'avancement des traitements longs (Write-OpProgress) est affiché dans la console (CLI).
+        Renvoie un objet décrivant le journal (Path, ToolLogDirectory, Level, Queue, Console).
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([pscustomobject])]
@@ -18,6 +19,7 @@
         [ValidateSet('DEBUG', 'INFO', 'WARN', 'ERROR')][string]$Level = 'INFO',
         [System.Collections.Concurrent.ConcurrentQueue[object]]$Queue,
         [string]$Directory,
+        [switch]$Console,
         [datetime]$Now = (Get-Date)
     )
 
@@ -40,6 +42,7 @@
         ToolLogDirectory = $(if ($Kind -eq 'Session') { $toolLogs } else { $null })
         Level            = $Level
         Queue            = $Queue
+        Console          = [bool]$Console
     }
     $script:OpLog
 }

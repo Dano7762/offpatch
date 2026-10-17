@@ -11,7 +11,7 @@ BeforeAll {
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $module = Join-Path $root 'app\module\OffPatch'
     foreach ($name in 'ConvertFrom-OpCatalogDownloadDialog', 'Get-OpCatalogDownloadLink', 'Invoke-OpWebRequest', 'Get-OpCatalogSelection', 'Resolve-OpDownloadUrl',
-        'Get-OpDepotPlan', 'Get-OpDefenderDefinitionPlan', 'Get-OpOdtPlan', 'Get-OpFileVersion', 'Get-OpFreeSpace', 'Write-OpLog', 'ConvertTo-OpMaskedText', 'Get-OpConfiguration', 'Read-OpJsonFile',
+        'Get-OpDepotPlan', 'Get-OpDefenderDefinitionPlan', 'Get-OpOdtPlan', 'Get-OpFileVersion', 'Get-OpFreeSpace', 'Write-OpLog', 'Write-OpProgress', 'Format-OpSize', 'ConvertTo-OpMaskedText', 'Get-OpConfiguration', 'Read-OpJsonFile',
         'Test-OpConfiguration', 'Get-OpPath', 'Get-OpRoot', 'Read-OpManifest', 'Test-OpManifest') {
         . (Join-Path $module "Private\$name.ps1")
     }

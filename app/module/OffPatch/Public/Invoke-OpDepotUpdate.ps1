@@ -152,6 +152,9 @@
     $toolVersion = $null
     if ($MyInvocation.MyCommand.Module) { $toolVersion = [string]$MyInvocation.MyCommand.Module.Version }
     $downloaded = @{}
+    # Avancement affiché dans la console de la CLI (Write-OpProgress) : un fichier partagé n'est compté qu'une fois.
+    $toFetch = @($items | ForEach-Object { $_.Files } | Where-Object { -not $_.Error -and -not $_.InDepot } | ForEach-Object { $_.Url } | Sort-Object -Unique)
+    $fileIndex = 0
     $new = New-Object System.Collections.Generic.List[object]
     foreach ($item in $items) {
         $entries = New-Object System.Collections.Generic.List[object]
@@ -166,9 +169,14 @@
             }
             if (-not $downloaded.ContainsKey($f.Url)) {
                 try {
+                    $fileIndex++
+                    Write-OpProgress ('Fichier {0}/{1} : {2} ({3})' -f $fileIndex, $toFetch.Count, $f.FileName, (Format-OpSize $f.SizeBytes))
+                    $fileStart = Get-Date
                     $downloaded[$f.Url] = Save-OpDepotFile -Item $item -File $f -Configuration $configuration -Root $Root -Confirm:$false
+                    Write-OpProgress ('  terminé et contrôlé en {0:N0} s.' -f ((Get-Date) - $fileStart).TotalSeconds)
                 } catch {
                     $downloaded[$f.Url] = $_.Exception.Message
+                    Write-OpProgress "  échec : $($_.Exception.Message)"
                 }
             }
             if ($downloaded[$f.Url] -is [string]) { $failure = $downloaded[$f.Url]; break }
@@ -197,6 +205,7 @@
 
     if ($odt -and -not $odt.Error -and -not $odt.UpToDate) {
         try {
+            Write-OpProgress "ODT $($odt.Version) : téléchargement et extraction."
             Save-OpOdt -Plan $odt -Configuration $configuration -Root $Root -Confirm:$false | Out-Null
             $result.OdtUpdated = $true
         } catch {
@@ -210,7 +219,11 @@
     if ($odt) {
         foreach ($src in @(Get-OpOfficeDownloadXml -Configuration $configuration -Root $Root)) {
             try {
+                Write-OpProgress "Source Office $($src.Id) ($($src.Channel)) : setup.exe /download en cours ; l'ODT n'indique pas sa progression (plusieurs Go, souvent 10 à 30 min)."
                 $saved = Save-OpOfficeSource -Source $src -SetupPath $odt.SetupPath -Root $Root -Confirm:$false
+                $version = $null
+                if ($saved.PSObject.Properties['Version']) { $version = $saved.Version }
+                Write-OpProgress "  terminé : version $version."
                 # Élément office-source : remplace celui de la version précédente de la même source (7.2).
                 $folder = @($configuration.OfficeSources.sources | Where-Object { $_.id -eq $src.Id })[0].folder
                 if (-not @($manifest.items | Where-Object { $_.id -eq "office-$($src.Id)-$($saved.Version)" })) {

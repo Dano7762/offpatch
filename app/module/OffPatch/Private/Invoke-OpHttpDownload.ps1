@@ -55,7 +55,16 @@
         if ($stream.CanTimeout) { $stream.ReadTimeout = $ReadTimeoutSeconds * 1000 }
         $file = New-Object System.IO.FileStream($part, $mode, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
         $buffer = New-Object byte[] (1MB)
-        while (($read = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) { $file.Write($buffer, 0, $read) }
+        $received = [long]0
+        if ($resumed) { $received = $existing }
+        $total = $null
+        if ($response.Content.Headers.ContentLength) { $total = $received + [long]$response.Content.Headers.ContentLength }
+        $lastReport = Get-Date
+        while (($read = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            $file.Write($buffer, 0, $read)
+            $received += $read
+            if (((Get-Date) - $lastReport).TotalSeconds -ge 30) { Write-OpProgress '  HttpClient :' -Bytes $received -TotalBytes $total; $lastReport = Get-Date }
+        }
         $file.Close()
         $file = $null
     } finally {

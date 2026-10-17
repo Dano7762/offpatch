@@ -10,7 +10,7 @@ BeforeAll {
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $module = Join-Path $root 'app\module\OffPatch'
     foreach ($name in 'ConvertTo-OpManifestItem', 'Read-OpMsuPackage', 'Save-OpDepotFile', 'Save-OpDownload', 'Confirm-OpDownloadIntegrity',
-        'Test-OpFileSignature', 'Get-OpFileVersion', 'Invoke-OpProcess', 'Get-OpDepotPlan', 'Get-OpOdtPlan', 'Save-OpOdt', 'Get-OpFreeSpace', 'Write-OpLog', 'ConvertTo-OpMaskedText',
+        'Test-OpFileSignature', 'Get-OpFileVersion', 'Invoke-OpProcess', 'Get-OpDepotPlan', 'Get-OpOdtPlan', 'Save-OpOdt', 'Get-OpFreeSpace', 'Write-OpLog', 'Write-OpProgress', 'Format-OpSize', 'ConvertTo-OpMaskedText',
         'Get-OpConfiguration', 'Read-OpJsonFile', 'Test-OpConfiguration', 'Get-OpPath', 'Get-OpRoot', 'Read-OpManifest', 'Test-OpManifest', 'Save-OpManifest',
         'Get-OpDepotPurgePlan') {
         . (Join-Path $module "Private\$name.ps1")
@@ -139,6 +139,17 @@ Describe 'Read-OpMsuPackage (.msu fabriqué avec makecab)' {
         Read-OpMsuPackage -Path $msu -WorkFolder (Join-Path $dir 'work') | Should -BeNullOrEmpty
     }
 
+    It 'renvoie $null avec un avertissement quand expand.exe ne peut pas ouvrir le .msu (cumulative de plus de 4 Go)' {
+        $dir = Join-Path $TestDrive 'msu4'
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        [IO.File]::WriteAllText((Join-Path $dir 'illisible.msu'), 'pas un cabinet')
+        Mock Write-OpLog {}
+        Mock Invoke-OpProcess { [pscustomobject]@{ ExitCode = -1; TimedOut = $false; StdOut = ''; StdErr = ''; Seconds = 1 } }
+        Read-OpMsuPackage -Path (Join-Path $dir 'illisible.msu') -WorkFolder (Join-Path $dir 'work') | Should -BeNullOrEmpty
+        Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -match 'paquet non lu' }
+        Test-Path -LiteralPath (Join-Path $dir 'work') | Should -BeFalse
+    }
+
     It 'renvoie $null pour un .msu sans update.mum lisible' {
         $dir = Join-Path $TestDrive 'msu3'
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -188,6 +199,16 @@ Describe 'Save-OpDepotFile' {
         { Save-OpDepotFile -Item (Get-PlanItem 'd' 'win11-x64' 'defender' @() @{ Version = [version]'1.459.675.0' }) -File (Get-PlanFile 'mpam-fe.exe') -Configuration $configuration -Root $tool } |
             Should -Throw '*version 1.459.600.0, 1.459.675.0 annoncée*'
         @(Get-ChildItem -LiteralPath (Join-Path $tool 'depot') -Recurse -File -Filter 'mpam-fe.exe').Count | Should -Be 0
+    }
+
+    It 'accepte une cumulative au paquet illisible, refuse un .NET au paquet illisible' {
+        Mock Read-OpMsuPackage { $null }
+        $entry = Save-OpDepotFile -Item (Get-PlanItem 'l' 'win11-x64' 'windows-lcu' @()) -File (Get-PlanFile 'l.msu') -Configuration $configuration -Root (Join-Path $TestDrive 'outil5')
+        $entry.package | Should -BeNullOrEmpty
+        $tool = Join-Path $TestDrive 'outil6'
+        { Save-OpDepotFile -Item (Get-PlanItem 'n' 'win11-x64' 'dotnet' @()) -File (Get-PlanFile 'n.msu') -Configuration $configuration -Root $tool } |
+            Should -Throw '*paquet illisibles*'
+        @(Get-ChildItem -LiteralPath (Join-Path $tool 'depot') -Recurse -File -Filter 'n.msu' -ErrorAction SilentlyContinue).Count | Should -Be 0
     }
 
     It 'respecte -WhatIf : rien téléchargé' {

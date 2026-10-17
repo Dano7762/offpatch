@@ -76,11 +76,19 @@
     $started = Get-Date
     $lastBytes = [long]-1
     $lastProgress = Get-Date
+    $lastReport = Get-Date
     while ($true) {
         $job = Get-BitsTransfer -JobId $jobId -ErrorAction Stop
         $state = [string]$job.JobState
         $bytes = [long]$job.BytesTransferred
         if ($bytes -gt $lastBytes) { $lastBytes = $bytes ; $lastProgress = Get-Date }
+        if (((Get-Date) - $lastReport).TotalSeconds -ge 30) {
+            # BytesTotal vaut UInt64.MaxValue tant que BITS ignore la taille.
+            $total = $null
+            if ($job.PSObject.Properties['BytesTotal'] -and [double]$job.BytesTotal -lt [double][long]::MaxValue) { $total = [long]$job.BytesTotal }
+            Write-OpProgress '  BITS :' -Bytes $bytes -TotalBytes $total
+            $lastReport = Get-Date
+        }
         if ($state -eq 'Transferred') {
             Complete-BitsTransfer -BitsJob $job -ErrorAction Stop
             return [pscustomobject]@{ Path = $Destination; Engine = 'BITS'; Resumed = $resumed; SizeBytes = $bytes }

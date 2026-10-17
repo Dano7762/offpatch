@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.31 du 17 octobre 2026.
+Version 1.32 du 17 octobre 2026.
 
 ## 1. Contexte
 
@@ -175,7 +175,7 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
     "level": "INFO"
   },
   "integrity": {
-    "trustedRootThumbprints": ["3B1EFD3A66EA28B16697394703A72CA340A05BD5"]
+    "trustedRootThumbprints": ["3B1EFD3A66EA28B16697394703A72CA340A05BD5", "8F43288AD272F3103B6FB1428485EA3014C0BCFE"]
   },
   "downloadPages": {
     "defenderDefinitions": {
@@ -763,3 +763,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.29 (12 octobre 2026) : champ `windows.supportedBuilds` de `settings.json` (6.1) : builds de base prises en charge par famille, lues par le contrôle préalable « cible reconnue » (8.2) au lieu d'être écrites dans le code (décision de David), contrôlées par `Test-OpConfiguration`.
 - 1.30 (12 octobre 2026) : table `checkpointUbr` de `catalog-queries.json` (6.2) : UBR des cumulatives checkpoint, que la page release-information ne donne pas (ligne 26100.1742 sans KB, relevé du 12 octobre 2026), recopié dans `resultingUbr` de l'élément `windows-checkpoint` ; détection de la checkpoint sur cette valeur (8.3). Suite de R-02.
 - 1.31 (17 octobre 2026) : Office Click-to-Run 32 bits non mis à jour, `NotApplicable` « Office 32 bits : la source du dépôt est en 64 bits », à la détection et à l'exécution (8.3, 8.5) ; décision de David.
+- 1.32 (17 octobre 2026) : `integrity.trustedRootThumbprints` complété de Microsoft Root Certificate Authority 2011 (`8F43288AD272F3103B6FB1428485EA3014C0BCFE`, dépôt PKI de Microsoft), racine des cumulatives .NET Windows 11 d'octobre 2026 (6.1, R-10) ; .msu illisible par `expand.exe` (code -1 sur les cumulatives de plus de 4 Go) : paquet non lu, le titre fait foi pour une cumulative, refus pour .NET dont la détection dépend du paquet (7.1, R-09).

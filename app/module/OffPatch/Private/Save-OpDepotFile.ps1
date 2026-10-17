@@ -45,6 +45,11 @@
     if (@('windows-lcu', 'dotnet') -contains $Item.Category -and $File.FileName -match '(?i)\.msu$') {
         $package = Read-OpMsuPackage -Path $temp -WorkFolder ($temp + '.inspect') -Confirm:$false
         if ($package) { Write-OpLog "Dépôt : $($File.FileName), paquet $($package.name) $($package.version)." }
+        elseif ($Item.Category -eq 'dotnet') {
+            # La détection de .NET repose sur ce paquet (8.3) : sans lui, l'élément ne peut pas entrer au manifeste.
+            Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+            throw "Fichier refusé, $($File.FileName) : nom et version du paquet illisibles dans le .msu, indispensables à la détection de .NET. Fichier supprimé."
+        }
     }
 
     $folder = Join-Path (Get-OpPath -Name DepotFiles -Root $Root) $check.Sha256

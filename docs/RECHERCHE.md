@@ -408,6 +408,7 @@ Impact : champ `resultingBuild`, états `UpToDate` et `Pending`.
 - Décision :
   - Cumulatives Windows : détection par build et UBR, conformément au cahier des charges 8.3 (`baseBuilds`, `resultingUbr`) ; aucune modification nécessaire.
   - Contre-vérification Windows 10 : lire `Package_for_RollupFix` dans `update.mum` et comparer son deuxième nombre à `resultingUbr` ; en cas de divergence, avertissement et la valeur du .msu fait foi (cahier des charges 7.2). Pas de contre-vérification pour Windows 11.
+  - **.msu illisible** (2026-10-17, même dépôt) : `expand.exe -F:*.cab` sort en code -1 sur les cumulatives Windows 11 d'octobre 2026 (KB5127648, 4,45 Go en x64, 4,22 Go en ARM64), au lieu du code 0 sans contenu relevé jusque-là ; l'élément n'entrait pas au manifeste. Décision : `Read-OpMsuPackage` renvoie `$null` avec un avertissement ; pour une cumulative le titre fait foi (comme prévu ci-dessus) ; pour .NET, dont la détection dépend du paquet, le fichier est refusé avec un motif explicite (cahier des charges 1.32).
   - **Office** (décision de David du 2026-10-05, cahier des charges 1.11, 8.3) : version installée = version de fichier de `WINWORD.EXE`, à défaut `EXCEL.EXE`, puis `POWERPNT.EXE`, dans le dossier `InstallationPath` du registre Click-to-Run ; `VersionToReport` en diagnostic seulement ; un écart entre les deux est signalé et rend Office « À installer ».
 
 ## R-10 Contrôle d'intégrité
@@ -435,6 +436,7 @@ Impact : étape de vérification après téléchargement.
   - **Source Office** : SHA-256 de chaque fichier enregistré dans le manifeste au téléchargement (l'ODT a validé les fichiers à ce moment-là) ; revérification de toute la source utilisée avant tout `setup.exe /configure` ; au moindre écart, étape en erreur, ODT non lancé, fichiers fautifs listés dans le rapport.
   - **Garde-fou ODT** : délai maximal de 30 min (`client.odtTimeoutMinutes`), arrêt de `setup.exe`, étape en erreur « délai dépassé », journaux de l'ODT conservés, nouvelle détection d'Office par la version de `WINWORD.EXE`. Pas de délai sur DISM.
   - Le SHA-1 inscrit dans le nom des fichiers du catalogue reste un contrôle supplémentaire au téléchargement (R-01, R-03).
+  - **Racine Microsoft Root Certificate Authority 2011** (2026-10-17, premier dépôt complet sur le poste de développement, journal `logs/depot_2026-10-17_222725.log`) : les cumulatives .NET Windows 11 d'octobre 2026 (KB5127694, x64 et ARM64) chaînent jusqu'à `CN=Microsoft Root Certificate Authority 2011`, empreinte `8F43288AD272F3103B6FB1428485EA3014C0BCFE`, refusées comme racine inconnue. Source : dépôt PKI de Microsoft, https://www.microsoft.com/pkiops/docs/repository.htm (consulté le 2026-10-17, section Corporate CPS : « Microsoft Root Certificate Authority 2011 », Thumbprint (sha1) `8F43288AD272F3103B6FB1428485EA3014C0BCFE` ; la racine 2010 y figure avec `3B1EFD3A66EA28B16697394703A72CA340A05BD5`) ; présente aussi dans le magasin `Cert:LocalMachineRoot` de Windows 11 (valable jusqu'au 22 mars 2036). Décision : ajoutée à `integrity.trustedRootThumbprints` (cahier des charges 1.32).
 
 ## R-11 MSCatalogLTS
 

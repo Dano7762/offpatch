@@ -16,6 +16,9 @@
     .PARAMETER Queue
         File de messages de l'interface (facultative) : chaque ligne du journal y est aussi déposée.
 
+    .PARAMETER Console
+        Affiche dans la console l'avancement des traitements longs (téléchargements, sources Office) : CLI seulement.
+
     .EXAMPLE
         $context = Initialize-OpSession -Kind Depot
 
@@ -27,6 +30,7 @@
     param(
         [Parameter(Mandatory)][ValidateSet('Depot', 'Session')][string]$Kind,
         [System.Collections.Concurrent.ConcurrentQueue[object]]$Queue,
+        [switch]$Console,
         [string]$Root
     )
 
@@ -40,7 +44,7 @@
     }
     $logDirectory = $null
     if ($Kind -eq 'Depot') { $logDirectory = Get-OpPath -Name Logs -Root $Root }
-    $log = Start-OpLog -Kind $Kind -Level $level -Queue $Queue -Directory $logDirectory
+    $log = Start-OpLog -Kind $Kind -Level $level -Queue $Queue -Directory $logDirectory -Console:$Console
     Write-OpLog "OffPatch, opération $Kind, racine $Root"
 
     try {

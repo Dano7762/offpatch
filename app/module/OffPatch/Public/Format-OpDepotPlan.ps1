@@ -22,12 +22,6 @@
         [Parameter(Mandatory)][pscustomobject]$Result
     )
 
-    $fr = [Globalization.CultureInfo]::GetCultureInfo('fr-FR')
-    function Format-Size($Bytes) {
-        if ($null -eq $Bytes) { return 'taille inconnue' }
-        if ($Bytes -ge 1GB) { return ([double]$Bytes / 1GB).ToString('N2', $fr) + ' Go' }
-        ([double]$Bytes / 1MB).ToString('N1', $fr) + ' Mo'
-    }
 
     foreach ($group in @($Result.Items | Group-Object -Property Target)) {
         "Cible $($group.Name)"
@@ -41,7 +35,7 @@
                 $state = 'à télécharger'
                 if ($f.Error) { $state = 'REFUSÉ' } elseif ($f.InDepot) { $state = 'au dépôt' }
                 $line = '  [{0}] {1} ({2}) : {3}' -f $state, $item.Category, $detail, $f.FileName
-                if (-not $f.InDepot -and -not $f.Error) { $line += ', ' + (Format-Size $f.SizeBytes) }
+                if (-not $f.InDepot -and -not $f.Error) { $line += ', ' + (Format-OpSize $f.SizeBytes) }
                 $line
                 if ($f.Error) { '      ' + $f.Error }
             }
@@ -55,15 +49,15 @@
         elseif ($odt.UpToDate) { "ODT [à jour] : setup.exe $($odt.InstalledVersion)" }
         elseif ($Result.OdtUpdated) { "ODT [mis à jour] : version $($odt.Version)" }
         elseif (-not $Result.ListOnly) { "ODT [ÉCHEC] : version $($odt.Version) non installée dans tools\odt, voir le journal." }
-        else { 'ODT [à télécharger] : version {0}, {1}, {2}' -f $odt.Version, $odt.FileName, (Format-Size $odt.SizeBytes) }
+        else { 'ODT [à télécharger] : version {0}, {1}, {2}' -f $odt.Version, $odt.FileName, (Format-OpSize $odt.SizeBytes) }
     }
-    $summary = 'À télécharger : {0} fichier(s), {1}' -f $Result.DownloadCount, (Format-Size $Result.DownloadBytes)
+    $summary = 'À télécharger : {0} fichier(s), {1}' -f $Result.DownloadCount, (Format-OpSize $Result.DownloadBytes)
     if ($Result.UnknownSizeCount -gt 0) { $summary += " (taille inconnue pour $($Result.UnknownSizeCount) fichier(s))" }
     $summary
     if ($null -eq $Result.FreeBytes) { 'Espace libre du volume du dépôt : illisible.' }
     else {
-        'Espace libre du volume du dépôt : ' + (Format-Size $Result.FreeBytes) + '.'
-        if ($Result.EnoughSpace -eq $false) { 'Espace insuffisant : il manque ' + (Format-Size ($Result.DownloadBytes - $Result.FreeBytes)) + ', la mise à jour s''arrêterait avant tout téléchargement.' }
+        'Espace libre du volume du dépôt : ' + (Format-OpSize $Result.FreeBytes) + '.'
+        if ($Result.EnoughSpace -eq $false) { 'Espace insuffisant : il manque ' + (Format-OpSize ($Result.DownloadBytes - $Result.FreeBytes)) + ', la mise à jour s''arrêterait avant tout téléchargement.' }
     }
     $listOnly = ($null -eq $Result.PSObject.Properties['ListOnly']) -or $Result.ListOnly
     if ($listOnly) {
@@ -85,17 +79,17 @@
             if ($null -ne $n.PSObject.Properties['kb']) { $parts += $n.kb }
             if ($null -ne $n.PSObject.Properties['resultingUbr']) { $parts += "UBR $($n.resultingUbr)" }
             if ($null -ne $n.PSObject.Properties['version']) { $parts += "version $($n.version)" }
-            '  + {0} : {1} ({2}), {3}' -f $n.id, $n.category, ($parts -join ', '), (Format-Size $size)
+            '  + {0} : {1} ({2}), {3}' -f $n.id, $n.category, ($parts -join ', '), (Format-OpSize $size)
         }
     }
     if ($Result.ErrorCount -gt 0) { "$($Result.ErrorCount) erreur(s) : liens refusés ou éléments non inscrits, voir le journal." }
     if ($null -ne $Result.PSObject.Properties['Purge'] -and $Result.Purge) {
         $p = $Result.Purge
-        if (@($p.RemovedItems).Count -gt 0) { 'Purge : {0} élément(s) retiré(s) ({1}), {2} libérés.' -f @($p.RemovedItems).Count, (@($p.RemovedItems) -join ', '), (Format-Size $p.FreedBytes) }
+        if (@($p.RemovedItems).Count -gt 0) { 'Purge : {0} élément(s) retiré(s) ({1}), {2} libérés.' -f @($p.RemovedItems).Count, (@($p.RemovedItems) -join ', '), (Format-OpSize $p.FreedBytes) }
         else { 'Purge : rien à retirer.' }
         if (@($p.Orphans).Count -gt 0) {
             "Fichiers orphelins (absents du manifeste, non supprimés) : $(@($p.Orphans).Count)"
-            foreach ($o in @($p.Orphans)) { '  ? {0}, {1}' -f $o.Path, (Format-Size $o.Size) }
+            foreach ($o in @($p.Orphans)) { '  ? {0}, {1}' -f $o.Path, (Format-OpSize $o.Size) }
         }
     }
     if ($null -ne $Result.PSObject.Properties['Office']) {

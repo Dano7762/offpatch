@@ -24,7 +24,12 @@
     New-Item -ItemType Directory -Force -Path $WorkFolder -ErrorAction Stop | Out-Null
     try {
         $r = Invoke-OpProcess -FilePath $expand -ArgumentList '-F:*.cab', $Path, $WorkFolder -TimeoutSeconds $TimeoutSeconds -Confirm:$false
-        if ($r.TimedOut -or $r.ExitCode -ne 0) { throw "expand.exe n'a pas pu ouvrir $([System.IO.Path]::GetFileName($Path)) (code $($r.ExitCode))." }
+        if ($r.TimedOut -or $r.ExitCode -ne 0) {
+            # Mesuré le 2026-10-17 : code -1 sur les cumulatives Windows 11 d'octobre (plus de 4 Go). L'appelant décide
+            # si le paquet est indispensable (.NET) ou non (cumulative : le titre du catalogue fait foi).
+            Write-OpLog -Level WARN -Message "expand.exe n'a pas pu ouvrir $([System.IO.Path]::GetFileName($Path)) (code $($r.ExitCode)) : paquet non lu."
+            return $null
+        }
         foreach ($cab in @(Get-ChildItem -LiteralPath $WorkFolder -Filter '*.cab' -File)) {
             if ($cab.Name -match '(?i)^(wsusscan|ssu-)') { continue }
             $mumFolder = Join-Path $WorkFolder ($cab.BaseName + '-mum')
