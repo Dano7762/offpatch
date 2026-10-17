@@ -21,8 +21,8 @@
           - defender-platform, defender : applicables si Get-MpComputerStatus répond et que AMRunningMode vaut
             Normal, Passive Mode ou EDR Block Mode ; non applicables sinon, jamais en erreur ; à jour si
             AMProductVersion, resp. AntivirusSignatureVersion, ≥ version du dépôt.
-          - office-source : aucun Office Click-to-Run, Office 2016/2019 (endOfSupport), canal absent du dépôt ou
-            langue absente de la source : NotApplicable ; source attendue absente du manifeste ou du support :
+          - office-source : aucun Office Click-to-Run, Office 2016/2019 (endOfSupport), Office 32 bits (source du
+            dépôt en 64 bits), canal absent du dépôt ou langue absente de la source : NotApplicable ; source attendue absente du manifeste ou du support :
             MissingFromDepot ; à jour si la version de fichier ≥ version de la source et égale à VersionToReport.
         Une cumulative, .NET ou Defender absente du manifeste pour la cible donne une ligne MissingFromDepot sans
         identifiant ; un élément à installer dont un fichier manque sur le support aussi.
@@ -185,6 +185,7 @@
         $missingLanguages = @()
         if ($item) { $missingLanguages = @($office.Languages | Where-Object { @($item.languages) -notcontains $_ }) }
         if ($pattern -and @($office.Products | Where-Object { $_ -match $pattern })) { Add-State (ConvertTo-State $null 'office-source' 'NotApplicable' ([string](Get-Prop $sources.endOfSupport 'reason')) $installedText $null) }
+        elseif ([string](Get-Prop $office 'Platform') -eq 'x86') { Add-State (ConvertTo-State $null 'office-source' 'NotApplicable' 'Office 32 bits : la source du dépôt est en 64 bits.' $installedText $null) }
         elseif (-not $source) { Add-State (ConvertTo-State $null 'office-source' 'NotApplicable' "Canal absent du dépôt (identifiant $($office.ChannelId))." $installedText $null) }
         elseif (-not $item) { Add-State (ConvertTo-State $null 'office-source' 'MissingFromDepot' "Source $($source.id) absente du manifeste." $installedText $null) }
         elseif ($missingLanguages.Count -gt 0) { Add-State (ConvertTo-State $item 'office-source' 'NotApplicable' "Langue absente de la source $($source.id) : $($missingLanguages -join ', ')." $installedText $item.version) }

@@ -197,8 +197,8 @@ Describe 'Get-OpUpdateState : Office' {
         Mock Get-WindowsPackage { }
         Mock Get-MpComputerStatus { throw 'non simulé' }
         $script:officeItem = ConvertTo-TestItem 'office-current-16.0.2.2' 'office-source' 'win11-x64' @{ channel = 'Current'; version = '16.0.2.2'; languages = @('fr-fr', 'en-us'); folder = 'office/current' }
-        function Initialize-TestOffice([string[]]$Products = @('O365HomePremRetail'), [string]$Channel = '492350f6-3a01-4f97-b9c0-c7c6ddf67d60', [string[]]$Languages = @('fr-fr'), [string]$Version = '16.0.2.2', [string]$Reported = '16.0.2.2') {
-            $script:info.Office = [pscustomobject]@{ Products = $Products; Languages = $Languages; ChannelId = $Channel; CdnChannelId = $Channel; UpdateChannelId = $Channel; ChannelMismatch = $false; Version = [version]$Version; VersionToReport = $Reported }
+        function Initialize-TestOffice([string[]]$Products = @('O365HomePremRetail'), [string]$Channel = '492350f6-3a01-4f97-b9c0-c7c6ddf67d60', [string[]]$Languages = @('fr-fr'), [string]$Version = '16.0.2.2', [string]$Reported = '16.0.2.2', [string]$Platform = 'x64') {
+            $script:info.Office = [pscustomobject]@{ Products = $Products; Languages = $Languages; ChannelId = $Channel; CdnChannelId = $Channel; UpdateChannelId = $Channel; ChannelMismatch = $false; Version = [version]$Version; VersionToReport = $Reported; Platform = $Platform }
         }
         function Get-OfficeState { @(Get-TestState @($officeItem) | Where-Object { $_.Category -eq 'office-source' })[0] }
     }
@@ -209,6 +209,7 @@ Describe 'Get-OpUpdateState : Office' {
         @{ Case = 'VersionToReport différent : à installer'; Arguments = @{ Reported = '16.0.3.3' }; State = 'Pending'; Reason = '*VersionToReport*' }
         @{ Case = 'Office 2019 : fin de support'; Arguments = @{ Products = @('ProPlus2019Retail') }; State = 'NotApplicable'; Reason = '*2016/2019*' }
         @{ Case = 'canal absent du dépôt'; Arguments = @{ Channel = '00000000-0000-0000-0000-000000000000' }; State = 'NotApplicable'; Reason = '*Canal absent*' }
+        @{ Case = 'Office 32 bits'; Arguments = @{ Platform = 'x86' }; State = 'NotApplicable'; Reason = '*32 bits*' }
         @{ Case = 'langue absente de la source'; Arguments = @{ Languages = @('fr-fr', 'de-de') }; State = 'NotApplicable'; Reason = '*Langue absente*de-de*' }
     ) {
         Initialize-TestOffice @Arguments
