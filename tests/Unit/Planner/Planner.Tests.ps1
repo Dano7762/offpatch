@@ -70,6 +70,34 @@ Describe 'Plan d''installation : cas <Name>' -ForEach $cases {
         @($plan | Where-Object RebootAfter | ForEach-Object { if ($_.Id) { $_.Id } else { $_.Category } }) | Should -Be @($case.expected | Where-Object { $null -ne $_.PSObject.Properties['rebootAfter'] -and $_.rebootAfter } | ForEach-Object { $_.step })
     }
 
+    # Chaque étape du plan passée à Invoke-OpInstallStep, exécuteurs simulés : seules les étapes à installer en appellent
+    # un, celui de leur catégorie ; les autres sont refusées (P6 : DISM jamais lancé pour l'enablement package ignoré ;
+    # P9, P11 : ODT jamais lancé).
+    It 'n''exécute que les étapes à installer, chacune par l''exécuteur de sa catégorie' {
+        $script:executed = New-Object System.Collections.Generic.List[string]
+        $script:caseInfo = $case.systemInfo
+        Mock Get-OpSystemInfo { $script:caseInfo }
+        Mock Test-OpPreflight { }
+        Mock New-OpRestorePoint { [pscustomobject]@{ Status = 'None'; Reason = 'simulé' } }
+        Mock Get-OpPath { Join-Path $TestDrive "programdata\$Name" } -ParameterFilter { $Name -in 'ClientTemp', 'ClientLogs' }
+        Mock Install-OpDefenderUpdate { $script:executed.Add("defender:$($Item.id)"); [pscustomobject]@{ Id = $Item.id; State = 'UpToDate'; Reason = '' } }
+        Mock Install-OpWindowsPackage { $script:executed.Add("dism:$($Item.id)"); [pscustomobject]@{ Id = $Item.id; State = 'UpToDate'; Reason = '' } }
+        Mock Install-OpOfficeUpdate { $script:executed.Add("odt:$($Item.id)"); [pscustomobject]@{ Id = $Item.id; State = 'UpToDate'; Reason = '' } }
+        $executor = @{ 'defender-platform' = 'defender'; 'defender' = 'defender'; 'office-source' = 'odt' }
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'programdata') -Recurse -Force -ErrorAction SilentlyContinue
+
+        foreach ($step in @($plan | Where-Object { $_.Id })) {
+            if ($step.State -eq 'Pending') { Invoke-OpInstallStep -StepId $step.Id -Root $tool | Out-Null }
+            else { { Invoke-OpInstallStep -StepId $step.Id -Root $tool } | Should -Throw "*état $($step.State)*" -Because $step.Id }
+        }
+        $expected = @($plan | Where-Object { $_.State -eq 'Pending' } | ForEach-Object {
+                $kind = $executor[$_.Category]
+                if (-not $kind) { $kind = 'dism' }
+                "${kind}:$($_.Id)"
+            })
+        @($script:executed) | Should -Be $expected
+    }
+
     It 'donne le motif et la version attendus' {
         for ($i = 0; $i -lt @($case.expected).Count; $i++) {
             $e = @($case.expected)[$i]

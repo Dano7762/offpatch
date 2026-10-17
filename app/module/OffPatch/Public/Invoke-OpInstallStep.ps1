@@ -48,9 +48,9 @@
     if (Test-Path -LiteralPath $sessionPath -PathType Leaf) { $session = Get-Content -LiteralPath $sessionPath -Raw -Encoding UTF8 | ConvertFrom-Json }
     if (-not $session) {
         # Versions et dates en texte : ConvertTo-Json de PowerShell 5.1 en ferait des objets.
-        if ($info.Office) { $info.Office.Version = [string]$info.Office.Version }
+        if ($info.PSObject.Properties['Office'] -and $info.Office) { $info.Office.Version = [string]$info.Office.Version }
         $restore = New-OpRestorePoint -Configuration $configuration -Confirm:$false
-        if ($restore -and $restore.CreationTime) { $restore.CreationTime = ([datetime]$restore.CreationTime).ToString('o') }
+        if ($restore -and $restore.PSObject.Properties['CreationTime'] -and $restore.CreationTime) { $restore.CreationTime = ([datetime]$restore.CreationTime).ToString('o') }
         $session = [pscustomobject]@{ StartTime = (Get-Date).ToString('o'); Before = $info; RestorePoint = $restore; Steps = @() }
     }
 

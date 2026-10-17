@@ -40,7 +40,7 @@
         $start = [datetime]$session.StartTime
         $before = $session.Before
         $restore = $session.RestorePoint
-        if ($restore -and $restore.CreationTime) { $restore.CreationTime = [datetime]$restore.CreationTime }
+        if ($restore -and $restore.PSObject.Properties['CreationTime'] -and $restore.CreationTime) { $restore.CreationTime = [datetime]$restore.CreationTime }
     }
     $doneIds = @($done | ForEach-Object { $_.Id })
     $steps = @($done) + @($plan | Where-Object { -not $_.Id -or $doneIds -notcontains $_.Id })
