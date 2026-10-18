@@ -197,13 +197,14 @@ Describe 'Session automatique simulée de bout en bout' {
             Should -Invoke Install-OpWindowsPackage -Times 0 -Exactly
         }
 
-        It 'Windows 10 sans ESU : étapes Windows ignorées et signalées, les autres exécutées' {
+        It 'Windows 10 sans ESU : étapes Windows et .NET ignorées et signalées, les autres exécutées' {
             Mock Test-OpPreflight { [pscustomobject]@{ Label = 'ESU Windows 10'; Result = 'Warning'; Message = 'ESU absent'; Action = 'SkipWindowsInAuto' } }
-            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false
-            $r.Result | Should -Be 'Restarting'
-            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('def', 'dot')
-            Should -Invoke Install-OpWindowsPackage -Times 1 -Exactly -ParameterFilter { $Item.id -eq 'dot' }
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false -WarningAction SilentlyContinue
+            $r.Result | Should -Be 'Completed'
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('def', 'off')
+            Should -Invoke Install-OpWindowsPackage -Times 0 -Exactly
             Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -like '*lcu ignorée*ESU*' }
+            Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -like '*dot ignorée*ESU*' }
         }
 
         It 'Windows 10 sans ESU avec -ForceWindows : étapes Windows exécutées, forçage gardé à la reprise' {

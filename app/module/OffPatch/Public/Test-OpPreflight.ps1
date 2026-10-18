@@ -91,7 +91,7 @@
         else {
             $detail = ''
             if ($i.Esu.Detail) { $detail = " $($i.Esu.Detail)" }
-            ConvertTo-Check 'Esu' 'ESU Windows 10' 'Warning' "ESU absent ou indétectable : en mode auto, l'étape Windows est ignorée sauf si elle est forcée dans le récapitulatif.$detail" 'SkipWindowsInAuto'
+            ConvertTo-Check 'Esu' 'ESU Windows 10' 'Warning' "ESU absent ou indétectable : en mode auto, les étapes Windows et .NET sont ignorées sauf si elles sont forcées dans le récapitulatif.$detail" 'SkipWindowsInAuto'
         }
     }
 

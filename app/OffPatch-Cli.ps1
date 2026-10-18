@@ -15,7 +15,7 @@
       - Report : rapport d'intervention de la session (étapes exécutées et plan du moment), puis fin de session ;
       - Auto : session automatique (plan affiché, une confirmation, étapes, redémarrages avec reprise, rapport) ;
         -Resume : reprise après redémarrage, sans confirmation (relancée par resume.ps1 via OffPatch.ps1) ;
-        -ForceWindows : Windows 10 sans ESU actif, étapes Windows exécutées quand même (sinon ignorées).
+        -ForceWindows : Windows 10 sans ESU actif, étapes Windows et .NET exécutées quand même (sinon ignorées).
     OffPatch installe uniquement des mises à jour : aucun paramètre de clé de produit, de profil ou de retrait
     (cahier des charges 2, 3.3).
     Codes de sortie : 0 réussite, 1 erreur (configuration invalide, étape refusée ou en échec).

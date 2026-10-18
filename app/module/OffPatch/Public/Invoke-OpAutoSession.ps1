@@ -15,7 +15,7 @@
         se termine par le rapport.
         Plus d'étape à faire : rapport et fin de session (Write-OpInstallReport), Completed.
         Windows 10 sans ESU actif (contrôle préalable SkipWindowsInAuto) : les étapes Windows (catégories windows-*)
-        sont ignorées et signalées au journal, sauf -ForceWindows.
+        et les étapes .NET (dotnet, R-19) sont ignorées et signalées au journal, sauf -ForceWindows.
         Une étape installée avant un redémarrage (UpToDate, redémarrage nécessaire) que le plan propose de nouveau
         après la reprise a été annulée par Windows au redémarrage : elle passe en Error « non appliquée après
         redémarrage (retour arrière probable) » dans state.json, sans nouvelle tentative (8.4).
@@ -29,8 +29,8 @@
         Durée du compte à rebours avant redémarrage ; par défaut client.rebootCountdownSeconds de settings.json.
 
     .PARAMETER ForceWindows
-        Windows 10 sans ESU actif ou détectable : exécute quand même les étapes Windows (forçage du récapitulatif,
-        R-04). Sans ce paramètre, elles sont ignorées et signalées au journal.
+        Windows 10 sans ESU actif ou détectable : exécute quand même les étapes Windows et .NET (forçage du
+        récapitulatif, R-04). Sans ce paramètre, elles sont ignorées et signalées au journal.
 
     .PARAMETER OnStep
         Bloc appelé avant chaque étape avec la ligne du plan, puis après avec son résultat (affichage).
@@ -82,11 +82,13 @@
         $plan = @(Get-OpInstallPlan -Root $Root -SystemInfo (Get-OpSystemInfo -Root $Root))
         $pending = @($plan | Where-Object { $_.State -eq 'Pending' -and -not $succeeded.ContainsKey($_.Id) -and [int]$attempts[$_.Id] -lt 2 })
         if ($skipWindows) {
-            foreach ($s in @($pending | Where-Object { $_.Category -like 'windows-*' })) {
-                Write-OpLog "Étape $($s.Id) ignorée : ESU absent ou indétectable, étape Windows non forcée en mode auto." -Level WARN
+            # .NET aussi : sans ESU, sa cumulative s'installe puis est écartée au redémarrage sans erreur (R-19).
+            $esuOnly = { $_.Category -like 'windows-*' -or $_.Category -eq 'dotnet' }
+            foreach ($s in @($pending | Where-Object $esuOnly)) {
+                Write-OpLog "Étape $($s.Id) ignorée : ESU absent ou indétectable, étape Windows ou .NET non forcée en mode auto." -Level WARN
                 $attempts[$s.Id] = 2
             }
-            $pending = @($pending | Where-Object { $_.Category -notlike 'windows-*' })
+            $pending = @($pending | Where-Object { -not (& $esuOnly) })
         }
         # Installée avant un redémarrage (UpToDate, redémarrage nécessaire) mais de nouveau à installer : Windows l'a
         # annulée au redémarrage (8.4, second temps du jugement). Erreur, sans nouvelle tentative.

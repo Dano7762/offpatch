@@ -24,7 +24,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File $cli -Action Plan | Tee-
 
 Attendu :
 
-- contrôles préalables : aucun `Blocking` ; « ESU Windows 10 » en `Warning`, « ESU absent ou indétectable : en mode auto, l'étape Windows est ignorée sauf si elle est forcée dans le récapitulatif » ; réseau `Ok` (PC hors ligne) ;
+- contrôles préalables : aucun `Blocking` ; « ESU Windows 10 » en `Warning`, « ESU absent ou indétectable : en mode auto, les étapes Windows et .NET sont ignorées sauf si elles sont forcées dans le récapitulatif » ; réseau `Ok` (PC hors ligne) ;
 - plan : SSU `win10-x64-ssu-KB5031539` « Pending » (UBR 2965 sous 3271), cumulative `win10-x64-lcu-KB5126657` « Pending » avec `RebootAfter` vrai, .NET `win10-x64-dotnet-KB5128925` « Pending » ou « NotApplicable » selon la version de .NET 4.x de l'image, plateforme et définitions Defender « Pending ».
 
 **Envoie-moi `T5-plan-1.txt` avant d'aller plus loin** si quelque chose diffère (surtout un `Blocking`).
@@ -39,7 +39,7 @@ Double-clic sur `E:\Lancer-OffPatch.cmd`, accepter l'élévation. Dans la consol
 
 Attendu :
 
-- aucune étape `windows-ssu` ni `windows-lcu` exécutée ; Defender (plateforme puis définitions) et .NET s'il était « Pending » exécutés, chacun `UpToDate` ;
+- aucune étape `windows-ssu`, `windows-lcu` ni `dotnet` exécutée (ESU absent, R-19) ; Defender (plateforme puis définitions) exécuté, chacun `UpToDate` ;
 - **aucun redémarrage** ;
 - rapport `E:\rapports\AAAA-MM-JJ_<NomPC>_<Série>.html` : cumulative et SSU toujours « Pending » ; dans les avertissements du journal, deux lignes « Étape … ignorée : ESU absent ou indétectable, étape Windows non forcée en mode auto. » ; rappel hors ligne (mode Avion ou réseau) ;
 - dans `C:\ProgramData\OffPatch\` : plus de `state.json`, de `resume.ps1` ni de `temp\` ; `logs\` contient le journal de session, l'archive `state_*.json` et la copie du rapport ;

@@ -464,7 +464,7 @@ Assistant accessible depuis l'onglet Dépôt :
 | Droits administrateur | Bloquant |
 | Processus PowerShell 32 bits sur un Windows 64 bits (`[Environment]::Is64BitOperatingSystem` vrai et `[Environment]::Is64BitProcess` faux) | Bloquant : DISM et le registre seraient vus à travers la redirection 32 bits. `Lancer-OffPatch.cmd` doit lancer le PowerShell natif (8.1) |
 | Cible reconnue (système, version, build, architecture, édition) | Hors périmètre : bloquant, avec le motif. Windows 10 et Windows 11 se distinguent par `CurrentBuild` (22000 et plus = Windows 11), jamais par `ProductName`, qui vaut encore « Windows 10 … » sur Windows 11. Le libellé affiché vient de `Win32_OperatingSystem.Caption` (R-09) |
-| Windows 10 : ESU actif | Absent ou indétectable : avertissement. En mode auto, l'étape Windows est ignorée sauf si je la force dans le récapitulatif (R-04) |
+| Windows 10 : ESU actif | Absent ou indétectable : avertissement. En mode auto, les étapes Windows et .NET sont ignorées sauf si je les force dans le récapitulatif (R-04). .NET aussi : sans ESU, sa cumulative s'installe puis est écartée au redémarrage, sans erreur (R-19) |
 | Redémarrage en attente (CBS, Windows Update, renommages de fichiers en attente) | Proposer de redémarrer avant de commencer |
 | Espace libre sur C: | Sous `minFreeSpaceGB` : bloquant |
 | Portable sur batterie | Avertissement, confirmation demandée avant le mode auto |
@@ -770,3 +770,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.34 (18 octobre 2026) : test T3 reformulé en « Windows 11 26H2 x64 déjà à jour » (12) : sur un 25H2, l'enablement package 26H2 est toujours proposé tant que `windows.includeEnablementPackage` est vrai, « rien à installer » n'y est pas atteignable ; décision de David.
 - 1.35 (18 octobre 2026) : Defender sur une plateforme ancienne sans `AMRunningMode` (4.18.1909.6, relevé sur un Windows 10 22H2) : jugé actif si `AMServiceEnabled` et `AntivirusEnabled` sont vrais (8.3). Accord de David du 18 octobre 2026, suite du relevé R-06.
 - 1.36 (18 octobre 2026) : Windows 10, installation des .msu par `wusa.exe /quiet /norestart` au lieu de DISM en ligne, que Microsoft ne prend en charge qu'à partir de Windows 11 21H2 (8.4, R-19) ; codes 0, 3010 et 2359302 mesurés sur un Windows 10 22H2. Accord de David du 18 octobre 2026.
+- 1.37 (18 octobre 2026) : Windows 10 sans ESU actif ou détectable, l'étape .NET est ignorée en mode auto comme l'étape Windows, sauf forçage (8.2) : mesuré sur un Windows 10 22H2 non inscrit, la cumulative .NET s'installe puis est écartée au redémarrage, sans erreur (R-19). Accord de David du 18 octobre 2026.
