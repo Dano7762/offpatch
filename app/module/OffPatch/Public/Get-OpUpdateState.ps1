@@ -164,7 +164,14 @@
         $wanted = ConvertTo-Version $package.version
         if ($installed -and $wanted -and $installed -ge $wanted) { Add-State (ConvertTo-State $item 'dotnet' 'UpToDate' "$($package.name) $installed installé." "$installed" $package.version) }
         elseif ($item -ne $dotnets[0]) { Add-State (ConvertTo-State $item 'dotnet' 'NotApplicable' "Repli : $($dotnets[0].id), plus récente, est au dépôt." "$installed" $package.version) }
-        else { Add-State (ConvertTo-State $item 'dotnet' 'Pending' "$($package.name) $(if ($installed) { "$installed installé" } else { 'absent' })." "$installed" $package.version) }
+        else {
+            # Installé mais pas encore appliqué (3010) : toujours à installer jusqu'au redémarrage, motif explicite.
+            $waiting = @($packages.Value | Where-Object { ([string]$_.PackageName -split '~')[0] -eq $package.name -and [string]$_.PackageState -eq 'InstallPending' } |
+                    ForEach-Object { ConvertTo-Version (([string]$_.PackageName -split '~')[-1]) } | Where-Object { $_ -and $wanted -and $_ -ge $wanted }) | Select-Object -First 1
+            $text = "$($package.name) $(if ($installed) { "$installed installé" } else { 'absent' })."
+            if ($waiting) { $text = "$($package.name) $waiting en attente de redémarrage (InstallPending)." }
+            Add-State (ConvertTo-State $item 'dotnet' 'Pending' $text "$installed" $package.version)
+        }
     }
 
     # Defender (R-06) : jamais en erreur.

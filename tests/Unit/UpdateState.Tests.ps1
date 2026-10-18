@@ -158,6 +158,16 @@ Describe 'Get-OpUpdateState : .NET' {
         @($s | Where-Object { $_.Category -eq 'dotnet' -and $_.State -eq 'MissingFromDepot' }).Count | Should -Be 1
     }
 
+    It 'paquet en attente de redémarrage : toujours à installer, avec le motif (mesuré sur runner le 2026-10-18)' {
+        Mock Get-WindowsPackage {
+            [pscustomobject]@{ PackageName = 'Package_for_DotNetRollup_481~31bf3856ad364e35~arm64~~10.0.9300.1'; PackageState = 'UninstallPending' }
+            [pscustomobject]@{ PackageName = 'Package_for_DotNetRollup_481~31bf3856ad364e35~arm64~~10.0.9347.1'; PackageState = 'InstallPending' }
+        }
+        $state = Get-StateOf (Get-TestState @(ConvertTo-TestItem 'w-net' 'dotnet' 'win11-x64' @{} @($netFile))) 'w-net'
+        $state.State | Should -Be 'Pending'
+        $state.Reason | Should -BeLike '*10.0.9347.1 en attente de redémarrage*'
+    }
+
     It 'liste DISM illisible : erreur' {
         Mock Get-WindowsPackage { throw 'élévation requise' }
         $s = Get-TestState @(ConvertTo-TestItem 'w-net' 'dotnet' 'win11-x64' @{} @($netFile))
