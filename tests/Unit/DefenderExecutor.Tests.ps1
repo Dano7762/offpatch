@@ -6,7 +6,7 @@ param()
 BeforeAll {
     Set-StrictMode -Version Latest
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    foreach ($name in 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Invoke-OpProcess', 'Test-OpItemFileHash', 'Install-OpDefenderUpdate') {
+    foreach ($name in 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Invoke-OpProcess', 'Test-OpItemFileHash', 'Get-OpDefenderRunningMode', 'Install-OpDefenderUpdate') {
         . (Join-Path $root "app\module\OffPatch\Private\$name.ps1")
     }
 
@@ -65,6 +65,19 @@ Describe 'Install-OpDefenderUpdate' {
     }
 
     Context 'plateforme Defender' {
+        It 'part d''une plateforme ancienne sans AMRunningMode sans attendre, et réussit quand la nouvelle le porte' {
+            $s = Get-DefenderScene 'defender-platform' '4.18.26080.4'
+            Use-DefenderReading @(
+                @{ AMServiceEnabled = $true; AntivirusEnabled = $true; AMProductVersion = '4.18.1909.6' }
+                @{ AMRunningMode = 'Normal'; AMProductVersion = '4.18.26080.4' })
+            Mock Invoke-OpProcess { Get-Ok }
+            $r = Install-OpDefenderUpdate -Item $s.Item -Depot $s.Depot
+            $r.State | Should -Be 'UpToDate'
+            $r.Before | Should -Be '4.18.1909.6'
+            Should -Invoke Start-Sleep -Times 0 -Exactly
+            Should -Invoke Write-OpLog -Times 0 -Exactly -ParameterFilter { $Level -eq 'WARN' }
+        }
+
         It 'lance l''exécutable sans argument et réussit quand AMProductVersion atteint la version du dépôt' {
             $s = Get-DefenderScene 'defender-platform' '4.18.26080.4'
             Use-DefenderReading @(

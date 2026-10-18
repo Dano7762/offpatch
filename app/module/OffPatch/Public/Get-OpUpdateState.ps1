@@ -20,7 +20,8 @@
             à jour si la liste DISM (Get-WindowsPackage -Online) contient le paquet de même nom, Installed, de version
             ≥ ; même règle de repli que les cumulatives.
           - defender-platform, defender : applicables si Get-MpComputerStatus répond et que AMRunningMode vaut
-            Normal, Passive Mode ou EDR Block Mode ; non applicables sinon, jamais en erreur ; à jour si
+            Normal, Passive Mode ou EDR Block Mode (plateforme ancienne sans AMRunningMode : AMServiceEnabled et
+            AntivirusEnabled vrais, Get-OpDefenderRunningMode) ; non applicables sinon, jamais en erreur ; à jour si
             AMProductVersion, resp. AntivirusSignatureVersion, ≥ version du dépôt.
           - office-source : aucun Office Click-to-Run, Office 2016/2019 (endOfSupport), Office 32 bits (source du
             dépôt en 64 bits), canal absent du dépôt ou langue absente de la source : NotApplicable ; source attendue absente du manifeste ou du support :
@@ -179,7 +180,7 @@
         $items = @(Get-NewestFirst @($mine | Where-Object { $_.category -eq $pair[0] }) { ConvertTo-Version (Get-Prop $_ 'version') })
         if ($items.Count -eq 0) { continue }
         $status = Get-Fact 'Defender' { Get-MpComputerStatus -ErrorAction Stop }
-        $mode = [string](Get-Prop $status.Value 'AMRunningMode')
+        $mode = Get-OpDefenderRunningMode $status.Value
         foreach ($item in $items) {
             $available = [string](Get-Prop $item 'version')
             if ($status.Error) { Add-State (ConvertTo-State $item $pair[0] 'NotApplicable' "Defender ne répond pas (Get-MpComputerStatus : $($status.Error))." $null $available); continue }

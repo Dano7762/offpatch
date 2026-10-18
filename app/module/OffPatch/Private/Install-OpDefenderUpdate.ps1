@@ -41,10 +41,7 @@
     function Get-Status {
         try { Get-MpComputerStatus -ErrorAction Stop } catch { $null }
     }
-    function Get-Mode($Status) {
-        if ($Status -and $Status.PSObject.Properties['AMRunningMode']) { return [string]$Status.AMRunningMode }
-        ''
-    }
+    function Get-Mode($Status) { Get-OpDefenderRunningMode $Status }
     function Get-InstalledVersion($Status) {
         $v = $null
         if ($Status -and $Status.PSObject.Properties[$versionProperty] -and [version]::TryParse(([string]$Status.$versionProperty).Trim(), [ref]$v)) { return $v }

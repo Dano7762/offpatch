@@ -210,6 +210,15 @@ Describe 'Get-OpUpdateState : Defender' {
         (Get-StateOf $s 'w-def').State | Should -Be 'Pending'
     }
 
+    It 'plateforme ancienne sans AMRunningMode (Windows 10, 4.18.1909.6) : en service si AMServiceEnabled et AntivirusEnabled' {
+        Mock Get-MpComputerStatus { [pscustomobject]@{ AMServiceEnabled = $true; AntivirusEnabled = $true; AMProductVersion = '4.18.1909.6'; AntivirusSignatureVersion = '1.303.25.0' } }
+        $s = Get-TestState $defender
+        (Get-StateOf $s 'w-plat').State | Should -Be 'Pending'
+        (Get-StateOf $s 'w-def').State | Should -Be 'Pending'
+        Mock Get-MpComputerStatus { [pscustomobject]@{ AMServiceEnabled = $true; AntivirusEnabled = $false; AMProductVersion = '4.18.1909.6'; AntivirusSignatureVersion = '1.303.25.0' } }
+        (Get-StateOf (Get-TestState $defender) 'w-def').Reason | Should -BeLike '*désactivé (AMRunningMode : absent)*'
+    }
+
     It 'Defender désactivé ou muet : non applicable, jamais en erreur' {
         Mock Get-MpComputerStatus { [pscustomobject]@{ AMRunningMode = 'Not running'; AMProductVersion = '4.18.1.1'; AntivirusSignatureVersion = '1.1.1.1' } }
         @(Get-TestState $defender | Where-Object { $_.Id } | ForEach-Object { $_.State } | Sort-Object -Unique) | Should -Be @('NotApplicable')
