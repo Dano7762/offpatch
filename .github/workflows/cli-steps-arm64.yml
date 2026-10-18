@@ -1,0 +1,32 @@
+# Étapes réelles de la CLI (Plan, InstallStep, Report) sur un Windows 11 ARM64 jetable : .NET par DISM, plateforme
+# et définitions Defender. Dépôt réduit (sans cumulative Windows ni source Office), aucun redémarrage.
+# Modifie le système du runner. Déclenchement manuel uniquement.
+name: cli-steps-arm64
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  steps:
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Étapes de la CLI
+        run: ./tests/runner/Invoke-CliStepsTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\cli-steps-out"
+
+      - name: Sorties, relevés, rapport et journaux
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: cli-steps-arm64
+          path: ${{ runner.temp }}/cli-steps-out
+          retention-days: 30
+          if-no-files-found: warn

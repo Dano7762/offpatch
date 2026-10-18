@@ -157,3 +157,16 @@ Describe 'Invoke-T3PlanTest.ps1' {
         (Get-FileHash -LiteralPath $settings).Hash | Should -Be $before.Hash
     }
 }
+
+Describe 'Invoke-CliStepsTest.ps1' {
+    BeforeEach { $savedFlag = $env:GITHUB_ACTIONS }
+    AfterEach { $env:GITHUB_ACTIONS = $savedFlag }
+
+    It 'refuse de s''exécuter hors d''un runner GitHub, avant de toucher à la configuration' {
+        $env:GITHUB_ACTIONS = 'false'
+        $queries = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'config\catalog-queries.json'
+        $before = Get-FileHash -LiteralPath $queries
+        { & (Join-Path $runner 'Invoke-CliStepsTest.ps1') -OutputDirectory $TestDrive -WhatIf } | Should -Throw -ExpectedMessage '*runner GitHub*'
+        (Get-FileHash -LiteralPath $queries).Hash | Should -Be $before.Hash
+    }
+}
