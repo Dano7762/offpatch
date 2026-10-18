@@ -27,3 +27,6 @@ tools/**/*.zip
 # Sorties de test et fichiers temporaires
 testResults.xml
 *.tmp
+
+# Notes de copier-coller de David (VM <-> hôte)
+Nouveau document texte.txt

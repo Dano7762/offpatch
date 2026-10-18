@@ -725,6 +725,7 @@ Impact : exécuteur des étapes Windows et .NET sur Windows 10 (cahier des charg
   - .NET 4.8 KB5127683 : code 3010 en 33 s ; journal Setup : Id 2 « installée correctement » et Id 4 « nécessite un redémarrage » ;
   - même fichier, second passage : code 2359302 (0x00240006) en 3 s ; journal Setup : Id 3 « n'a pas pu être installée en raison d'une erreur: 2359302 », c'est-à-dire déjà installé ;
   - SSU KB5031539 : code 0 en 9 s ; Id 2 « Package KB5031539 was successfully changed to the Installed state » ;
-  - cumulative ESU KB5126657, PC **non inscrit** à l'ESU : code 3010 en 1 442 s ; paquets KB5126657 et KB5127308 en attente de redémarrage. Qu'elle s'applique vraiment au redémarrage (UBR 7807) reste à constater.
+  - cumulative ESU KB5126657, PC **non inscrit** à l'ESU : code 3010 en 1 442 s ; paquets KB5126657 et KB5127308 en attente de redémarrage ;
+  - au redémarrage : journal Setup, Id 3, « Package KB5126657 failed to be changed to the Installed state. Status: 0x800f0922 », de même pour KB5127308 et pour .NET KB5127683, tous les trois appliqués dans la même opération ; UBR resté à 2965 : cumulative ESU annulée sans ESU. On ne sait pas si .NET a échoué de lui-même ou avec la cumulative (à mesurer seul en T5). OffPatch ne contourne pas l'ESU : sans ESU, l'étape Windows reste ignorée en mode auto (R-04), et une étape annulée au redémarrage passe en erreur sans nouvelle tentative (8.4).
   - Code « non applicable » de wusa : non mesuré ; tout code autre que 0, 3010 et 2359302 est une erreur.
 - Décision : `Install-OpWindowsPackage` lance wusa pour les éléments Windows 10 (`target.os` win10), DISM sinon ; jugement inchangé ensuite (liste DISM, `Get-WindowsPackage -Online`, en lecture seule). Cahier des charges 1.36 (8.4).

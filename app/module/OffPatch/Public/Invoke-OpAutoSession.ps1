@@ -16,6 +16,9 @@
         Plus d'étape à faire : rapport et fin de session (Write-OpInstallReport), Completed.
         Windows 10 sans ESU actif (contrôle préalable SkipWindowsInAuto) : les étapes Windows (catégories windows-*)
         sont ignorées et signalées au journal, sauf -ForceWindows.
+        Une étape installée avant un redémarrage (UpToDate, redémarrage nécessaire) que le plan propose de nouveau
+        après la reprise a été annulée par Windows au redémarrage : elle passe en Error « non appliquée après
+        redémarrage (retour arrière probable) » dans state.json, sans nouvelle tentative (8.4).
         Une session manuelle en cours (CLI) est refusée : la terminer d'abord par son rapport.
         Renvoie Result (Restarting, Cancelled ou Completed), ReportPath et Steps (résultats de cet appel).
 
@@ -84,6 +87,26 @@
                 $attempts[$s.Id] = 2
             }
             $pending = @($pending | Where-Object { $_.Category -notlike 'windows-*' })
+        }
+        # Installée avant un redémarrage (UpToDate, redémarrage nécessaire) mais de nouveau à installer : Windows l'a
+        # annulée au redémarrage (8.4, second temps du jugement). Erreur, sans nouvelle tentative.
+        $state = Read-OpSessionState
+        $rolledBack = @()
+        if ($state) {
+            foreach ($s in $pending) {
+                $previous = @($state.steps | Where-Object { $_ -and $_.Id -eq $s.Id }) | Select-Object -First 1
+                if ($previous -and $previous.State -eq 'UpToDate' -and $previous.PSObject.Properties['RebootRequired'] -and $previous.RebootRequired) {
+                    $previous.State = 'Error'
+                    $previous.Reason = "$($previous.Reason) Non appliquée après redémarrage (retour arrière probable)."
+                    Write-OpLog "Étape $($s.Id) : installée mais non appliquée après redémarrage (retour arrière probable) ; pas de nouvelle tentative." -Level ERROR
+                    $attempts[$s.Id] = 2
+                    $rolledBack += $s.Id
+                }
+            }
+        }
+        if ($rolledBack.Count -gt 0) {
+            Save-OpSessionState -State $state -Confirm:$false
+            $pending = @($pending | Where-Object { $rolledBack -notcontains $_.Id })
         }
         $next = $pending | Select-Object -First 1
         if (-not $next) { break }

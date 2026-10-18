@@ -218,6 +218,24 @@ Describe 'Session automatique simulée de bout en bout' {
             @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('off', 'ssu')
         }
 
+        It 'cumulative annulée au redémarrage (0x800f0922 sans ESU) : erreur à la reprise, sans réinstallation' {
+            # La cumulative s'installe (3010) mais reste à installer après le redémarrage.
+            Mock Install-OpWindowsPackage {
+                $r = [pscustomobject]@{ Id = $Item.id; Category = $Item.category; State = 'UpToDate'; Reason = 'Package_for_RollupFix : InstallPending.'; ExitCode = 3010 }
+                if ($Item.id -ne 'lcu') { $script:installed[$Item.id] = $true }
+                $r | Add-Member RebootRequired $true
+                $r
+            }
+            (Invoke-OpAutoSession -Root $script:root -Confirm:$false).Result | Should -Be 'Restarting'
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('dot')
+            Should -Invoke Install-OpWindowsPackage -Times 1 -Exactly -ParameterFilter { $Item.id -eq 'lcu' }
+            $lcu = @((Read-OpSessionState).steps | Where-Object { $_.Id -eq 'lcu' })[0]
+            $lcu.State | Should -Be 'Error'
+            $lcu.Reason | Should -BeLike '*non appliquée après redémarrage*'
+            Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'ERROR' -and $Message -like '*lcu*retour arrière*' }
+        }
+
         It 'ne fait rien avec -WhatIf' {
             Invoke-OpAutoSession -Root $script:root -WhatIf | Should -BeNullOrEmpty
             Should -Invoke Install-OpDefenderUpdate -Times 0 -Exactly
