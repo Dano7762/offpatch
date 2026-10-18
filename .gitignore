@@ -30,3 +30,6 @@ testResults.xml
 
 # Notes de copier-coller de David (VM <-> hôte)
 Nouveau document texte.txt
+# Rapports et sorties d'essai déposés à la racine par David
+/*.html
+/T*-*.txt
