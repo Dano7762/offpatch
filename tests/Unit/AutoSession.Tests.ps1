@@ -13,7 +13,7 @@ BeforeAll {
     'Get-OpSupportIdentity', 'Get-OpInitialSessionState', 'Read-OpSessionState', 'Save-OpSessionState', 'Complete-OpSessionState',
     'Register-OpResumeTask', 'Unregister-OpResumeTask'
     foreach ($name in $private) { . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1") }
-    foreach ($name in 'Get-OpSystemInfo', 'Test-OpPreflight', 'Get-OpInstallPlan', 'Invoke-OpInstallStep', 'Restart-OpSession', 'Write-OpInstallReport') {
+    foreach ($name in 'Get-OpSystemInfo', 'Test-OpPreflight', 'Get-OpInstallPlan', 'Invoke-OpInstallStep', 'Restart-OpSession', 'Write-OpInstallReport', 'Invoke-OpAutoSession') {
         . (Join-Path $repo "app\module\OffPatch\Public\$name.ps1")
     }
 
@@ -21,6 +21,7 @@ BeforeAll {
         [pscustomobject]@{ Sequence = 1; Id = $Id; Category = $Category; State = 'Pending'; Reason = "motif $Id"; Installed = $null; Available = '1'; RebootAfter = $RebootAfter }
     }
     function Get-Result([string]$Id, [string]$Category) {
+        $script:installed[$Id] = $true
         [pscustomobject]@{ Id = $Id; Category = $Category; State = 'UpToDate'; Reason = "fait $Id"; ExitCode = 0 }
     }
     function Get-ProgramData([string]$Child) { Join-Path (Join-Path $script:root 'programdata') $Child }
@@ -48,7 +49,9 @@ Describe 'Session automatique simulée de bout en bout' {
         }
         Mock Test-OpPreflight { [pscustomobject]@{ Label = 'Espace libre'; Result = 'Ok'; Message = 'ok' } }
         $script:plan = @((Get-Row 'def' 'defender'), (Get-Row 'lcu' 'windows-lcu' $true), (Get-Row 'dot' 'dotnet' $true), (Get-Row 'off' 'office-source'))
-        Mock Get-OpInstallPlan { $script:plan }
+        # Plan recalculé : une étape installée passe à UpToDate.
+        $script:installed = @{}
+        Mock Get-OpInstallPlan { $script:plan | ForEach-Object { $r = $_.PSObject.Copy(); if ($script:installed.ContainsKey($r.Id)) { $r.State = 'UpToDate' }; $r } }
         Mock Read-OpManifest { [pscustomobject]@{ generatedAt = '2026-10-14T09:12:00Z'; items = @($script:plan | ForEach-Object { [pscustomobject]@{ id = $_.Id; category = $_.Category } }) } }
         Mock New-OpRestorePoint { [pscustomobject]@{ Status = 'Created'; Description = 'OffPatch'; CreationTime = Get-Date; Reason = $null; ProtectionEnabled = $true } }
         Mock Install-OpDefenderUpdate { Get-Result $Item.id 'defender' }
@@ -122,5 +125,82 @@ Describe 'Session automatique simulée de bout en bout' {
         (Read-OpSessionState).rebootCount | Should -Be 0
         (Invoke-OpInstallStep -StepId 'off' -Root $script:root).State | Should -Be 'UpToDate'
         @((Read-OpSessionState).steps | ForEach-Object { $_.Id }) | Should -Be @('lcu', 'off')
+    }
+
+    Context 'Invoke-OpAutoSession' {
+        It 'déroule le plan : redémarre après lcu puis dot, termine par le rapport à la troisième reprise' {
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false
+            $r.Result | Should -Be 'Restarting'
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('def', 'lcu')
+            (Read-OpSessionState).mode | Should -Be 'Auto'
+            $script:task.TaskName | Should -Be 'OffPatch-Reprise'
+
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false
+            $r.Result | Should -Be 'Restarting'
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('dot')
+
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false -WarningAction SilentlyContinue
+            $r.Result | Should -Be 'Completed'
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('off')
+            Test-Path -LiteralPath $r.ReportPath | Should -BeTrue
+            Should -Invoke Restart-Computer -Times 2 -Exactly
+            $script:task | Should -BeNullOrEmpty
+            Test-Path -LiteralPath (Get-ProgramData 'state.json') | Should -BeFalse
+        }
+
+        It 'retente une étape en erreur une fois, l''abandonne et continue' {
+            $script:plan = @((Get-Row 'off' 'office-source'), (Get-Row 'def' 'defender'))
+            Mock Install-OpOfficeUpdate { [pscustomobject]@{ Id = $Item.id; Category = 'office-source'; State = 'Error'; Reason = 'ODT en échec'; ExitCode = 17 } }
+            $steps = New-Object System.Collections.Generic.List[object]
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false -WarningAction SilentlyContinue -OnStep { param($s) $steps.Add($s) }
+            $r.Result | Should -Be 'Completed'
+            Should -Invoke Install-OpOfficeUpdate -Times 2 -Exactly
+            Should -Invoke Install-OpDefenderUpdate -Times 1 -Exactly
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('off', 'off', 'def')
+            $r.Steps[1].Abandoned | Should -BeTrue
+            $steps.Count | Should -Be 6
+        }
+
+        It 'limite de redémarrages atteinte : s''arrête et termine par le rapport' {
+            $script:maxReboots = 0
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false -WarningAction SilentlyContinue
+            $r.Result | Should -Be 'Completed'
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('def', 'lcu')
+            Should -Invoke Restart-Computer -Times 0 -Exactly
+            $r.ReportPath | Should -Not -BeNullOrEmpty
+        }
+
+        It 'redémarrage annulé : Cancelled, état conservé pour la reprise' {
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false -IsCancelled { $true }
+            $r.Result | Should -Be 'Cancelled'
+            Test-Path -LiteralPath (Get-ProgramData 'state.json') | Should -BeTrue
+            Should -Invoke Restart-Computer -Times 0 -Exactly
+        }
+
+        It 'rien à installer : rapport sans session ni redémarrage' {
+            $script:plan = @((Get-Row 'def' 'defender') | ForEach-Object { $_.State = 'UpToDate'; $_ })
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false -WarningAction SilentlyContinue
+            $r.Result | Should -Be 'Completed'
+            $r.Steps.Count | Should -Be 0
+            Test-Path -LiteralPath $r.ReportPath | Should -BeTrue
+            Should -Invoke Install-OpDefenderUpdate -Times 0 -Exactly
+        }
+
+        It 'refuse <Cas> sans rien exécuter' -TestCases @(
+            @{ Cas = 'une session manuelle en cours'; Manual = $true; Blocking = $false; Pattern = '*Session manuelle*' }
+            @{ Cas = 'un contrôle préalable bloquant'; Manual = $false; Blocking = $true; Pattern = '*bloquant*' }
+        ) {
+            param($Manual, $Blocking, $Pattern)
+            if ($Manual) { Invoke-OpInstallStep -StepId 'def' -Root $script:root | Out-Null }
+            if ($Blocking) { Mock Test-OpPreflight { [pscustomobject]@{ Label = 'Droits'; Result = 'Blocking'; Message = 'non élevé' } } }
+            { Invoke-OpAutoSession -Root $script:root -Confirm:$false } | Should -Throw $Pattern
+            Should -Invoke Install-OpWindowsPackage -Times 0 -Exactly
+        }
+
+        It 'ne fait rien avec -WhatIf' {
+            Invoke-OpAutoSession -Root $script:root -WhatIf | Should -BeNullOrEmpty
+            Should -Invoke Install-OpDefenderUpdate -Times 0 -Exactly
+            Test-Path -LiteralPath (Get-ProgramData 'state.json') | Should -BeFalse
+        }
     }
 }

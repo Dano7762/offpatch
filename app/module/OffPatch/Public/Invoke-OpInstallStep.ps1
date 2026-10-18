@@ -23,6 +23,9 @@
     .PARAMETER Root
         Racine de l'outil ; par défaut, celle retrouvée par le fichier offpatch.root.
 
+    .PARAMETER Mode
+        Mode noté dans state.json à l'ouverture de la session : Manual (CLI, mode manuel) ou Auto (Invoke-OpAutoSession).
+
     .EXAMPLE
         Invoke-OpInstallStep -StepId (Get-OpInstallPlan | Where-Object State -eq 'Pending' | Select-Object -First 1).Id
     #>
@@ -30,7 +33,8 @@
     [OutputType([pscustomobject])]
     param(
         [Parameter(Mandatory)][string]$StepId,
-        [string]$Root
+        [string]$Root,
+        [ValidateSet('Manual', 'Auto')][string]$Mode = 'Manual'
     )
 
     if (-not $Root) { $Root = Get-OpRoot }
@@ -53,7 +57,7 @@
     if (-not $PSCmdlet.ShouldProcess($StepId, "Exécution de l'étape $($step.Category)")) { return }
 
     if (-not $session) {
-        $session = Get-OpInitialSessionState -Root $Root -SystemInfo $info -RestorePoint (New-OpRestorePoint -Configuration $configuration -Confirm:$false)
+        $session = Get-OpInitialSessionState -Root $Root -SystemInfo $info -Mode $Mode -RestorePoint (New-OpRestorePoint -Configuration $configuration -Confirm:$false)
         Write-OpLog "Session $($session.sessionId) ouverte."
     }
 

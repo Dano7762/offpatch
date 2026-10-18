@@ -66,6 +66,14 @@ Describe 'OffPatch-Cli.ps1' {
         @(Get-ChildItem -Path (Join-Path $tool 'ProgramData\OffPatch\logs') -Filter '*.html').Count | Should -Be 1
     }
 
+    It 'Auto -Resume sans étape à faire (dépôt vide) termine par le rapport (code 0)' {
+        $tool = Get-ToolCopy
+        $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'Auto', '-Resume')
+        $r.ExitCode | Should -Be 0 -Because $r.Output
+        $r.Output | Should -Match 'Session automatique : Completed'
+        @(Get-ChildItem -Path (Join-Path $tool 'rapports') -Filter '*.html').Count | Should -Be 1
+    }
+
     # DepotUpdate interroge le catalogue puis télécharge : testé sans réseau dans DepotPlan.Tests.ps1 et
     # DepotUpdate.Tests.ps1, et en ligne par le contrat. Ici, configuration invalide : arrêt avant tout accès réseau.
     It 'ouvre le journal du dépôt pour DepotUpdate, puis s''arrête sur une configuration invalide (code 1)' {

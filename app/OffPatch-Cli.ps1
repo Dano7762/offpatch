@@ -12,7 +12,9 @@
       - InstallStep -StepId <id> : une étape du plan (refusée si elle n'est pas « À installer » ou si un contrôle
         préalable est bloquant) ; code 1 si elle est refusée ou en erreur ; le redémarrage nécessaire est signalé,
         jamais lancé ;
-      - Report : rapport d'intervention de la session (étapes exécutées et plan du moment), puis fin de session.
+      - Report : rapport d'intervention de la session (étapes exécutées et plan du moment), puis fin de session ;
+      - Auto : session automatique (plan affiché, une confirmation, étapes, redémarrages avec reprise, rapport) ;
+        -Resume : reprise après redémarrage, sans confirmation (relancée par resume.ps1 via OffPatch.ps1).
     OffPatch installe uniquement des mises à jour : aucun paramètre de clé de produit, de profil ou de retrait
     (cahier des charges 2, 3.3).
     Codes de sortie : 0 réussite, 1 erreur (configuration invalide, étape refusée ou en échec).
@@ -22,6 +24,7 @@
     Plan : détection et plan pour ce PC, en lecture seule.
     InstallStep : exécution d'une étape du plan (-StepId).
     Report : écriture du rapport d'intervention.
+    Auto : session automatique ; avec -Resume, reprise sans confirmation.
 
 .EXAMPLE
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\app\OffPatch-Cli.ps1 -Action Plan
@@ -34,9 +37,10 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [Parameter(Mandatory)][ValidateSet('DepotUpdate', 'Plan', 'InstallStep', 'Report')][string]$Action,
+    [Parameter(Mandatory)][ValidateSet('DepotUpdate', 'Plan', 'InstallStep', 'Report', 'Auto')][string]$Action,
     [switch]$ListOnly,
-    [string]$StepId
+    [string]$StepId,
+    [switch]$Resume
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -103,6 +107,28 @@ switch ($Action) {
         } catch {
             Write-Host "OffPatch : $($_.Exception.Message)"
             exit 1
+        }
+        exit 0
+    }
+    'Auto' {
+        try {
+            if (-not $Resume) {
+                $info = Get-OpSystemInfo -Root $context.Root
+                Write-Host 'Plan :'
+                Write-Host (Get-OpInstallPlan -Root $context.Root -SystemInfo $info | Format-Table Sequence, Category, Id, State, RebootAfter, Reason -AutoSize -Wrap | Out-String -Width 200).TrimEnd()
+            }
+            $onStep = { param($s) if ($s.PSObject.Properties['Seconds']) { Write-Host "Étape $($s.Id) : $($s.State). $($s.Reason)" } else { Write-Host "Étape $($s.Id) ($($s.Category)) : en cours…" } }
+            $onTick = { param($left) Write-Host "Redémarrage dans $left s (Ctrl+C pour interrompre)" }
+            $confirm = @{}
+            if ($Resume) { $confirm.Confirm = $false }
+            $result = Invoke-OpAutoSession -Root $context.Root -OnStep $onStep -OnTick $onTick -WhatIf:$WhatIfPreference @confirm
+        } catch {
+            Write-Host "OffPatch : $($_.Exception.Message)"
+            exit 1
+        }
+        if ($result) {
+            Write-Host "Session automatique : $($result.Result)."
+            if ($result.ReportPath) { Write-Host "Rapport : $($result.ReportPath)" }
         }
         exit 0
     }
