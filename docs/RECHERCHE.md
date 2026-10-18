@@ -711,7 +711,7 @@ Question : `dism.exe /Online /Add-Package` d'un .msu (R-14) fonctionne-t-il sur 
 
 Impact : exécuteur des étapes Windows et .NET sur Windows 10 (cahier des charges 8.4), essais T4, T5, T7.
 
-- Statut : À trancher (2026-10-18), décision de David attendue.
+- Statut : Tranché (2026-10-18), option 1 validée par David.
 - Relevé (2026-10-18, VM de David, Windows 10 Famille 22H2 19045.2965, DISM 10.0.19041.844, essai T5 en mode auto) : `dism.exe /English /Online /Add-Package /PackagePath:windows10.0-kb5127683-x64-ndp48_….msu` sort en code 50 (0x32) en moins d'une seconde ; journal DISM : « DISM does not support installing MSU files online. - CMsuPackage::Install(hr:0x80070032) ». Deux tentatives, étape abandonnée, session poursuivie (comportement d'OffPatch conforme).
 - Sources (consultées le 2026-10-18) :
   - https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-operating-system-package-servicing-command-line-options : « You can use `/Add-Package` to add an .msu package to an online or offline Windows 11, version 21H2, or later image. » ; « If you're working with a Windows image prior to Windows 11, version 21H2, you can only add .msu packages on offline target images. » R-14 n'avait été mesuré que sur Windows 11 (`windows-11-arm`).
@@ -721,3 +721,10 @@ Impact : exécuteur des étapes Windows et .NET sur Windows 10 (cahier des charg
 - Options :
   1. (recommandée) Windows 10 : `wusa.exe <.msu> /quiet /norestart`, seul moyen documenté par Microsoft pour un .msu sur Windows 10 en cours d'exécution ; Windows 11 inchangé (DISM, R-14). Codes retour (réussite, 3010, déjà installé, non applicable) et journal à mesurer sur la VM avant d'écrire l'exécuteur.
   2. Extraire le .cab avec `expand.exe` puis DISM en ligne : non documenté par Microsoft pour Windows 10, ordre SSU/LCU dans les paquets combinés à deviner ; écartée.
+- Mesuré (2026-10-18, même VM, après T5, `Start-Process wusa.exe -ArgumentList '"<.msu>" /quiet /norestart' -Wait -PassThru`, hors ligne) :
+  - .NET 4.8 KB5127683 : code 3010 en 33 s ; journal Setup : Id 2 « installée correctement » et Id 4 « nécessite un redémarrage » ;
+  - même fichier, second passage : code 2359302 (0x00240006) en 3 s ; journal Setup : Id 3 « n'a pas pu être installée en raison d'une erreur: 2359302 », c'est-à-dire déjà installé ;
+  - SSU KB5031539 : code 0 en 9 s ; Id 2 « Package KB5031539 was successfully changed to the Installed state » ;
+  - cumulative ESU KB5126657, PC **non inscrit** à l'ESU : code 3010 en 1 442 s ; paquets KB5126657 et KB5127308 en attente de redémarrage. Qu'elle s'applique vraiment au redémarrage (UBR 7807) reste à constater.
+  - Code « non applicable » de wusa : non mesuré ; tout code autre que 0, 3010 et 2359302 est une erreur.
+- Décision : `Install-OpWindowsPackage` lance wusa pour les éléments Windows 10 (`target.os` win10), DISM sinon ; jugement inchangé ensuite (liste DISM, `Get-WindowsPackage -Online`, en lecture seule). Cahier des charges 1.36 (8.4).

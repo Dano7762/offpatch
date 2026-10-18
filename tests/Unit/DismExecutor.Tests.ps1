@@ -180,6 +180,53 @@ Describe 'Install-OpWindowsPackage' {
         }
     }
 
+    # Windows 10 : DISM n'installe pas de .msu en ligne (R-19) ; codes de wusa mesurés sur la VM Windows 10 22H2.
+    Context 'Windows 10 (wusa)' {
+        BeforeEach {
+            $script:win10 = @{ resultingUbr = 7807; target = [pscustomobject]@{ os = 'win10'; arch = 'x64' } }
+            function Use-WusaRun([int]$Code) {
+                $script:wusaCode = $Code
+                Mock Invoke-OpProcess { [pscustomobject]@{ ExitCode = $script:wusaCode; TimedOut = $false; StdOut = ''; StdErr = ''; Seconds = 1 } }
+            }
+        }
+
+        It 'lance wusa.exe /quiet /norestart et réussit sur 3010 avec la cumulative en attente' {
+            $s = Get-DismScene 'windows-lcu' $script:win10
+            Use-WusaRun 3010
+            Use-PackageList @(@{ PackageName = 'Package_for_RollupFix~31bf3856ad364e35~amd64~~19041.7807.1.9'; PackageState = 'InstallPending' })
+            $r = Install-OpWindowsPackage -Item $s.Item -Depot $s.Depot -LogDirectory $s.Logs
+            $r.State | Should -Be 'UpToDate'
+            $r.RebootRequired | Should -BeTrue
+            $wusa = Join-Path $env:SystemRoot 'System32\wusa.exe'
+            Should -Invoke Invoke-OpProcess -Times 1 -Exactly -ParameterFilter {
+                $FilePath -eq $wusa -and $ArgumentList[0] -like '*paquet.msu' -and $ArgumentList[1] -eq '/quiet' -and $ArgumentList[2] -eq '/norestart' -and $NoTimeout
+            }
+        }
+
+        It 'juge 2359302 (déjà installé) sur la liste des paquets' {
+            $s = Get-DismScene 'dotnet' $script:win10 -Package @{ name = 'Package_for_DotNetRollup'; version = '10.0.4614.7' }
+            Use-WusaRun 2359302
+            Use-PackageList @(@{ PackageName = 'Package_for_DotNetRollup~31bf3856ad364e35~amd64~~10.0.4614.7'; PackageState = 'Installed' })
+            (Install-OpWindowsPackage -Item $s.Item -Depot $s.Depot -LogDirectory $s.Logs).State | Should -Be 'UpToDate'
+        }
+
+        It 'réussit la SSU sur le code 0, sans journal de l''étape' {
+            $s = Get-DismScene 'windows-ssu' $script:win10
+            Use-WusaRun 0
+            (Install-OpWindowsPackage -Item $s.Item -Depot $s.Depot -LogDirectory $s.Logs).State | Should -Be 'UpToDate'
+        }
+
+        It 'est en erreur sur un autre code, avec le nom de wusa dans le motif' {
+            $s = Get-DismScene 'windows-lcu' $script:win10
+            Use-WusaRun -2145124329
+            Use-PackageList @()
+            $r = Install-OpWindowsPackage -Item $s.Item -Depot $s.Depot -LogDirectory $s.Logs
+            $r.State | Should -Be 'Error'
+            $r.Reason | Should -BeLike 'wusa a échoué, code -2145124329 (0x80240017)*'
+            Should -Invoke Get-WindowsPackage -Times 0 -Exactly
+        }
+    }
+
     Context 'garde-fous' {
         It 'ne lance pas DISM si le fichier ne correspond plus au manifeste' {
             $s = Get-DismScene 'windows-lcu' @{ resultingUbr = 9550 } -Corrupt

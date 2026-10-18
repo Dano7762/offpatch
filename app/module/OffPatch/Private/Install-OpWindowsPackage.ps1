@@ -1,8 +1,8 @@
 ﻿function Install-OpWindowsPackage {
     <#
     .SYNOPSIS
-        Installe un paquet Windows ou .NET par DISM en ligne et juge le résultat sur la liste DISM, pas sur le seul
-        code retour.
+        Installe un paquet Windows ou .NET (DISM en ligne, wusa sur Windows 10) et juge le résultat sur la liste
+        DISM, pas sur le seul code retour.
 
     .DESCRIPTION
         Cahier des charges 8.4 (R-02, R-14). Catégories windows-lcu, windows-checkpoint, windows-ekb, windows-ssu et
@@ -10,10 +10,13 @@
         à plusieurs fichiers, le fichier est choisi par la valeur Release de .NET Framework 4 (netRelease), comme à la
         détection.
         Lancement : %SystemRoot%\System32\dism.exe /English /Online /Add-Package /PackagePath:<fichier> /NoRestart
-        /LogPath:<LogDirectory>\dism_<id>.log, sans délai maximal.
+        /LogPath:<LogDirectory>\dism_<id>.log, sans délai maximal. Élément Windows 10 (target.os win10) : DISM
+        n'installe pas de .msu en ligne avant Windows 11 21H2 (R-19), d'où %SystemRoot%\System32\wusa.exe <fichier>
+        /quiet /norestart, sans journal de l'étape (journal Setup de Windows) ; 2359302 (0x00240006, déjà installé,
+        mesuré) est jugé comme 0.
           - 1618 ou 0x80070652 (autre installation en cours) : attente de RetryDelaySeconds, une seule nouvelle
             tentative, jugée comme la première.
-          - Code autre que 0 ou 3010 : Error avec le code.
+          - Code autre que 0 ou 3010 (ou 2359302 avec wusa) : Error avec le code.
           - 0 ou 3010 : le paquet doit être Installed ou InstallPending dans la liste DISM (Get-WindowsPackage
             -Online) : cumulative et checkpoint par la version <build>.<resultingUbr> de Package_for_RollupFix,
             enablement package par son KB, .NET par le nom et la version du paquet lus dans le .msu. Sinon, journal
@@ -65,15 +68,23 @@
         return (ConvertTo-StepResult 'Error' $reason $null $false $null)
     }
     $path = Join-Path $Depot ([string]$file.path -replace '/', '\')
-    if (-not $PSCmdlet.ShouldProcess($path, 'Installation par DISM en ligne')) { return }
+    $engine = 'DISM'
+    $exe = Join-Path $env:SystemRoot 'System32\dism.exe'
+    $arguments = '/English', '/Online', '/Add-Package', "/PackagePath:$path", '/NoRestart', "/LogPath:$logPath"
+    $successCodes = 0, 3010
+    if ([string](Get-Prop (Get-Prop $Item 'target') 'os') -eq 'win10') {
+        $engine = 'wusa'
+        $exe = Join-Path $env:SystemRoot 'System32\wusa.exe'
+        $arguments = $path, '/quiet', '/norestart'
+        $successCodes = 0, 3010, 2359302
+    }
+    if (-not $PSCmdlet.ShouldProcess($path, "Installation par $engine en ligne")) { return }
 
     New-Item -ItemType Directory -Force -Path $LogDirectory -ErrorAction Stop | Out-Null
-    $dism = Join-Path $env:SystemRoot 'System32\dism.exe'
-    $arguments = '/English', '/Online', '/Add-Package', "/PackagePath:$path", '/NoRestart', "/LogPath:$logPath"
     $run = $null
     for ($attempt = 1; $attempt -le 2; $attempt++) {
-        Write-OpLog "$($Item.id) : DISM /Add-Package $(Split-Path -Leaf $path) (tentative $attempt)."
-        $run = Invoke-OpProcess -FilePath $dism -ArgumentList $arguments -NoTimeout
+        Write-OpLog "$($Item.id) : $engine $(Split-Path -Leaf $path) (tentative $attempt)."
+        $run = Invoke-OpProcess -FilePath $exe -ArgumentList $arguments -NoTimeout
         # Les lignes HOTPATCHUTIL de la console sont un diagnostic sans conséquence (R-14).
         $console = @(([string]$run.StdOut) -split '\r?\n' | Where-Object { $_.Trim() -and $_ -notmatch 'HOTPATCHUTIL' }) -join ' / '
         Write-OpLog "$($Item.id) : code retour $(Format-Code $run.ExitCode) en $($run.Seconds) s : $console"
@@ -85,8 +96,8 @@
         break
     }
     $code = $run.ExitCode
-    if (@(0, 3010) -notcontains $code) {
-        $reason = "DISM a échoué, code $(Format-Code $code)."
+    if ($successCodes -notcontains $code) {
+        $reason = "$engine a échoué, code $(Format-Code $code)."
         Write-OpLog "$($Item.id) : $reason" -Level ERROR
         return (ConvertTo-StepResult 'Error' $reason $code $false $null)
     }
@@ -95,7 +106,7 @@
     if ($Item.category -ne 'windows-ssu') {
         try { $packages = @(Get-WindowsPackage -Online -ErrorAction Stop) }
         catch {
-            $reason = "DISM a renvoyé $(Format-Code $code), liste des paquets illisible : $($_.Exception.Message)"
+            $reason = "$engine a renvoyé $(Format-Code $code), liste des paquets illisible : $($_.Exception.Message)"
             Write-OpLog "$($Item.id) : $reason" -Level ERROR
             return (ConvertTo-StepResult 'Error' $reason $code ($code -eq 3010) $null)
         }
@@ -136,7 +147,7 @@
         Write-OpLog "$($Item.id) : paquet non applicable (CBS HRESULT=0x800f081e) alors qu'il a été jugé applicable par le planificateur : détection à corriger." -Level WARN
         return (ConvertTo-StepResult 'NotApplicable' 'Paquet non applicable à ce PC (CBS HRESULT=0x800f081e).' $code $false $null)
     }
-    $reason = "DISM a réussi sans installer le paquet (code $(Format-Code $code))."
+    $reason = "$engine a réussi sans installer le paquet (code $(Format-Code $code))."
     Write-OpLog "$($Item.id) : $reason" -Level ERROR
     ConvertTo-StepResult 'Error' $reason $code $false $null
 }
