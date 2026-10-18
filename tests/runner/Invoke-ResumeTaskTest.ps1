@@ -3,7 +3,7 @@
     Essai sur un runner GitHub : création réelle de la tâche OffPatch-Reprise par le module, relecture, suppression.
 
 .DESCRIPTION
-    Cahier des charges 8.6, R-17. Script réservé aux runners GitHub hébergés : il crée une tâche planifiée et écrit
+    Cahier des charges 8.6, R-18. Script réservé aux runners GitHub hébergés : il crée une tâche planifiée et écrit
     dans ProgramData. Register-OpResumeTask, puis Export-ScheduledTask (XML de la tâche) et Get-ScheduledTask :
     déclencheur, utilisateur, niveau d'exécution, réglages batterie, action ; resume.ps1 copié ; puis
     Unregister-OpResumeTask et contrôle de la disparition. Aucun redémarrage : le déclenchement à l'ouverture de

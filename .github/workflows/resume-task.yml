@@ -1,4 +1,4 @@
-# R-17 : création réelle de la tâche OffPatch-Reprise par le module sur un runner jetable, relecture, suppression.
+# R-18 : création réelle de la tâche OffPatch-Reprise par le module sur un runner jetable, relecture, suppression.
 # Modifie le système du runner (tâche planifiée, ProgramData). Déclenchement manuel uniquement.
 name: resume-task
 

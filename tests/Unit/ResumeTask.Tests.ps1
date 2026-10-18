@@ -1,4 +1,4 @@
-﻿# Tâche planifiée OffPatch-Reprise (cahier des charges 8.6, R-17) : copie de resume.ps1, déclencheur à l'ouverture de
+﻿# Tâche planifiée OffPatch-Reprise (cahier des charges 8.6, R-18) : copie de resume.ps1, déclencheur à l'ouverture de
 # session de l'utilisateur de la console, privilèges les plus élevés, batterie autorisée ; suppression. Module
 # ScheduledTasks simulé : aucune tâche réelle n'est créée.
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification = 'Variables partagées entre blocs Pester, non vues par l''analyse.')]

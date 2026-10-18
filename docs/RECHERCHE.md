@@ -683,3 +683,23 @@ Impact : `Get-OpPendingReboot`, `Get-OpNetworkConnection`, `Test-OpPreflight`.
   - PC connecté : au moins un profil de `Get-NetConnectionProfile` avec une connectivité IPv4 ou IPv6 Subnet, LocalNetwork ou Internet.
   - Essai en lecture seule sur la machine de développement (Windows 11 25H2 .9550) : aucun indicateur de redémarrage, protection du système inactive (les deux indicateurs de 8.2 à faux), un profil Wi-Fi « Internet ».
 - À valider sur intervention réelle : mode Avion (aucun profil attendu), PC juste après une cumulative non redémarrée (indicateurs CBS et Windows Update).
+
+## R-18 Tâche planifiée de reprise
+
+Question : comment créer, sous Windows PowerShell 5.1, la tâche `OffPatch-Reprise` du cahier des charges 8.6 (à l'ouverture de session de l'utilisateur courant, privilèges les plus élevés), et laquelle des identités retenir quand OffPatch est élevé avec d'autres identifiants que ceux de la session ?
+
+Impact : mode automatique (phase 5), reprise après redémarrage.
+
+- Statut : Tranché (2026-10-18)
+- Sources (consultées le 2026-10-18) :
+  - https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasktrigger (mise à jour du 2025-05-14) : `-AtLogOn` « Indicates that a trigger starts a task when a user logs on » ; `-User` « Specifies the identifier of the user for a trigger that starts a task when a user logs on ».
+  - https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtaskprincipal (mise à jour du 2025-05-14) : `-RunLevel` « Highest. Tasks run by using the highest privileges » ; `-LogonType` (None, Password, S4U, Interactive, Group, ServiceAccount, InteractiveOrPassword).
+  - https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-computersystem (mise à jour du 2023-11-09) : `UserName` « Name of a user that is logged on currently… returns the name of the user that is logged on to the console ».
+  - Workflow `resume-task` sur `windows-2025` : https://github.com/Dano7762/offpatch/actions/runs/39112078472.
+- Conclusion :
+  - Déclencheur `New-ScheduledTaskTrigger -AtLogOn -User <utilisateur>`, principal `-UserId <utilisateur> -LogonType Interactive -RunLevel Highest` : la tâche s'exécute dans la session ouverte, élevée, sans mot de passe enregistré.
+  - L'utilisateur est celui de la console (`Win32_ComputerSystem.UserName`), pas l'identité du processus : quand l'élévation UAC se fait avec les identifiants d'un autre compte administrateur, le processus tourne sous ce compte alors que la session est celle du client. À défaut de valeur, l'identité courante, avec un avertissement.
+  - Réglage par défaut d'une tâche : pas de démarrage sur batterie ; `New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries` est indispensable pour un portable débranché.
+  - Mesuré sur runner : tâche `Ready`, déclencheur `MSFT_TaskLogonTrigger` sur `runnervm…\runneradmin`, principal `Interactive` / `Highest`, `DisallowStartIfOnBatteries` et `StopIfGoingOnBatteries` à faux, action `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\ProgramData\OffPatch\resume.ps1"` ; une seconde création remplace la première (une seule tâche) ; suppression effective, seconde suppression sans effet.
+- Décision : `Register-OpResumeTask` (copie de `resume.ps1` dans ProgramData, puis tâche) et `Unregister-OpResumeTask`, conformes au cahier des charges 8.6 sans modification.
+- À valider sur intervention réelle : déclenchement effectif à l'ouverture de session après redémarrage (T1, T7), et élévation avec les identifiants d'un autre compte sur un PC client à compte standard.

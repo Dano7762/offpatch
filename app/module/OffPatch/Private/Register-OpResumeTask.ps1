@@ -5,7 +5,7 @@
 
     .DESCRIPTION
         Cahier des charges 8.6 (avant un redémarrage). Module ScheduledTasks de Windows (Learn, consulté le
-        2026-10-18, R-17) :
+        2026-10-18, R-18) :
           - déclencheur à l'ouverture de session de l'utilisateur de la console (Win32_ComputerSystem.UserName), qui
             peut différer du compte élevé quand l'élévation s'est faite avec d'autres identifiants ; à défaut,
             l'identité courante ;
