@@ -1,6 +1,6 @@
 # Essais T1 et T3 en pilotant la CLI étape par étape (phase 4)
 
-Ce qui se fait sans toi : T3 en ARM64 sur le runner `windows-11-arm` (workflow `t3-plan`, actions `Plan` et `Report`, aucune installation). Le reste demande des redémarrages et un Windows 11 x64 client : c'est une VM chez toi (VirtualBox), jetable grâce aux instantanés. On commence toujours par l'action `Plan`, en lecture seule.
+Déjà fait sans toi : actions `Plan` et `Report` sur le runner `windows-11-arm` (workflow `t3-plan`, aucune installation). Le reste demande des redémarrages et un Windows 11 x64 client : c'est une VM chez toi (VirtualBox), jetable grâce aux instantanés. On commence toujours par l'action `Plan`, en lecture seule.
 
 ## 0. Préparer le dépôt (poste de développement)
 
@@ -13,7 +13,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\app\OffPatch-Cli.ps1 -
 
 Attendu : code 0, résumé des nouveautés, `depot\manifest.json` écrit. Compte plusieurs gigaoctets (cumulatives des trois cibles, sources Office).
 
-**T3 en x64, au passage** : ton poste est un Windows 11 25H2 à jour (26200.9711 le 17 octobre). Une fois le dépôt fait, je peux y lancer `-Action Plan` moi-même, c'est en lecture seule : attendu, rien « À installer » si le dépôt n'a rien de plus récent que ton PC.
+Fait le 18 octobre 2026 : dépôt complet, 0 erreur. `Plan` sur ton poste (25H2 à jour) a validé la détection ; T3 (« Windows 11 26H2 déjà à jour, rien à installer », cahier des charges 1.34) se fait à l'étape 4 ci-dessous, sur la VM T1 une fois toutes ses étapes passées.
 
 ## 1. Préparer la VM T1
 
@@ -34,7 +34,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File $cli -Action Plan | Tee-
 Attendu :
 
 - contrôles préalables : droits administrateur `Ok`, système `Ok` (build 26300), aucun `Blocking` ; réseau sans avertissement (VM hors ligne) ;
-- plan : plateforme et définitions Defender « Pending » (image de l'ISO plus ancienne que le dépôt), cumulative Windows 11 « Pending » avec `RebootAfter` vrai, enablement package « NotApplicable » (déjà en 26H2), .NET « Pending » ou « UpToDate », Office « NotApplicable » avec le motif « Aucun Office Click-to-Run. ».
+- plan : plateforme et définitions Defender « Pending » (image de l'ISO plus ancienne que le dépôt), cumulative Windows 11 « Pending » avec `RebootAfter` vrai, enablement package « NotApplicable » (déjà en 26H2), .NET `KB5127694` (26H2) « Pending » ou « UpToDate » et `KB5127690` (24H2 et 25H2) « NotApplicable », motif « Build 26300 absente de baseBuilds », Office « NotApplicable » avec le motif « Aucun Office Click-to-Run. ».
 
 **Envoie-moi `T1-plan-1.txt` avant d'aller plus loin** si quelque chose diffère.
 
@@ -57,7 +57,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File $cli -Action Plan | Tee-
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File $cli -Action Report
 ```
 
-Attendu : plan final sans aucune ligne « Pending » ni « Error » ; rapport `E:\rapports\AAAA-MM-JJ_<NomPC>_<Série>.html`, copie dans `C:\ProgramData\OffPatch\logs\`. Dans le rapport : Windows avant et après (UBR monté), versions Defender, Office « Non applicable : Aucun Office Click-to-Run. », chaque étape avec code retour et durée, rappel hors ligne (mode Avion ou réseau), point de restauration ou son motif (la protection du système est souvent inactive sur une VM : « Protection du système inactive », sans appel à `Checkpoint-Computer`).
+Attendu : plan final sans aucune ligne « Pending » ni « Error » (c'est T3 : un Windows 11 26H2 à jour, rien à installer) ; rapport `E:\rapports\AAAA-MM-JJ_<NomPC>_<Série>.html`, copie dans `C:\ProgramData\OffPatch\logs\`. Dans le rapport : Windows avant et après (UBR monté), versions Defender, Office « Non applicable : Aucun Office Click-to-Run. », chaque étape avec code retour et durée, rappel hors ligne (mode Avion ou réseau), point de restauration ou son motif (la protection du système est souvent inactive sur une VM : « Protection du système inactive », sans appel à `Checkpoint-Computer`).
 
 ## 5. À me renvoyer
 

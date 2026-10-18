@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.33 du 18 octobre 2026.
+Version 1.34 du 18 octobre 2026.
 
 ## 1. Contexte
 
@@ -688,7 +688,7 @@ Tests réels, selon deux moyens :
 |---|---|---|---|
 | T1 | Windows 11 26H2 x64 installé depuis une ISO, sans Office | Mode auto complet, Office `NotApplicable` « aucun Office Click-to-Run », rapport sans erreur | Intervention réelle (redémarrages, x64 client) |
 | T2 | Windows 11 24H2 x64 avec un Office Click-to-Run préinstallé ancien (Microsoft 365 Famille ou Office 2024, canal Current) | Enablement package appliqué, Office mis à jour depuis la source Current, licence inchangée | Intervention réelle (redémarrages, x64 client) |
-| T3 | Windows 11 25H2 x64 déjà à jour | Rien à installer, rapport cohérent | Runner `windows-11-arm` pour l'action `Plan` sur un 25H2 à jour (en ARM64), puis intervention réelle en x64 |
+| T3 | Windows 11 26H2 x64 déjà à jour (par exemple la VM de T1 une fois toutes ses étapes faites) | Rien à installer, rapport cohérent | Intervention réelle (VM) ; l'action `Plan` a aussi tourné sur le runner `windows-11-arm` (25H2, non à jour) et sur un 25H2 x64 à jour, où l'enablement package 26H2 reste proposé tant que `includeEnablementPackage` est vrai |
 | T4 | Windows 10 22H2 x64 avec ESU actif | Cumulative ESU installée | Intervention réelle (Windows 10) |
 | T5 | Windows 10 22H2 x64 sans ESU | Avertissement, aucune étape Windows en mode auto | Intervention réelle (Windows 10) |
 | T6 | Windows 11 ARM64 avec un Office 64 bits Click-to-Run ancien | Mode manuel complet, Office mis à jour et fonctionnel | Runner `windows-11-arm` pour les étapes sans redémarrage, puis matériel réel |
@@ -766,3 +766,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.31 (17 octobre 2026) : Office Click-to-Run 32 bits non mis à jour, `NotApplicable` « Office 32 bits : la source du dépôt est en 64 bits », à la détection et à l'exécution (8.3, 8.5) ; décision de David.
 - 1.32 (17 octobre 2026) : `integrity.trustedRootThumbprints` complété de Microsoft Root Certificate Authority 2011 (`8F43288AD272F3103B6FB1428485EA3014C0BCFE`, dépôt PKI de Microsoft), racine des cumulatives .NET Windows 11 d'octobre 2026 (6.1, R-10) ; .msu illisible par `expand.exe` (code -1 sur les cumulatives de plus de 4 Go) : paquet non lu, le titre fait foi pour une cumulative, refus pour .NET dont la détection dépend du paquet (7.1, R-09).
 - 1.33 (18 octobre 2026) : cumulatives .NET de Windows 11 publiées par version de Windows depuis octobre 2026 (KB5127690 pour 24H2 et 25H2, KB5127694 pour 26H2) : champ `versionBuilds` de `catalog-queries.json` (6.2), un élément .NET par KB avec ses `baseBuilds` (7.2), rétention par build (7.3), détection limitée aux builds de l'élément (8.3) ; décision de David. Suite de R-05.
+- 1.34 (18 octobre 2026) : test T3 reformulé en « Windows 11 26H2 x64 déjà à jour » (12) : sur un 25H2, l'enablement package 26H2 est toujours proposé tant que `windows.includeEnablementPackage` est vrai, « rien à installer » n'y est pas atteignable ; décision de David.
