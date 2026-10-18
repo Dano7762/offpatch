@@ -4,11 +4,12 @@
         Écrit le rapport d'intervention de la session en cours et clôt la session de la CLI.
 
     .DESCRIPTION
-        Cahier des charges 8.8. Rassemble ProgramData\OffPatch\temp\cli-session.json (début, relevé du PC avant,
-        point de restauration, résultat des étapes exécutées par Invoke-OpInstallStep), le plan recalculé (étapes
-        non exécutées, avec leur état), le relevé du PC après, l'état du réseau (hors ligne : rappel du mode Avion),
-        la version de l'outil, la date du dépôt et le journal de session. Sans session en cours, le rapport décrit
-        l'état du PC sans étape exécutée. Écrit le rapport par Save-OpReport, puis supprime cli-session.json.
+        Cahier des charges 8.6, 8.8. Rassemble l'état de session state.json (début, relevé du PC avant, point de
+        restauration, résultat des étapes exécutées par Invoke-OpInstallStep), le plan recalculé (étapes non
+        exécutées, avec leur état), le relevé du PC après, l'état du réseau (hors ligne : rappel du mode Avion), la
+        version de l'outil, la date du dépôt et les journaux de la session. Sans session en cours, le rapport décrit
+        l'état du PC sans étape exécutée. Écrit le rapport par Save-OpReport, puis clôt la session : state.json est
+        archivé dans les journaux (Complete-OpSessionState).
         Renvoie le chemin du rapport sur le support.
 
     .PARAMETER Root
@@ -27,9 +28,7 @@
     $configuration = Get-OpConfiguration -Root $Root
     $after = Get-OpSystemInfo -Root $Root
     $plan = @(Get-OpInstallPlan -Root $Root -SystemInfo $after)
-    $sessionPath = Join-Path (Get-OpPath -Name ClientTemp) 'cli-session.json'
-    $session = $null
-    if (Test-Path -LiteralPath $sessionPath -PathType Leaf) { $session = Get-Content -LiteralPath $sessionPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+    $session = Read-OpSessionState
 
     $done = @()
     $start = Get-Date
@@ -37,12 +36,12 @@
     $restore = [pscustomobject]@{ Status = 'None'; Reason = 'Aucune étape exécutée : aucun point demandé.' }
     $logPaths = @()
     if ($session) {
-        $done = @($session.Steps | Where-Object { $_ })
-        $start = [datetime]$session.StartTime
-        $before = $session.Before
-        $restore = $session.RestorePoint
+        $done = @($session.steps | Where-Object { $_ })
+        $start = [datetime]$session.startTime
+        $before = $session.before
+        $restore = $session.restorePoint
         if ($restore -and $restore.PSObject.Properties['CreationTime'] -and $restore.CreationTime) { $restore.CreationTime = [datetime]$restore.CreationTime }
-        if ($session.PSObject.Properties['LogPaths']) { $logPaths = @($session.LogPaths) }
+        $logPaths = @($session.logPaths | Where-Object { $_ })
     }
     $doneIds = @($done | ForEach-Object { $_.Id })
     $steps = @($done) + @($plan | Where-Object { -not $_.Id -or $doneIds -notcontains $_.Id })
@@ -67,6 +66,6 @@
         DepotDate    = $manifest.generatedAt
     }
     $path = Save-OpReport -Session $report -Configuration $configuration -Root $Root -WhatIf:$WhatIfPreference -Confirm:$false
-    if ($path -and $session -and $PSCmdlet.ShouldProcess($sessionPath, 'Clôture de la session de la CLI')) { Remove-Item -LiteralPath $sessionPath -Force -ErrorAction Stop }
+    if ($path -and $session) { [void](Complete-OpSessionState -WhatIf:$WhatIfPreference -Confirm:$false) }
     $path
 }

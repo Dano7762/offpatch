@@ -14,7 +14,7 @@
          étape refusée par la CLI est notée, la suite continue ;
       5. -Action Plan de nouveau (attendu : plus rien à installer hors enablement package), puis -Action Report ;
       6. dans OutputDirectory : sorties et codes, relevés avant et après, manifeste, rapport, journaux (session,
-         DISM), cli-session.json.
+         DISM), state.json archivé.
 
 .EXAMPLE
     .\Invoke-CliStepsTest.ps1 -OutputDirectory $env:RUNNER_TEMP\cli-steps-out

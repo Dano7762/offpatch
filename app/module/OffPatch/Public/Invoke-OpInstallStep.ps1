@@ -7,9 +7,9 @@
         Cahier des charges 8.2 à 8.5. Le plan est recalculé (Get-OpInstallPlan) : l'étape doit y figurer à l'état
         Pending (« À installer »), sinon elle est refusée avec son état et son motif. Un contrôle préalable bloquant
         (Test-OpPreflight) refuse aussi l'étape.
-        À la première étape de la session, relevé du PC et point de restauration (New-OpRestorePoint) sont gardés
-        dans ProgramData\OffPatch\temp\cli-session.json, avec le résultat et le journal de chaque étape, pour le rapport
-        (Write-OpInstallReport). Écriture atomique.
+        À la première étape de la session, relevé du PC et point de restauration (New-OpRestorePoint) ouvrent l'état de
+        session ProgramData\OffPatch\state.json (8.6, écriture atomique), qui garde ensuite le résultat et le journal
+        de chaque étape, pour la reprise et le rapport (Write-OpInstallReport).
         Exécuteur selon la catégorie : Defender (plateforme, définitions), DISM (cumulatives, checkpoint, enablement
         package, SSU, .NET), ODT (source Office). Journaux de DISM et de l'ODT dans le sous-dossier de la session.
         Renvoie le résultat de l'exécuteur (Id, Category, State, Reason, ExitCode…), complété de StartTime, Seconds
@@ -43,15 +43,10 @@
     $item = @((Read-OpManifest -Path (Get-OpPath -Name Manifest -Root $Root)).items | Where-Object { $_ -and $_.id -eq $StepId }) | Select-Object -First 1
     if (-not $PSCmdlet.ShouldProcess($StepId, "Exécution de l'étape $($step.Category)")) { return }
 
-    $sessionPath = Join-Path (Get-OpPath -Name ClientTemp) 'cli-session.json'
-    $session = $null
-    if (Test-Path -LiteralPath $sessionPath -PathType Leaf) { $session = Get-Content -LiteralPath $sessionPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+    $session = Read-OpSessionState
     if (-not $session) {
-        # Versions et dates en texte : ConvertTo-Json de PowerShell 5.1 en ferait des objets.
-        if ($info.PSObject.Properties['Office'] -and $info.Office) { $info.Office.Version = [string]$info.Office.Version }
-        $restore = New-OpRestorePoint -Configuration $configuration -Confirm:$false
-        if ($restore -and $restore.PSObject.Properties['CreationTime'] -and $restore.CreationTime) { $restore.CreationTime = ([datetime]$restore.CreationTime).ToString('o') }
-        $session = [pscustomobject]@{ StartTime = (Get-Date).ToString('o'); Before = $info; RestorePoint = $restore; Steps = @() }
+        $session = Get-OpInitialSessionState -Root $Root -SystemInfo $info -RestorePoint (New-OpRestorePoint -Configuration $configuration -Confirm:$false)
+        Write-OpLog "Session $($session.sessionId) ouverte."
     }
 
     $logDirectory = Join-Path (Get-OpPath -Name ClientLogs) 'etapes'
@@ -70,15 +65,11 @@
     $result | Add-Member -NotePropertyName RebootAfter -NotePropertyValue ([bool]$step.RebootAfter) -Force
     Write-OpLog "Étape $StepId : $($result.State), $($result.Reason)"
 
-    $session.Steps = @(@($session.Steps | Where-Object { $_ -and $_.Id -ne $StepId }) + $result)
+    $session.steps = @(@($session.steps | Where-Object { $_ -and $_.Id -ne $StepId }) + $result)
     # Chaque appel de la CLI a son journal : le rapport en reprend les avertissements et les erreurs.
-    $logPaths = @()
-    if ($session.PSObject.Properties['LogPaths']) { $logPaths = @($session.LogPaths | Where-Object { $_ }) }
+    $logPaths = @($session.logPaths | Where-Object { $_ })
     if ($log -and $log.Path -and $logPaths -notcontains $log.Path) { $logPaths += $log.Path }
-    $session | Add-Member -NotePropertyName LogPaths -NotePropertyValue $logPaths -Force
-    New-Item -ItemType Directory -Force -Path (Split-Path -Path $sessionPath -Parent) -ErrorAction Stop | Out-Null
-    $tmp = "$sessionPath.tmp"
-    [System.IO.File]::WriteAllText($tmp, ($session | ConvertTo-Json -Depth 8), (New-Object System.Text.UTF8Encoding $false))
-    Move-Item -LiteralPath $tmp -Destination $sessionPath -Force -ErrorAction Stop
+    $session.logPaths = $logPaths
+    Save-OpSessionState -State $session -Confirm:$false
     $result
 }

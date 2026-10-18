@@ -79,7 +79,7 @@ Describe 'Plan d''installation : cas <Name>' -ForEach $cases {
         Mock Get-OpSystemInfo { $script:caseInfo }
         Mock Test-OpPreflight { }
         Mock New-OpRestorePoint { [pscustomobject]@{ Status = 'None'; Reason = 'simulé' } }
-        Mock Get-OpPath { Join-Path $TestDrive "programdata\$Name" } -ParameterFilter { $Name -in 'ClientTemp', 'ClientLogs' }
+        Mock Get-OpPath { Join-Path $TestDrive "programdata\$Name" } -ParameterFilter { $Name -in 'ClientTemp', 'ClientLogs', 'State' }
         Mock Install-OpDefenderUpdate { $script:executed.Add("defender:$($Item.id)"); [pscustomobject]@{ Id = $Item.id; State = 'UpToDate'; Reason = '' } }
         Mock Install-OpWindowsPackage { $script:executed.Add("dism:$($Item.id)"); [pscustomobject]@{ Id = $Item.id; State = 'UpToDate'; Reason = '' } }
         Mock Install-OpOfficeUpdate { $script:executed.Add("odt:$($Item.id)"); [pscustomobject]@{ Id = $Item.id; State = 'UpToDate'; Reason = '' } }

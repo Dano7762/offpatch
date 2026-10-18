@@ -8,7 +8,8 @@ BeforeAll {
     Set-StrictMode -Version Latest
     $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $private = 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Get-OpRoot', 'Get-OpPath', 'Get-OpConfiguration', 'Read-OpManifest', 'Get-OpNetworkConnection',
-    'New-OpRestorePoint', 'Install-OpDefenderUpdate', 'Install-OpWindowsPackage', 'Install-OpOfficeUpdate', 'ConvertTo-OpReportHtml', 'Save-OpReport'
+    'New-OpRestorePoint', 'Install-OpDefenderUpdate', 'Install-OpWindowsPackage', 'Install-OpOfficeUpdate', 'ConvertTo-OpReportHtml', 'Save-OpReport',
+    'Get-OpSupportIdentity', 'Get-OpInitialSessionState', 'Read-OpSessionState', 'Save-OpSessionState', 'Complete-OpSessionState'
     foreach ($name in $private) { . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1") }
     foreach ($name in 'Get-OpSystemInfo', 'Test-OpPreflight', 'Get-OpInstallPlan', 'Invoke-OpInstallStep', 'Write-OpInstallReport') {
         . (Join-Path $repo "app\module\OffPatch\Public\$name.ps1")
@@ -29,6 +30,7 @@ Describe 'Invoke-OpInstallStep et Write-OpInstallReport' {
         Mock Write-OpLog {}
         Mock Get-OpPath { Join-Path $script:root 'programdata\temp' } -ParameterFilter { $Name -eq 'ClientTemp' }
         Mock Get-OpPath { Join-Path $script:root 'programdata\logs' } -ParameterFilter { $Name -eq 'ClientLogs' }
+        Mock Get-OpPath { Join-Path $script:root 'programdata\state.json' } -ParameterFilter { $Name -eq 'State' }
         Mock Get-OpConfiguration { [pscustomobject]@{ Settings = [pscustomobject]@{}; OfficeSources = [pscustomobject]@{} } }
         Mock Get-OpSystemInfo {
             [pscustomobject]@{ ComputerName = 'PC-TEST'; SerialNumber = 'SN1'; Caption = 'Windows 11'; EditionId = 'Core'; DisplayVersion = '25H2'; CurrentBuild = '26200'; Ubr = 9457
@@ -76,17 +78,21 @@ Describe 'Invoke-OpInstallStep et Write-OpInstallReport' {
         Invoke-OpInstallStep -StepId 'def' -Root $script:root | Out-Null
         Invoke-OpInstallStep -StepId 'lcu' -Root $script:root | Out-Null
         Should -Invoke New-OpRestorePoint -Times 1 -Exactly
-        $session = Get-Content -LiteralPath (Join-Path $script:root 'programdata\temp\cli-session.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-        @($session.Steps.Id) | Should -Be @('def', 'lcu')
-        $session.Before.ComputerName | Should -Be 'PC-TEST'
-        $session.Before.Office.Version | Should -Be '16.0.1.1'
-        $session.RestorePoint.Status | Should -Be 'Created'
+        $session = Get-Content -LiteralPath (Join-Path $script:root 'programdata\state.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+        @($session.steps.Id) | Should -Be @('def', 'lcu')
+        $session.before.ComputerName | Should -Be 'PC-TEST'
+        $session.before.Office.Version | Should -Be '16.0.1.1'
+        $session.restorePoint.Status | Should -Be 'Created'
+        $session.sessionId | Should -Match '^[0-9a-f-]{36}$'
+        $session.rebootCount | Should -Be 0
+        $session.support.relativeRoot | Should -Not -BeNullOrEmpty
+        Test-Path (Join-Path $script:root 'programdata\state.json.tmp') | Should -BeFalse
     }
 
     It 'respecte -WhatIf' {
         Invoke-OpInstallStep -StepId 'def' -Root $script:root -WhatIf | Should -BeNullOrEmpty
         Should -Invoke Install-OpDefenderUpdate -Times 0 -Exactly
-        Test-Path (Join-Path $script:root 'programdata\temp\cli-session.json') | Should -BeFalse
+        Test-Path (Join-Path $script:root 'programdata\state.json') | Should -BeFalse
     }
 
     It 'écrit le rapport avec les étapes exécutées et le reste du plan, puis clôt la session' {
@@ -99,7 +105,8 @@ Describe 'Invoke-OpInstallStep et Write-OpInstallReport' {
         $html | Should -Not -Match 'motif def'
         $html | Should -Match 'mode Avion'
         $html | Should -Match 'Point créé par OffPatch'
-        Test-Path (Join-Path $script:root 'programdata\temp\cli-session.json') | Should -BeFalse
+        Test-Path (Join-Path $script:root 'programdata\state.json') | Should -BeFalse
+        @(Get-ChildItem -Path (Join-Path $script:root 'programdata\logs') -Filter 'state_*.json').Count | Should -Be 1
     }
 
     It 'écrit un rapport sans session en cours (aucune étape exécutée)' {
