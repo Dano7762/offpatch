@@ -15,7 +15,8 @@
           - windows-ssu : à installer si la build est dans baseBuilds et l'UBR inférieur à applyBelowUbr.
           - windows-ekb : non applicable si windows.includeEnablementPackage est faux ou si la build n'est pas dans
             baseBuilds (déjà en version cible, autre branche) ; à installer sinon (minUbr : planificateur).
-          - dotnet : fichier choisi par la valeur Release de .NET Framework 4 (netRelease) quand il y en a plusieurs ;
+          - dotnet : non applicable si la build n'est pas dans baseBuilds (une cumulative par version de Windows 11,
+            R-05) ; fichier choisi par la valeur Release de .NET Framework 4 (netRelease) quand il y en a plusieurs ;
             à jour si la liste DISM (Get-WindowsPackage -Online) contient le paquet de même nom, Installed, de version
             ≥ ; même règle de repli que les cumulatives.
           - defender-platform, defender : applicables si Get-MpComputerStatus répond et que AMRunningMode vaut
@@ -126,8 +127,20 @@
         else { Add-State (ConvertTo-State $item 'windows-ekb' 'Pending' "Passage en build $resulting ; prérequis UBR ≥ $(Get-Prop $item 'minUbr')." "$build.$ubr" $resulting) }
     }
 
-    # .NET : fichier selon Release (Windows 10, R-05), puis paquet DISM.
-    $dotnets = @(Get-NewestFirst @($mine | Where-Object { $_.category -eq 'dotnet' }) { [string](Get-Prop $_ 'releaseDate') })
+    # .NET : une cumulative par version de Windows 11 depuis octobre 2026 (baseBuilds, R-05) ; fichier selon Release
+    # (Windows 10), puis paquet DISM.
+    function Test-ForBuild($Item) {
+        $builds = @(Get-Prop $Item 'baseBuilds' | Where-Object { $null -ne $_ })
+        $builds.Count -eq 0 -or $builds -contains $build
+    }
+    $allDotnets = @($mine | Where-Object { $_.category -eq 'dotnet' })
+    foreach ($item in @($allDotnets | Where-Object { -not (Test-ForBuild $_) })) {
+        Add-State (ConvertTo-State $item 'dotnet' 'NotApplicable' "Build $build absente de baseBuilds ($(@(Get-Prop $item 'baseBuilds') -join ', '))." $null $null)
+    }
+    $dotnets = @(Get-NewestFirst @($allDotnets | Where-Object { Test-ForBuild $_ }) { [string](Get-Prop $_ 'releaseDate') })
+    if ($allDotnets.Count -gt 0 -and $dotnets.Count -eq 0) {
+        Add-State (ConvertTo-State $null 'dotnet' 'MissingFromDepot' "Aucun élément dotnet au dépôt pour la build $build." $null $null)
+    }
     foreach ($item in $dotnets) {
         $files = @($item.files)
         $file = $files[0]

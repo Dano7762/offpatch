@@ -75,6 +75,18 @@ Describe 'Get-OpDepotPurgePlan' {
         @($p.RemovedFiles | ForEach-Object { ($_.Path -split '/')[-1] }) | Should -Be @('a.msu')
     }
 
+    It 'compte la rétention .NET par build quand il y a une cumulative par version de Windows 11' {
+        $net = { param($Kb, $Date, $Builds, $Name) Get-Item2 "win11-x64-dotnet-$Kb" 'win11-x64' 'dotnet' @($Name) @{ kb = $Kb; releaseDate = $Date; baseBuilds = $Builds } }
+        $manifest = [pscustomobject]@{ schemaVersion = 1; items = @(
+                & $net 'KB5126052' '2026-09-08' @(26100, 26200, 26300) 'sept.msu'
+                & $net 'KB5127690' '2026-10-13' @(26100, 26200) 'oct-25.msu'
+                & $net 'KB5127694' '2026-10-13' @(26300) 'oct-26.msu'
+            ) }
+        $p = Get-OpDepotPurgePlan -Manifest $manifest -Configuration $configuration
+        Get-IdList $p.Removed | Should -Be @('win11-x64-dotnet-KB5126052')
+        Get-IdList $p.Kept | Sort-Object | Should -Be @('win11-x64-dotnet-KB5127690', 'win11-x64-dotnet-KB5127694')
+    }
+
     It 'ne retire rien d''une cible sans valeur de rétention' {
         $manifest = [pscustomobject]@{ schemaVersion = 1; items = @(
                 Get-Lcu 'win10-arm64' 'KB1' '2026-08-11' 1 @('a.msu')

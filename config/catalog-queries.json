@@ -27,6 +27,7 @@
         "includeTitlePattern": "^\\d{4}-\\d{2} Cumulative Update for \\.NET Framework 3\\.5 and 4\\.8\\.1 for Windows 11, version (24H2|25H2|26H2) for x64 \\(KB\\d+\\)$",
         "excludeTitlePattern": "Preview|Server|26H1",
         "pick": "latestMonth",
+        "versionBuilds": { "24H2": 26100, "25H2": 26200, "26H2": 26300 },
         "prerequisites": [],
         "runsAfter": []
       },
@@ -65,6 +66,7 @@
         "includeTitlePattern": "^\\d{4}-\\d{2} Cumulative Update for \\.NET Framework 3\\.5 and 4\\.8\\.1 for Windows 11, version (24H2|25H2|26H2) for arm64 \\(KB\\d+\\)$",
         "excludeTitlePattern": "Preview|Server|26H1",
         "pick": "latestMonth",
+        "versionBuilds": { "24H2": 26100, "25H2": 26200, "26H2": 26300 },
         "prerequisites": [],
         "runsAfter": []
       },

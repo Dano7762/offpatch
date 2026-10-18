@@ -195,6 +195,34 @@ Describe 'Select-OpCatalogUpdate' {
             $s.Warnings | Should -BeNullOrEmpty
         }
 
+        It 'garde un élément par KB quand Microsoft sépare les versions (octobre 2026), avec les builds de chacun' {
+            $rows = @(
+                Get-CatalogRow '2026-10 Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 24H2 for x64 (KB5127690)' '2026-10-13'
+                Get-CatalogRow '2026-10 Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 25H2 for x64 (KB5127690)' '2026-10-13'
+                Get-CatalogRow '2026-10 Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 26H2 for x64 (KB5127694)' '2026-10-13'
+                Get-CatalogRow '2026-10 Cumulative Update for .NET Framework 3.5 and 4.8.1 for Microsoft server operating system version 24H2 for x64 (KB5127690)' '2026-10-13'
+                Get-CatalogRow '2026-09 Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 25H2 for x64 (KB5126052)' '2026-09-08'
+            )
+            $s = @(Select-OpCatalogUpdate -Item $rows -Entry (Get-Entry 'win11-x64' 'dotnet') | Sort-Object Kb)
+            @($s.Kb) | Should -Be @('KB5127690', 'KB5127694')
+            @($s[0].BaseBuilds) | Should -Be @(26100, 26200)
+            @($s[1].BaseBuilds) | Should -Be @(26300)
+            @($s[0].Entries).Count | Should -Be 2
+            $s[0].Warnings | Should -BeNullOrEmpty
+        }
+
+        It 'écarte, avec un avertissement, un KB dont aucune version n''est dans versionBuilds' {
+            $entry = Get-Entry 'win11-x64' 'dotnet'
+            $entry.versionBuilds = [pscustomobject]@{ '25H2' = 26200 }
+            $rows = @(
+                Get-CatalogRow '2026-10 Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 25H2 for x64 (KB5127690)' '2026-10-13'
+                Get-CatalogRow '2026-10 Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 26H2 for x64 (KB5127694)' '2026-10-13'
+            )
+            $s = @(Select-OpCatalogUpdate -Item $rows -Entry $entry)
+            @($s.Kb) | Should -Be @('KB5127690')
+            ($s[0].Warnings -join ' ') | Should -BeLike '*KB5127694 écarté*26H2*versionBuilds*'
+        }
+
         It 'retient l''entrée Windows 10 qui apporte les deux fichiers' {
             $rows = @(
                 Get-CatalogRow '2026-09 Cumulative Update for .NET Framework 3.5 and 4.8 for Windows 10 Version 22H2 for x64 (KB5126046)'

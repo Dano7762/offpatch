@@ -139,6 +139,25 @@ Describe 'Get-OpUpdateState : .NET' {
         (Get-StateOf $s 'w-net').State | Should -Be $Expected
     }
 
+    It 'une cumulative par version de Windows 11 : seule celle de la build du PC est évaluée' {
+        Mock Get-WindowsPackage { [pscustomobject]@{ PackageName = 'Package_for_DotNetRollup_481~31bf3856ad364e35~amd64~~10.0.9363.1'; PackageState = 'Installed' } }
+        $file25 = [pscustomobject]@{ path = 'files/a/ndp481-25.msu'; package = [pscustomobject]@{ name = 'Package_for_DotNetRollup_481'; version = '10.0.9363.1' } }
+        $file26 = [pscustomobject]@{ path = 'files/b/ndp481-26.msu'; package = [pscustomobject]@{ name = 'Package_for_DotNetRollup_481'; version = '10.0.10008.1' } }
+        $s = Get-TestState @(
+            (ConvertTo-TestItem 'net-24-25' 'dotnet' 'win11-x64' @{ releaseDate = '2026-10-13'; baseBuilds = @(26100, 26200) } @($file25))
+            (ConvertTo-TestItem 'net-26' 'dotnet' 'win11-x64' @{ releaseDate = '2026-10-13'; baseBuilds = @(26300) } @($file26)))
+        (Get-StateOf $s 'net-24-25').State | Should -Be 'UpToDate'
+        (Get-StateOf $s 'net-26').State | Should -Be 'NotApplicable'
+        (Get-StateOf $s 'net-26').Reason | Should -BeLike '*26200 absente de baseBuilds*'
+    }
+
+    It 'aucune cumulative .NET pour la build du PC : absent du dépôt' {
+        Mock Get-WindowsPackage { @() }
+        $file26 = [pscustomobject]@{ path = 'files/b/ndp481-26.msu'; package = [pscustomobject]@{ name = 'Package_for_DotNetRollup_481'; version = '10.0.10008.1' } }
+        $s = @(Get-TestState @(ConvertTo-TestItem 'net-26' 'dotnet' 'win11-x64' @{ baseBuilds = @(26300) } @($file26)))
+        @($s | Where-Object { $_.Category -eq 'dotnet' -and $_.State -eq 'MissingFromDepot' }).Count | Should -Be 1
+    }
+
     It 'liste DISM illisible : erreur' {
         Mock Get-WindowsPackage { throw 'élévation requise' }
         $s = Get-TestState @(ConvertTo-TestItem 'w-net' 'dotnet' 'win11-x64' @{} @($netFile))

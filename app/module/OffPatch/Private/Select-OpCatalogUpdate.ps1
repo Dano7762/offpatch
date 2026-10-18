@@ -13,9 +13,14 @@
           - latestMonth : préfixe AAAA-MM du titre le plus récent ; la date du catalogue ne départage deux KB du
             même mois qu'avec un avertissement ;
           - highestVersion : version la plus élevée citée dans le titre (« (Version 4.18.x.y) »).
-        Renvoie un seul objet : KB choisi (Kb à $null si rien ne convient), entrée représentative (UpdateId, Title),
-        toutes les entrées du groupe, BaseBuilds, ResultingUbr, Version, Month, champs recopiés de l'entrée
-        (prerequisites, runsAfter, fileNamePattern) et la liste des avertissements, à journaliser par l'appelant.
+        versionBuilds (facultatif, avec latestMonth) : table version de Windows → build de base (« 25H2 » : 26200).
+        Chaque KB du mois retenu est alors gardé, avec pour BaseBuilds les builds des versions citées dans ses
+        titres (« version 25H2 ») : Microsoft publie une cumulative .NET par version de Windows 11 depuis octobre
+        2026 (R-05). Un KB dont aucune version n'est dans la table est écarté avec un avertissement.
+        Renvoie un objet par KB retenu (un seul, Kb à $null si rien ne convient, sans versionBuilds) : entrée
+        représentative (UpdateId, Title), toutes les entrées du groupe, BaseBuilds, ResultingUbr, Version, Month,
+        champs recopiés de l'entrée (prerequisites, runsAfter, fileNamePattern) et la liste des avertissements, à
+        journaliser par l'appelant.
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -27,6 +32,8 @@
 
     $warnings = New-Object System.Collections.Generic.List[string]
     $label = "$($Entry.category) ($($Entry.pick))"
+    $versionBuilds = $null
+    if ($null -ne $Entry.PSObject.Properties['versionBuilds'] -and $Entry.versionBuilds) { $versionBuilds = $Entry.versionBuilds }
 
     # Lignes retenues par les motifs, avec les valeurs lues dans le titre.
     $candidates = New-Object System.Collections.Generic.List[object]
@@ -105,7 +112,7 @@
             if ($pick -eq 'latestMonth') { $tied = @($sorted | Where-Object { $_.Month -eq $chosen.Month }) }
             elseif ($pick -eq 'highestVersion') { $tied = @($sorted | Where-Object { $_.Version -eq $chosen.Version }) }
             else { $tied = @($sorted | Where-Object { $_.Ubr -eq $chosen.Ubr }) }
-            if ($tied.Count -gt 1) {
+            if ($tied.Count -gt 1 -and -not $versionBuilds) {
                 $warnings.Add("$label : $($tied.Count) KB à égalité ($(($tied | ForEach-Object { $_.Kb }) -join ', ')) ; $($chosen.Kb) retenu d'après la date du catalogue.")
             }
         }
@@ -113,13 +120,6 @@
         $warnings.Add("$label : aucune entrée du catalogue ne correspond aux motifs.")
     }
 
-    $representative = $null
-    if ($chosen) { $representative = $chosen.Members[0].Item }
-    $baseBuilds = @()
-    if ($chosen -and $Entry.pick -eq 'highestUbr') { $baseBuilds = @($chosen.Members | ForEach-Object { $_.Build } | Sort-Object -Unique) }
-    elseif ($chosen -and $Entry.pick -eq 'highestUbrFromReleaseInformation') { $baseBuilds = @([int]$Entry.releaseInformationBuild) }
-    $resultingUbr = $null
-    if ($chosen -and @('highestUbr', 'highestUbrFromReleaseInformation') -contains $pick) { $resultingUbr = $chosen.Ubr }
     # Champs facultatifs de l'entrée, lus sans erreur sous StrictMode.
     $fileNamePattern = $null
     if ($null -ne $Entry.PSObject.Properties['fileNamePattern']) { $fileNamePattern = $Entry.fileNamePattern }
@@ -128,22 +128,53 @@
     $runsAfter = @()
     if ($null -ne $Entry.PSObject.Properties['runsAfter']) { $runsAfter = @($Entry.runsAfter) }
 
-    [pscustomobject]@{
-        Category        = $Entry.category
-        Pick            = $Entry.pick
-        Kb              = $(if ($chosen) { $chosen.Kb } else { $null })
-        UpdateId        = $(if ($representative) { $representative.UpdateId } else { $null })
-        Title           = $(if ($representative) { $representative.Title } else { $null })
-        Entries         = $(if ($chosen) { @($chosen.Members | ForEach-Object { $_.Item }) } else { @() })
-        BaseBuilds      = $baseBuilds
-        ResultingUbr    = $resultingUbr
-        Version         = $(if ($chosen) { $chosen.Version } else { $null })
-        Month           = $(if ($chosen) { $chosen.Month } else { $null })
-        ReleaseDate     = $(if ($chosen) { $chosen.LastUpdated } else { $null })
-        SizeBytes       = $(if ($representative) { $representative.SizeBytes } else { $null })
-        FileNamePattern = $fileNamePattern
-        Prerequisites   = $prerequisites
-        RunsAfter       = $runsAfter
-        Warnings        = $warnings.ToArray()
+    # Groupes retenus : le choisi ; avec versionBuilds, chaque KB de son mois, avec les builds de ses versions.
+    $selected = @()
+    if ($chosen) { $selected = @([pscustomobject]@{ Group = $chosen; BaseBuilds = @() }) }
+    if ($chosen -and $versionBuilds) {
+        # Groupes du mois, du plus récent au plus ancien au catalogue : chaque build revient au premier qui la couvre.
+        $claimed = @{}
+        $selected = @(foreach ($g in @($sorted | Where-Object { $_.Month -eq $chosen.Month })) {
+                $versions = @($g.Members | ForEach-Object { [regex]::Match($_.Item.Title, '\bversion (\d{2}H\d)\b').Groups[1].Value } | Where-Object { $_ } | Sort-Object -Unique)
+                $builds = @($versions | Where-Object { $null -ne $versionBuilds.PSObject.Properties[$_] } | ForEach-Object { [int]$versionBuilds.$_ } | Sort-Object -Unique)
+                if ($builds.Count -eq 0) { $warnings.Add("$label : $($g.Kb) écarté, aucune de ses versions ($($versions -join ', ')) n'est dans versionBuilds.") ; continue }
+                $free = @($builds | Where-Object { -not $claimed.ContainsKey($_) })
+                if ($free.Count -eq 0) {
+                    $warnings.Add("$label : $($g.Kb) à égalité avec $(($builds | ForEach-Object { $claimed[$_] } | Sort-Object -Unique) -join ', ') pour les mêmes versions ; le plus récent d'après la date du catalogue est retenu.")
+                    continue
+                }
+                foreach ($b in $free) { $claimed[$b] = $g.Kb }
+                [pscustomobject]@{ Group = $g; BaseBuilds = $free }
+            })
+    }
+    if ($selected.Count -eq 0) { $selected = @([pscustomobject]@{ Group = $null; BaseBuilds = @() }) }
+
+    foreach ($s in $selected) {
+        $g = $s.Group
+        $representative = $null
+        if ($g) { $representative = $g.Members[0].Item }
+        $baseBuilds = @($s.BaseBuilds)
+        if ($g -and $Entry.pick -eq 'highestUbr') { $baseBuilds = @($g.Members | ForEach-Object { $_.Build } | Sort-Object -Unique) }
+        elseif ($g -and $Entry.pick -eq 'highestUbrFromReleaseInformation') { $baseBuilds = @([int]$Entry.releaseInformationBuild) }
+        $resultingUbr = $null
+        if ($g -and @('highestUbr', 'highestUbrFromReleaseInformation') -contains $pick) { $resultingUbr = $g.Ubr }
+        [pscustomobject]@{
+            Category        = $Entry.category
+            Pick            = $Entry.pick
+            Kb              = $(if ($g) { $g.Kb } else { $null })
+            UpdateId        = $(if ($representative) { $representative.UpdateId } else { $null })
+            Title           = $(if ($representative) { $representative.Title } else { $null })
+            Entries         = $(if ($g) { @($g.Members | ForEach-Object { $_.Item }) } else { @() })
+            BaseBuilds      = $baseBuilds
+            ResultingUbr    = $resultingUbr
+            Version         = $(if ($g) { $g.Version } else { $null })
+            Month           = $(if ($g) { $g.Month } else { $null })
+            ReleaseDate     = $(if ($g) { $g.LastUpdated } else { $null })
+            SizeBytes       = $(if ($representative) { $representative.SizeBytes } else { $null })
+            FileNamePattern = $fileNamePattern
+            Prerequisites   = $prerequisites
+            RunsAfter       = $runsAfter
+            Warnings        = $warnings.ToArray()
+        }
     }
 }

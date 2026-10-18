@@ -63,16 +63,20 @@
             $map = $releaseInformation[$key]
         }
 
-        $selection = Select-OpCatalogUpdate -Item $items.ToArray() -Entry $entry -ReleaseInformation $map
-        foreach ($w in $selection.Warnings) { Write-OpLog -Level WARN -Message "Catalogue, $Target : $w" }
-        if ($selection.Kb) {
-            $detail = $selection.Kb
-            if ($null -ne $selection.ResultingUbr) { $detail += ", UBR $($selection.ResultingUbr)" }
-            if ($null -ne $selection.Version) { $detail += ", version $($selection.Version)" }
-            Write-OpLog -Message "Catalogue, $label : $detail retenu (« $($selection.Title) »)."
+        # Plusieurs sélections pour une entrée à versionBuilds (un KB par version de Windows), mêmes avertissements.
+        $selections = @(Select-OpCatalogUpdate -Item $items.ToArray() -Entry $entry -ReleaseInformation $map)
+        foreach ($w in $selections[0].Warnings) { Write-OpLog -Level WARN -Message "Catalogue, $Target : $w" }
+        foreach ($selection in $selections) {
+            if ($selection.Kb) {
+                $detail = $selection.Kb
+                if ($null -ne $selection.ResultingUbr) { $detail += ", UBR $($selection.ResultingUbr)" }
+                if ($null -ne $selection.Version) { $detail += ", version $($selection.Version)" }
+                if (@($selection.BaseBuilds).Count -gt 0 -and $null -eq $selection.ResultingUbr) { $detail += ", builds $(@($selection.BaseBuilds) -join ', ')" }
+                Write-OpLog -Message "Catalogue, $label : $detail retenu (« $($selection.Title) »)."
+            }
+            $selection | Add-Member -NotePropertyName Target -NotePropertyValue $Target
+            $selection | Add-Member -NotePropertyName Queries -NotePropertyValue $texts.ToArray()
+            $selection
         }
-        $selection | Add-Member -NotePropertyName Target -NotePropertyValue $Target
-        $selection | Add-Member -NotePropertyName Queries -NotePropertyValue $texts.ToArray()
-        $selection
     }
 }

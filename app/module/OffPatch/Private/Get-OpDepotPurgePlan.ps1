@@ -5,7 +5,8 @@
 
     .DESCRIPTION
         Fonction pure (cahier des charges 7.3). Règles :
-          - cumulatives Windows (windows-lcu) et .NET (dotnet) : par cible et par catégorie, on garde les
+          - cumulatives Windows (windows-lcu) et .NET (dotnet) : par cible et par catégorie (.NET à baseBuilds : par
+            build, une cumulative par version de Windows 11, R-05), on garde les
             retention.windowsMonths.<cible> plus récentes (date de publication, puis UBR, puis numéro de KB) ;
           - définitions et plateforme Defender : par cible, seulement la version la plus élevée ;
           - éléments épinglés (pinned-items.json) : jamais retirés ;
@@ -48,7 +49,20 @@
         } else {
             continue
         }
-        foreach ($old in @($sorted | Select-Object -Skip $keep)) { $removedIds[$old.id] = $true }
+        $builds = @()
+        if ($first.category -eq 'dotnet') { $builds = @($sorted | ForEach-Object { if ($null -ne $_.PSObject.Properties['baseBuilds']) { @($_.baseBuilds) } } | Sort-Object -Unique) }
+        if ($builds.Count -eq 0) {
+            foreach ($old in @($sorted | Select-Object -Skip $keep)) { $removedIds[$old.id] = $true }
+            continue
+        }
+        # .NET par version de Windows 11 (baseBuilds, R-05) : rétention comptée par build ; un élément sans
+        # baseBuilds couvre toutes les builds. Gardé s'il est parmi les plus récents d'au moins une de ses builds.
+        $keptByBuild = @{}
+        foreach ($b in $builds) {
+            $covering = @($sorted | Where-Object { $null -eq $_.PSObject.Properties['baseBuilds'] -or @($_.baseBuilds).Count -eq 0 -or @($_.baseBuilds) -contains $b })
+            foreach ($k in @($covering | Select-Object -First $keep)) { $keptByBuild[$k.id] = $true }
+        }
+        foreach ($old in @($sorted | Where-Object { -not $keptByBuild.ContainsKey($_.id) })) { $removedIds[$old.id] = $true }
     }
 
     $kept = @($items | Where-Object { -not $removedIds.ContainsKey($_.id) })

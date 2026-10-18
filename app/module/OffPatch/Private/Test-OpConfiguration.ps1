@@ -111,6 +111,15 @@
                 if (-not (Test-Property $entry 'releaseInformationBuild') -or [int]$entry.releaseInformationBuild -lt 10000) { $errors.Add("$label : releaseInformationBuild absent ou invalide (build de base lue sur la page release-information).") }
                 if (-not (Test-Property $s.downloadPages 'windows10ReleaseInformation')) { $errors.Add("$label : settings.json, downloadPages.windows10ReleaseInformation absent (page release-information).") }
             }
+            # versionBuilds : version de Windows (« 25H2 ») → build de base, un élément par KB du mois (R-05).
+            if (Test-Property $entry 'versionBuilds') {
+                if ($entry.pick -ne 'latestMonth') { $errors.Add("$label : versionBuilds ne s'emploie qu'avec la règle latestMonth.") }
+                $pairs = @($entry.versionBuilds.PSObject.Properties)
+                if ($pairs.Count -eq 0) { $errors.Add("$label : versionBuilds est vide.") }
+                foreach ($p in $pairs) {
+                    if ($p.Name -notmatch '^\d{2}H\d$' -or [string]$p.Value -notmatch '^\d{5}$') { $errors.Add("$label : versionBuilds, « $($p.Name) » : $($p.Value) invalide (version de la forme 25H2, build de 5 chiffres).") }
+                }
+            }
             foreach ($dep in @($entry.prerequisites) + @($entry.runsAfter)) {
                 if ($dep -and $categories -notcontains $dep) { $errors.Add("$label : dépendance vers une catégorie inconnue « $dep ».") }
             }

@@ -198,7 +198,7 @@ Question : titres exacts au catalogue pour chaque cible, versions de .NET Framew
 
 Impact : catégorie `dotnet`, détection.
 
-- Statut : Tranché (décision de David du 2026-10-04 ; cahier des charges 1.5, 7.1, 7.2 et 8.3)
+- Statut : Tranché (décision de David du 2026-10-04 ; cahier des charges 1.5, 7.1, 7.2 et 8.3), révisé le 2026-10-18 (cahier des charges 1.33) : voir « Octobre 2026 » ci-dessous
 - Sources (consultées le 2026-10-04) :
   - https://support.microsoft.com/help/5126052 : « Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 24H2, Windows 11, version 25H2 and Microsoft server operating system 24H2 ». Prérequis : « you must have .NET Framework 3.5 or 4.8.1 installed ». Redémarrage : « if any affected files are being used ».
   - https://support.microsoft.com/help/5126046 : article chapeau Windows 10 21H2/22H2 (3.5 et 4.8), qui renvoie aux articles par produit, dont KB5126146 « Cumulative Update for .NET Framework 3.5, 4.8 and 4.8.1 for Windows 10 Version 22H2 ». Les pages KB5126146 et KB5126421 renvoient une erreur.
@@ -223,6 +223,7 @@ Impact : catégorie `dotnet`, détection.
   - Sélection mensuelle : pas de build dans le titre ; on retient l'entrée la plus récente parmi les non-préversions du mois courant et du précédent. En cas d'égalité, la version de paquet la plus élevée.
   - Cumulative Windows 10 (décision de David, voir R-09) : release-information reste la source de sélection ; la lecture du .msu sert de contre-vérification.
   - Reste à valider sur intervention réelle : Windows 10 (choix ndp48 ou ndp481, liste DISM après installation, nom du KB dans `Get-HotFix`) et code retour quand la cumulative .NET est déjà présente (R-14).
+- **Octobre 2026 : une cumulative .NET par version de Windows 11** (relevé du 2026-10-18, catalogue interrogé par `Find-OpCatalogUpdate`, lecture seule) : KB5127690 « 2026-10 Cumulative Update for .NET Framework 3.5 and 4.8.1 for Windows 11, version 24H2 / version 25H2 for x64 / for arm64 » (et Microsoft server operating system version 24H2), KB5127694 « … for Windows 11, version 26H2 for x64 / for arm64 », publiés le même jour (2026-10-13). Fichiers différents, paquets `Package_for_DotNetRollup_481` différents : 10.0.10008.1 pour KB5127694 (lu dans le .msu), 10.0.9363.1 installé par Windows Update sur le poste de développement en 25H2 (26200.9711). La conclusion « les entrées 24H2, 25H2 et 26H2 du même KB renvoient le même fichier » ne vaut plus. Constat : le premier dépôt complet (2026-10-17) n'avait retenu que KB5127694 pour toute la cible, à installer à tort sur un 25H2. Décision (David, 2026-10-18, cahier des charges 1.33) : champ `versionBuilds` des entrées .NET Windows 11 de `catalog-queries.json` (`24H2` 26100, `25H2` 26200, `26H2` 26300), un élément par KB du mois avec ses `baseBuilds` ; détection limitée aux builds de l'élément ; rétention par build. Un retour à un KB unique pour toutes les versions reste pris en charge (un seul élément, toutes les builds). Vérifié par `-ListOnly` et le contrat en ligne le 2026-10-18 : KB5127690 et KB5127694 retenus pour `win11-x64` et `win11-arm64`.
 
 ## R-06 Définitions Defender
 
