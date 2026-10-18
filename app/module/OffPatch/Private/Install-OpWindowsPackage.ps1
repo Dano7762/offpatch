@@ -63,7 +63,7 @@
 
     $problems = @(Test-OpItemFileHash -Depot $Depot -File @($file))
     if ($problems.Count -gt 0) {
-        $reason = "Fichier non conforme au manifeste, DISM non lancé : $($problems -join ' ')"
+        $reason = "Fichier non conforme au manifeste, installation non lancée : $($problems -join ' ')"
         Write-OpLog "$($Item.id) : $reason" -Level ERROR
         return (ConvertTo-StepResult 'Error' $reason $null $false $null)
     }
