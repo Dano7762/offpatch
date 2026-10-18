@@ -9,20 +9,36 @@
       2. Cherche, sur tous les lecteurs (Win32_LogicalDisk), celui dont le numéro de série correspond et qui porte
          offpatch.root à ce chemin : la lettre peut avoir changé depuis le redémarrage. Si l'état ne connaît pas
          le numéro de série (illisible au début de la session), le marqueur seul suffit, avec une mention au journal.
-      3. Relance <racine>\app\OffPatch.ps1 -Resume avec le PowerShell natif du système (Sysnative depuis un
+      3. Support absent : une petite fenêtre demande de le rebrancher et la recherche reprend toutes les
+         PollSeconds secondes, jusqu'à ce qu'il soit trouvé (sur n'importe quelle lettre) ou que l'attente soit
+         abandonnée (bouton ou fermeture de la fenêtre). L'état de session est conservé dans tous les cas.
+      4. Relance <racine>\app\OffPatch.ps1 -Resume avec le PowerShell natif du système (Sysnative depuis un
          processus 32 bits sur Windows 64 bits, comme Lancer-OffPatch.cmd), sans attendre sa fin.
     Journal : ProgramData\OffPatch\logs\resume_AAAA-MM-JJ_HHMMSS.log.
-    Codes de sortie : 0 interface relancée, 1 état de session absent ou illisible, 2 support introuvable.
+    Codes de sortie : 0 interface relancée, 1 état de session absent ou illisible, 2 support introuvable (attente
+    abandonnée ou délai dépassé).
 
 .PARAMETER StatePath
     Chemin de state.json ; par défaut ProgramData\OffPatch\state.json.
+
+.PARAMETER PollSeconds
+    Intervalle entre deux recherches du support pendant l'attente ; 5 secondes par défaut (8.6).
+
+.PARAMETER TimeoutSeconds
+    Durée maximale de l'attente du support ; 0 (par défaut) : sans limite.
+
+.PARAMETER NoWindow
+    Attend le support sans fenêtre, avec un message dans la console (débogage, tests).
 
 .EXAMPLE
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\ProgramData\OffPatch\resume.ps1
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$StatePath
+    [string]$StatePath,
+    [ValidateRange(1, 3600)][int]$PollSeconds = 5,
+    [ValidateRange(0, 86400)][int]$TimeoutSeconds = 0,
+    [switch]$NoWindow
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -55,6 +71,54 @@ function Find-ResumeSupport([string]$Serial, [string]$RelativeRoot) {
     $null
 }
 
+# Attente du support : recherche toutes les $Poll secondes ; $null si l'attente est abandonnée ou expire ($Timeout,
+# 0 : sans limite). Petite fenêtre non modale, message et bouton Abandonner ; la fermer revient à abandonner.
+function Wait-ResumeSupport([string]$Serial, [string]$RelativeRoot, [int]$Poll, [int]$Timeout, [bool]$Console) {
+    $message = "Le support OffPatch est introuvable. Rebranchez-le (dossier $RelativeRoot) : la session reprendra dès qu'il sera détecté, vérification toutes les $Poll secondes."
+    $form = $null
+    if ($Console) {
+        Write-Host $message
+    } else {
+        Add-Type -AssemblyName System.Windows.Forms, System.Drawing -ErrorAction Stop
+        $form = New-Object System.Windows.Forms.Form
+        $form.Text = 'OffPatch : reprise de la session'
+        $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+        $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+        $form.MaximizeBox = $false
+        $form.MinimizeBox = $false
+        $form.TopMost = $true
+        $form.ClientSize = New-Object System.Drawing.Size 420, 150
+        $label = New-Object System.Windows.Forms.Label
+        $label.Text = $message
+        $label.SetBounds(15, 15, 390, 85)
+        $button = New-Object System.Windows.Forms.Button
+        $button.Text = 'Abandonner'
+        $button.SetBounds(305, 110, 100, 28)
+        $button.Add_Click({ $form.Close() }.GetNewClosure())
+        $form.Controls.AddRange(@($label, $button))
+        $form.Show()
+    }
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+    $next = $Poll
+    try {
+        while ($true) {
+            if ($form) {
+                [System.Windows.Forms.Application]::DoEvents()
+                if ($form.IsDisposed -or -not $form.Visible) { Write-ResumeLog 'Attente du support abandonnée.' 'WARN'; return $null }
+            }
+            if ($clock.Elapsed.TotalSeconds -ge $next) {
+                $found = Find-ResumeSupport $Serial $RelativeRoot
+                if ($found) { Write-ResumeLog "Support rebranché après $([int]$clock.Elapsed.TotalSeconds) s."; return $found }
+                $next += $Poll
+            }
+            if ($Timeout -gt 0 -and $clock.Elapsed.TotalSeconds -ge $Timeout) { Write-ResumeLog "Support toujours absent après $Timeout s." 'WARN'; return $null }
+            Start-Sleep -Milliseconds 200
+        }
+    } finally {
+        if ($form) { $form.Dispose() }
+    }
+}
+
 try {
     $state = Get-Content -LiteralPath $StatePath -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
     $serial = [string]$state.support.volumeSerial
@@ -67,8 +131,12 @@ if (-not $serial) { Write-ResumeLog 'Numéro de série du support inconnu dans s
 
 $root = Find-ResumeSupport $serial $relative
 if (-not $root) {
-    Write-ResumeLog "Support introuvable (volume $(if ($serial) { $serial } else { 'inconnu' }), racine $relative)." 'WARN'
-    exit 2
+    Write-ResumeLog "Support introuvable (volume $(if ($serial) { $serial } else { 'inconnu' }), racine $relative) : attente du rebranchement." 'WARN'
+    $root = Wait-ResumeSupport $serial $relative $PollSeconds $TimeoutSeconds ([bool]$NoWindow)
+    if (-not $root) {
+        Write-ResumeLog 'Session conservée : elle pourra être reprise au prochain lancement d''OffPatch.' 'WARN'
+        exit 2
+    }
 }
 
 $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'

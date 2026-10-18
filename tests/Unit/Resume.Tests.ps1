@@ -52,15 +52,33 @@ Describe 'resume.ps1' {
         $found.TrimEnd('\') | Should -Be $support
     }
 
-    It 'sort en code 2 si le volume au bon numéro n''a pas le marqueur, ou si aucun volume ne correspond' {
+    It 'attend puis sort en code 2 si le volume au bon numéro n''a pas le marqueur, ou si aucun volume ne correspond' {
         $empty = Initialize-TestVolume 'H' 'OffPatch'
         Use-TestDisk @([pscustomobject]@{ DeviceID = $empty; VolumeSerialNumber = '1A2B3C4D' })
-        & $resume -StatePath (Initialize-TestState '1A2B3C4D' 'OffPatch') -WhatIf | Should -BeNullOrEmpty
+        & $resume -StatePath (Initialize-TestState '1A2B3C4D' 'OffPatch') -NoWindow -PollSeconds 1 -TimeoutSeconds 1 -WhatIf 6>$null | Should -BeNullOrEmpty
         $LASTEXITCODE | Should -Be 2
         $marked = Initialize-TestVolume 'I' 'OffPatch' -Marker
         Use-TestDisk @([pscustomobject]@{ DeviceID = $marked; VolumeSerialNumber = '99999999' })
-        & $resume -StatePath (Initialize-TestState '1A2B3C4D' 'OffPatch') -WhatIf | Should -BeNullOrEmpty
+        & $resume -StatePath (Initialize-TestState '1A2B3C4D' 'OffPatch') -NoWindow -PollSeconds 1 -TimeoutSeconds 1 -WhatIf 6>$null | Should -BeNullOrEmpty
         $LASTEXITCODE | Should -Be 2
+        # Recherche initiale, puis une par seconde d'attente.
+        Should -Invoke Get-CimInstance -Times 4 -Exactly
+    }
+
+    It 'reprend dès que le support est rebranché pendant l''attente, sous une autre lettre' {
+        $support = Initialize-TestVolume 'K' 'OffPatch' -Marker
+        Use-TestDisk @([pscustomobject]@{ DeviceID = $support; VolumeSerialNumber = '1A2B3C4D' })
+        # Premier appel (recherche initiale) : support absent ; les suivants : support branché.
+        $env:OP_RESUME_TEST_CALLS = '0'
+        Mock Get-CimInstance {
+            $env:OP_RESUME_TEST_CALLS = [string]([int]$env:OP_RESUME_TEST_CALLS + 1)
+            if ([int]$env:OP_RESUME_TEST_CALLS -ge 2) { (Get-Content -LiteralPath $env:OP_RESUME_TEST_DISKS -Raw -Encoding UTF8 | ConvertFrom-Json) | ForEach-Object { $_ } }
+        }
+        $found = & $resume -StatePath (Initialize-TestState '1A2B3C4D' 'OffPatch') -NoWindow -PollSeconds 1 -TimeoutSeconds 30 -WhatIf 6>$null
+        Remove-Item -Path Env:OP_RESUME_TEST_CALLS -ErrorAction SilentlyContinue
+        $LASTEXITCODE | Should -Be 0
+        $found | Should -Be (Join-Path $support 'OffPatch')
+        Should -Invoke Get-CimInstance -Times 2 -Exactly
     }
 
     It 'se contente du marqueur quand l''état ne connaît pas le numéro de série' {
