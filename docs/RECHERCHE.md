@@ -704,3 +704,20 @@ Impact : mode automatique (phase 5), reprise après redémarrage.
   - Mesuré sur runner : tâche `Ready`, déclencheur `MSFT_TaskLogonTrigger` sur `runnervm…\runneradmin`, principal `Interactive` / `Highest`, `DisallowStartIfOnBatteries` et `StopIfGoingOnBatteries` à faux, action `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\ProgramData\OffPatch\resume.ps1"` ; une seconde création remplace la première (une seule tâche) ; suppression effective, seconde suppression sans effet.
 - Décision : `Register-OpResumeTask` (copie de `resume.ps1` dans ProgramData, puis tâche) et `Unregister-OpResumeTask`, conformes au cahier des charges 8.6 sans modification.
 - À valider sur intervention réelle : déclenchement effectif à l'ouverture de session après redémarrage (T1, T7), et élévation avec les identifiants d'un autre compte sur un PC client à compte standard.
+
+## R-19 Installation des .msu sur Windows 10
+
+Question : `dism.exe /Online /Add-Package` d'un .msu (R-14) fonctionne-t-il sur Windows 10 22H2 ? Sinon, quel moteur documenté pour les cumulatives, la SSU et .NET de Windows 10 ?
+
+Impact : exécuteur des étapes Windows et .NET sur Windows 10 (cahier des charges 8.4), essais T4, T5, T7.
+
+- Statut : À trancher (2026-10-18), décision de David attendue.
+- Relevé (2026-10-18, VM de David, Windows 10 Famille 22H2 19045.2965, DISM 10.0.19041.844, essai T5 en mode auto) : `dism.exe /English /Online /Add-Package /PackagePath:windows10.0-kb5127683-x64-ndp48_….msu` sort en code 50 (0x32) en moins d'une seconde ; journal DISM : « DISM does not support installing MSU files online. - CMsuPackage::Install(hr:0x80070032) ». Deux tentatives, étape abandonnée, session poursuivie (comportement d'OffPatch conforme).
+- Sources (consultées le 2026-10-18) :
+  - https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-operating-system-package-servicing-command-line-options : « You can use `/Add-Package` to add an .msu package to an online or offline Windows 11, version 21H2, or later image. » ; « If you're working with a Windows image prior to Windows 11, version 21H2, you can only add .msu packages on offline target images. » R-14 n'avait été mesuré que sur Windows 11 (`windows-11-arm`).
+  - https://support.microsoft.com/en-us/topic/description-of-the-windows-update-standalone-installer-in-windows-799ba3df-ec7e-b05e-ee13-1cdae8f23b19 (s'applique notamment à Windows 10 Famille et Professionnel 22H2) : `wusa.exe <fichier.msu> /quiet /norestart` ; « /norestart: Prevents Wusa.exe from restarting the computer. The /norestart switch is ignored if the /quiet switch is not present. » Codes retour non documentés sur cette page.
+  - Aucune page Microsoft consultée ne documente, pour Windows 10, l'extraction du .cab d'un .msu puis `DISM /Online /Add-Package` du .cab (cumulatives combinées SSU + LCU comprises).
+- Conséquence : sur Windows 10, toutes les étapes .msu (SSU, cumulative, .NET) échouent avec DISM en ligne ; T5 n'a installé que Defender.
+- Options :
+  1. (recommandée) Windows 10 : `wusa.exe <.msu> /quiet /norestart`, seul moyen documenté par Microsoft pour un .msu sur Windows 10 en cours d'exécution ; Windows 11 inchangé (DISM, R-14). Codes retour (réussite, 3010, déjà installé, non applicable) et journal à mesurer sur la VM avant d'écrire l'exécuteur.
+  2. Extraire le .cab avec `expand.exe` puis DISM en ligne : non documenté par Microsoft pour Windows 10, ordre SSU/LCU dans les paquets combinés à deviner ; écartée.

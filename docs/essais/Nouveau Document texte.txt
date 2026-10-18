@@ -1,2 +1,0 @@
-Set-Location C:\OffPatch
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\app\OffPatch-Cli.ps1 -Action Plan | Tee-Object -FilePath C:\OffPatch\T5-plan-2.txt
