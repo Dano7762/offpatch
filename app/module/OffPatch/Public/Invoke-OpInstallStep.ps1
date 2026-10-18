@@ -12,8 +12,10 @@
         de chaque étape, pour la reprise et le rapport (Write-OpInstallReport).
         Exécuteur selon la catégorie : Defender (plateforme, définitions), DISM (cumulatives, checkpoint, enablement
         package, SSU, .NET), ODT (source Office). Journaux de DISM et de l'ODT dans le sous-dossier de la session.
-        Renvoie le résultat de l'exécuteur (Id, Category, State, Reason, ExitCode…), complété de StartTime, Seconds
-        et RebootAfter (redémarrage prévu par le plan après cette étape).
+        Les échecs (Error) de chaque étape sont comptés dans la session : au deuxième, l'étape est abandonnée et
+        signalée (Abandoned), et toute nouvelle tentative est refusée ; la session continue avec les suivantes (8.6).
+        Renvoie le résultat de l'exécuteur (Id, Category, State, Reason, ExitCode…), complété de StartTime, Seconds,
+        RebootAfter (redémarrage prévu par le plan après cette étape), Failures et Abandoned.
 
     .PARAMETER StepId
         Identifiant de l'élément du manifeste, tel qu'affiché par Get-OpInstallPlan.
@@ -41,9 +43,15 @@
     if (-not $step) { throw "Étape $StepId absente du plan de ce PC." }
     if ($step.State -ne 'Pending') { throw "Étape $StepId non exécutée : état $($step.State) ($($step.Reason))." }
     $item = @((Read-OpManifest -Path (Get-OpPath -Name Manifest -Root $Root)).items | Where-Object { $_ -and $_.id -eq $StepId }) | Select-Object -First 1
+    # Une étape qui a échoué deux fois dans la session est abandonnée (8.6) : plus de nouvelle tentative.
+    $session = Read-OpSessionState
+    $failures = 0
+    $previous = $null
+    if ($session) { $previous = @($session.steps | Where-Object { $_ -and $_.Id -eq $StepId }) | Select-Object -First 1 }
+    if ($previous -and $previous.PSObject.Properties['Failures']) { $failures = [int]$previous.Failures }
+    if ($failures -ge 2) { throw "Étape $StepId abandonnée après deux échecs dans cette session : $($previous.Reason)" }
     if (-not $PSCmdlet.ShouldProcess($StepId, "Exécution de l'étape $($step.Category)")) { return }
 
-    $session = Read-OpSessionState
     if (-not $session) {
         $session = Get-OpInitialSessionState -Root $Root -SystemInfo $info -RestorePoint (New-OpRestorePoint -Configuration $configuration -Confirm:$false)
         Write-OpLog "Session $($session.sessionId) ouverte."
@@ -63,7 +71,11 @@
     $result | Add-Member -NotePropertyName StartTime -NotePropertyValue $start.ToString('o') -Force
     $result | Add-Member -NotePropertyName Seconds -NotePropertyValue ([math]::Round(((Get-Date) - $start).TotalSeconds, 1)) -Force
     $result | Add-Member -NotePropertyName RebootAfter -NotePropertyValue ([bool]$step.RebootAfter) -Force
-    Write-OpLog "Étape $StepId : $($result.State), $($result.Reason)"
+    if ($result.State -eq 'Error') { $failures++ }
+    $result | Add-Member -NotePropertyName Failures -NotePropertyValue $failures -Force
+    $result | Add-Member -NotePropertyName Abandoned -NotePropertyValue ($failures -ge 2) -Force
+    if ($result.Abandoned) { $result.Reason = "$($result.Reason) Étape abandonnée après deux échecs, la session continue avec les suivantes." }
+    Write-OpLog "Étape $StepId : $($result.State), $($result.Reason)" -Level $(if ($result.Abandoned) { 'WARN' } else { 'INFO' })
 
     $session.steps = @(@($session.steps | Where-Object { $_ -and $_.Id -ne $StepId }) + $result)
     # Chaque appel de la CLI a son journal : le rapport en reprend les avertissements et les erreurs.
