@@ -9,7 +9,7 @@ BeforeAll {
     $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $private = 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Get-OpRoot', 'Get-OpPath', 'Get-OpConfiguration', 'Read-OpManifest', 'Get-OpNetworkConnection',
     'New-OpRestorePoint', 'Install-OpDefenderUpdate', 'Install-OpWindowsPackage', 'Install-OpOfficeUpdate', 'ConvertTo-OpReportHtml', 'Save-OpReport',
-    'Get-OpSupportIdentity', 'Get-OpInitialSessionState', 'Read-OpSessionState', 'Save-OpSessionState', 'Complete-OpSessionState'
+    'Get-OpSupportIdentity', 'Get-OpInitialSessionState', 'Read-OpSessionState', 'Save-OpSessionState', 'Complete-OpSessionState', 'Unregister-OpResumeTask'
     foreach ($name in $private) { . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1") }
     foreach ($name in 'Get-OpSystemInfo', 'Test-OpPreflight', 'Get-OpInstallPlan', 'Invoke-OpInstallStep', 'Write-OpInstallReport') {
         . (Join-Path $repo "app\module\OffPatch\Public\$name.ps1")
@@ -31,6 +31,8 @@ Describe 'Invoke-OpInstallStep et Write-OpInstallReport' {
         Mock Get-OpPath { Join-Path $script:root 'programdata\temp' } -ParameterFilter { $Name -eq 'ClientTemp' }
         Mock Get-OpPath { Join-Path $script:root 'programdata\logs' } -ParameterFilter { $Name -eq 'ClientLogs' }
         Mock Get-OpPath { Join-Path $script:root 'programdata\state.json' } -ParameterFilter { $Name -eq 'State' }
+        Mock Get-OpPath { Join-Path $script:root 'programdata\resume.ps1' } -ParameterFilter { $Name -eq 'ClientResume' }
+        Mock Unregister-OpResumeTask { $true }
         Mock Get-OpConfiguration { [pscustomobject]@{ Settings = [pscustomobject]@{}; OfficeSources = [pscustomobject]@{} } }
         Mock Get-OpSystemInfo {
             [pscustomobject]@{ ComputerName = 'PC-TEST'; SerialNumber = 'SN1'; Caption = 'Windows 11'; EditionId = 'Core'; DisplayVersion = '25H2'; CurrentBuild = '26200'; Ubr = 9457
@@ -129,6 +131,40 @@ Describe 'Invoke-OpInstallStep et Write-OpInstallReport' {
         $html | Should -Match 'Point créé par OffPatch'
         Test-Path (Join-Path $script:root 'programdata\state.json') | Should -BeFalse
         @(Get-ChildItem -Path (Join-Path $script:root 'programdata\logs') -Filter 'state_*.json').Count | Should -Be 1
+    }
+
+    It 'supprime en fin de session la tâche, resume.ps1 et temp, et rappelle le mode Avion à l''écran' {
+        Invoke-OpInstallStep -StepId 'def' -Root $script:root | Out-Null
+        New-Item -ItemType Directory -Force -Path (Join-Path $script:root 'programdata\temp\sous') | Out-Null
+        Set-Content -LiteralPath (Join-Path $script:root 'programdata\temp\sous\a.xml') -Value 'x'
+        Set-Content -LiteralPath (Join-Path $script:root 'programdata\resume.ps1') -Value 'x'
+        $path = Write-OpInstallReport -Root $script:root -WarningVariable warnings -WarningAction SilentlyContinue
+        $path | Should -Not -BeNullOrEmpty
+        Should -Invoke Unregister-OpResumeTask -Times 1 -Exactly
+        Test-Path (Join-Path $script:root 'programdata\temp') | Should -BeFalse
+        Test-Path (Join-Path $script:root 'programdata\resume.ps1') | Should -BeFalse
+        @(Get-ChildItem -Path (Join-Path $script:root 'programdata\logs') -Filter 'state_*.json').Count | Should -Be 1
+        "$warnings" | Should -Match 'mode Avion'
+    }
+
+    It 'termine la session même si la tâche ne peut être supprimée, sans rappel si le PC est en ligne' {
+        Mock Unregister-OpResumeTask { throw 'accès refusé' }
+        Mock Get-OpNetworkConnection { [pscustomobject]@{ Name = 'Réseau'; Connectivity = 'Internet' } }
+        Invoke-OpInstallStep -StepId 'def' -Root $script:root | Out-Null
+        Set-Content -LiteralPath (Join-Path $script:root 'programdata\resume.ps1') -Value 'x'
+        $path = Write-OpInstallReport -Root $script:root -WarningVariable warnings
+        $path | Should -Not -BeNullOrEmpty
+        Test-Path (Join-Path $script:root 'programdata\resume.ps1') | Should -BeFalse
+        Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -like '*accès refusé*' }
+        @($warnings).Count | Should -Be 0
+    }
+
+    It 'ne supprime rien avec -WhatIf' {
+        Invoke-OpInstallStep -StepId 'def' -Root $script:root | Out-Null
+        Set-Content -LiteralPath (Join-Path $script:root 'programdata\resume.ps1') -Value 'x'
+        Write-OpInstallReport -Root $script:root -WhatIf -WarningAction SilentlyContinue | Out-Null
+        Test-Path (Join-Path $script:root 'programdata\resume.ps1') | Should -BeTrue
+        Test-Path (Join-Path $script:root 'programdata\state.json') | Should -BeTrue
     }
 
     It 'écrit un rapport sans session en cours (aucune étape exécutée)' {

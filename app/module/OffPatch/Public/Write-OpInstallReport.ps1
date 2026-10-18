@@ -9,7 +9,9 @@
         exécutées, avec leur état), le relevé du PC après, l'état du réseau (hors ligne : rappel du mode Avion), la
         version de l'outil, la date du dépôt et les journaux de la session. Sans session en cours, le rapport décrit
         l'état du PC sans étape exécutée. Écrit le rapport par Save-OpReport, puis clôt la session : state.json est
-        archivé dans les journaux (Complete-OpSessionState).
+        archivé dans les journaux (Complete-OpSessionState), la tâche OffPatch-Reprise, resume.ps1 et le dossier temp
+        de ProgramData sont supprimés. PC hors ligne : avertissement à l'écran qui rappelle de désactiver le mode Avion
+        ou de rebrancher le réseau.
         Renvoie le chemin du rapport sur le support.
 
     .PARAMETER Root
@@ -66,6 +68,22 @@
         DepotDate    = $manifest.generatedAt
     }
     $path = Save-OpReport -Session $report -Configuration $configuration -Root $Root -WhatIf:$WhatIfPreference -Confirm:$false
-    if ($path -and $session) { [void](Complete-OpSessionState -WhatIf:$WhatIfPreference -Confirm:$false) }
+    if ($path -and $session) {
+        [void](Complete-OpSessionState -WhatIf:$WhatIfPreference -Confirm:$false)
+        # Nettoyage de ProgramData : un échec est journalisé sans empêcher la fin de session (rapport déjà écrit).
+        try { [void](Unregister-OpResumeTask -WhatIf:$WhatIfPreference -Confirm:$false) } catch { Write-OpLog "Tâche de reprise non supprimée : $($_.Exception.Message)" -Level WARN }
+        foreach ($name in 'ClientResume', 'ClientTemp') {
+            $target = Get-OpPath -Name $name
+            if (-not (Test-Path -LiteralPath $target)) { continue }
+            if (-not $PSCmdlet.ShouldProcess($target, 'Suppression en fin de session')) { continue }
+            try { Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction Stop; Write-OpLog "$target supprimé." }
+            catch { Write-OpLog "$target non supprimé : $($_.Exception.Message)" -Level WARN }
+        }
+    }
+    if ($offline) {
+        $reminder = 'PC hors ligne : désactiver le mode Avion ou rebrancher le réseau, pour que Windows et Defender se mettent à jour d''eux-mêmes.'
+        Write-OpLog $reminder
+        Write-Warning $reminder
+    }
     $path
 }
