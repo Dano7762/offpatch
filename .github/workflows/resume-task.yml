@@ -1,0 +1,31 @@
+# R-17 : création réelle de la tâche OffPatch-Reprise par le module sur un runner jetable, relecture, suppression.
+# Modifie le système du runner (tâche planifiée, ProgramData). Déclenchement manuel uniquement.
+name: resume-task
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  task:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Tâche de reprise
+        run: ./tests/runner/Invoke-ResumeTaskTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\resume-task-out"
+
+      - name: XML de la tâche et journal
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: resume-task
+          path: ${{ runner.temp }}/resume-task-out
+          retention-days: 30
+          if-no-files-found: warn

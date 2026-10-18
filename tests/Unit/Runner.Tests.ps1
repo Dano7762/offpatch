@@ -170,3 +170,13 @@ Describe 'Invoke-CliStepsTest.ps1' {
         (Get-FileHash -LiteralPath $queries).Hash | Should -Be $before.Hash
     }
 }
+
+Describe 'Invoke-ResumeTaskTest.ps1' {
+    BeforeEach { $savedFlag = $env:GITHUB_ACTIONS }
+    AfterEach { $env:GITHUB_ACTIONS = $savedFlag }
+
+    It 'refuse de s''exécuter hors d''un runner GitHub' {
+        $env:GITHUB_ACTIONS = 'false'
+        { & (Join-Path $runner 'Invoke-ResumeTaskTest.ps1') -OutputDirectory $TestDrive -WhatIf } | Should -Throw -ExpectedMessage '*runner GitHub*'
+    }
+}
