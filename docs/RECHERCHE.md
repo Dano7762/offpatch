@@ -704,6 +704,7 @@ Impact : mode automatique (phase 5), reprise après redémarrage.
   - Mesuré sur runner : tâche `Ready`, déclencheur `MSFT_TaskLogonTrigger` sur `runnervm…\runneradmin`, principal `Interactive` / `Highest`, `DisallowStartIfOnBatteries` et `StopIfGoingOnBatteries` à faux, action `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\ProgramData\OffPatch\resume.ps1"` ; une seconde création remplace la première (une seule tâche) ; suppression effective, seconde suppression sans effet.
 - Décision : `Register-OpResumeTask` (copie de `resume.ps1` dans ProgramData, puis tâche) et `Unregister-OpResumeTask`, conformes au cahier des charges 8.6 sans modification.
 - À valider sur intervention réelle : déclenchement effectif à l'ouverture de session après redémarrage (T1, T7), et élévation avec les identifiants d'un autre compte sur un PC client à compte standard.
+- Validé sur intervention réelle (2026-10-19, essai T7, VM Windows 10 22H2 de David, compte local `vboxuser` administrateur) : tâche créée avant le redémarrage, `resume.ps1` lancé à l'ouverture de session, élevé (relance de l'outil sans demande d'élévation), support débranché : attente de 90 s puis support trouvé sous `F:` au lieu de `E:` (même numéro de série D6715F54), reprise sans question, tâche et `resume.ps1` supprimés en fin de session. Reste à voir : élévation avec les identifiants d'un autre compte (PC à compte standard).
 
 ## R-19 Installation des .msu sur Windows 10
 

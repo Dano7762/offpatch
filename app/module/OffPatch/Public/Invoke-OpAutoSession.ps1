@@ -7,8 +7,8 @@
         Cahier des charges 8.6. Une seule validation au départ (confirmation, sauf -Confirm:$false à la reprise).
         Tant que le plan recalculé propose une étape Pending, elle est exécutée par Invoke-OpInstallStep (session
         en mode Auto). Une étape en erreur est retentée une fois, puis abandonnée (Invoke-OpInstallStep) ; la session
-        continue avec les suivantes. Dans un même appel, une étape réussie n'est pas relancée, même si le plan la
-        propose encore.
+        continue avec les suivantes. Une étape réussie dans la session n'est pas relancée, même si le plan la
+        propose encore (SSU jugée sur l'UBR après une cumulative annulée).
         Après une étape suivie d'un redémarrage (RebootAfter), Restart-OpSession crée la tâche de reprise, décompte et
         redémarre : la fonction renvoie Restarting, et resume.ps1 relancera la session à l'ouverture de session.
         Redémarrage annulé : Cancelled, l'état est conservé. Limite maxAutoReboots atteinte : la session s'arrête et
@@ -104,12 +104,13 @@
                     $attempts[$s.Id] = 2
                     $rolledBack += $s.Id
                 }
+                # Réussie plus tôt dans la session sans redémarrage, mais encore proposée (SSU jugée sur l'UBR, que la
+                # cumulative annulée n'a pas fait monter) : pas de nouvelle installation.
+                elseif ($previous -and $previous.State -eq 'UpToDate') { $succeeded[$s.Id] = $true }
             }
         }
-        if ($rolledBack.Count -gt 0) {
-            Save-OpSessionState -State $state -Confirm:$false
-            $pending = @($pending | Where-Object { $rolledBack -notcontains $_.Id })
-        }
+        if ($rolledBack.Count -gt 0) { Save-OpSessionState -State $state -Confirm:$false }
+        $pending = @($pending | Where-Object { $rolledBack -notcontains $_.Id -and -not $succeeded.ContainsKey($_.Id) })
         $next = $pending | Select-Object -First 1
         if (-not $next) { break }
         $attempts[$next.Id] = [int]$attempts[$next.Id] + 1

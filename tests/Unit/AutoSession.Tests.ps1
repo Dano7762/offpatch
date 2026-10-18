@@ -237,6 +237,22 @@ Describe 'Session automatique simulée de bout en bout' {
             Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'ERROR' -and $Message -like '*lcu*retour arrière*' }
         }
 
+        It 'T7 : SSU réussie mais encore proposée après la reprise (cumulative annulée) : pas réinstallée' {
+            $script:plan = @((Get-Row 'ssu' 'windows-ssu'), (Get-Row 'lcu' 'windows-lcu' $true), (Get-Row 'off' 'office-source'))
+            # Ni la SSU (jugée sur l'UBR) ni la cumulative annulée ne quittent l'état Pending.
+            Mock Install-OpWindowsPackage {
+                $r = [pscustomobject]@{ Id = $Item.id; Category = $Item.category; State = 'UpToDate'; Reason = 'ok'; ExitCode = 0 }
+                $r | Add-Member RebootRequired ($Item.id -eq 'lcu')
+                $r
+            }
+            (Invoke-OpAutoSession -Root $script:root -Confirm:$false).Result | Should -Be 'Restarting'
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false -WarningAction SilentlyContinue
+            $r.Result | Should -Be 'Completed'
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('off')
+            Should -Invoke Install-OpWindowsPackage -Times 1 -Exactly -ParameterFilter { $Item.id -eq 'ssu' }
+            Should -Invoke Install-OpWindowsPackage -Times 1 -Exactly -ParameterFilter { $Item.id -eq 'lcu' }
+        }
+
         It 'ne fait rien avec -WhatIf' {
             Invoke-OpAutoSession -Root $script:root -WhatIf | Should -BeNullOrEmpty
             Should -Invoke Install-OpDefenderUpdate -Times 0 -Exactly
