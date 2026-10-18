@@ -14,7 +14,8 @@
         jamais lancé ;
       - Report : rapport d'intervention de la session (étapes exécutées et plan du moment), puis fin de session ;
       - Auto : session automatique (plan affiché, une confirmation, étapes, redémarrages avec reprise, rapport) ;
-        -Resume : reprise après redémarrage, sans confirmation (relancée par resume.ps1 via OffPatch.ps1).
+        -Resume : reprise après redémarrage, sans confirmation (relancée par resume.ps1 via OffPatch.ps1) ;
+        -ForceWindows : Windows 10 sans ESU actif, étapes Windows exécutées quand même (sinon ignorées).
     OffPatch installe uniquement des mises à jour : aucun paramètre de clé de produit, de profil ou de retrait
     (cahier des charges 2, 3.3).
     Codes de sortie : 0 réussite, 1 erreur (configuration invalide, étape refusée ou en échec).
@@ -40,7 +41,8 @@ param(
     [Parameter(Mandatory)][ValidateSet('DepotUpdate', 'Plan', 'InstallStep', 'Report', 'Auto')][string]$Action,
     [switch]$ListOnly,
     [string]$StepId,
-    [switch]$Resume
+    [switch]$Resume,
+    [switch]$ForceWindows
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -121,7 +123,7 @@ switch ($Action) {
             $onTick = { param($left) Write-Host "Redémarrage dans $left s (Ctrl+C pour interrompre)" }
             $confirm = @{}
             if ($Resume) { $confirm.Confirm = $false }
-            $result = Invoke-OpAutoSession -Root $context.Root -OnStep $onStep -OnTick $onTick -WhatIf:$WhatIfPreference @confirm
+            $result = Invoke-OpAutoSession -Root $context.Root -OnStep $onStep -OnTick $onTick -ForceWindows:$ForceWindows -WhatIf:$WhatIfPreference @confirm
         } catch {
             Write-Host "OffPatch : $($_.Exception.Message)"
             exit 1

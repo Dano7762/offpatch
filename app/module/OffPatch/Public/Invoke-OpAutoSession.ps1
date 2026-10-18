@@ -14,6 +14,8 @@
         Redémarrage annulé : Cancelled, l'état est conservé. Limite maxAutoReboots atteinte : la session s'arrête et
         se termine par le rapport.
         Plus d'étape à faire : rapport et fin de session (Write-OpInstallReport), Completed.
+        Windows 10 sans ESU actif (contrôle préalable SkipWindowsInAuto) : les étapes Windows (catégories windows-*)
+        sont ignorées et signalées au journal, sauf -ForceWindows.
         Une session manuelle en cours (CLI) est refusée : la terminer d'abord par son rapport.
         Renvoie Result (Restarting, Cancelled ou Completed), ReportPath et Steps (résultats de cet appel).
 
@@ -22,6 +24,10 @@
 
     .PARAMETER CountdownSeconds
         Durée du compte à rebours avant redémarrage ; par défaut client.rebootCountdownSeconds de settings.json.
+
+    .PARAMETER ForceWindows
+        Windows 10 sans ESU actif ou détectable : exécute quand même les étapes Windows (forçage du récapitulatif,
+        R-04). Sans ce paramètre, elles sont ignorées et signalées au journal.
 
     .PARAMETER OnStep
         Bloc appelé avant chaque étape avec la ligne du plan, puis après avec son résultat (affichage).
@@ -43,6 +49,7 @@
     param(
         [string]$Root,
         [ValidateRange(-1, 3600)][int]$CountdownSeconds = -1,
+        [switch]$ForceWindows,
         [scriptblock]$OnStep,
         [scriptblock]$OnTick,
         [scriptblock]$IsCancelled
@@ -52,8 +59,13 @@
     $session = Read-OpSessionState
     if ($session -and $session.mode -ne 'Auto') { throw 'Session manuelle en cours : la terminer par son rapport (CLI, -Action Report) avant le mode automatique.' }
     $info = Get-OpSystemInfo -Root $Root
-    $blocking = @(Test-OpPreflight -Root $Root -SystemInfo $info | Where-Object { $_.Result -eq 'Blocking' })
+    $checks = @(Test-OpPreflight -Root $Root -SystemInfo $info)
+    $blocking = @($checks | Where-Object { $_.Result -eq 'Blocking' })
     if ($blocking.Count -gt 0) { throw "Session automatique refusée, contrôle préalable bloquant : $(($blocking | ForEach-Object { "$($_.Label) : $($_.Message)" }) -join ' ; ')" }
+    # Windows 10 sans ESU actif (R-04) : étapes Windows ignorées en mode auto, sauf forçage au récapitulatif. Le
+    # forçage est gardé dans state.json (forceWindows) : la reprise après redémarrage se fait sans paramètre.
+    if ($session -and $session.PSObject.Properties['forceWindows'] -and $session.forceWindows) { $ForceWindows = [switch]$true }
+    $skipWindows = -not $ForceWindows -and @($checks | Where-Object { $_.Action -eq 'SkipWindowsInAuto' }).Count -gt 0
     $verb = 'Démarrage'
     if ($session) { $verb = 'Reprise' }
     if (-not $PSCmdlet.ShouldProcess($env:COMPUTERNAME, "$verb de la session automatique")) { return }
@@ -65,7 +77,15 @@
     $restart = $null
     while ($true) {
         $plan = @(Get-OpInstallPlan -Root $Root -SystemInfo (Get-OpSystemInfo -Root $Root))
-        $next = @($plan | Where-Object { $_.State -eq 'Pending' -and -not $succeeded.ContainsKey($_.Id) -and [int]$attempts[$_.Id] -lt 2 }) | Select-Object -First 1
+        $pending = @($plan | Where-Object { $_.State -eq 'Pending' -and -not $succeeded.ContainsKey($_.Id) -and [int]$attempts[$_.Id] -lt 2 })
+        if ($skipWindows) {
+            foreach ($s in @($pending | Where-Object { $_.Category -like 'windows-*' })) {
+                Write-OpLog "Étape $($s.Id) ignorée : ESU absent ou indétectable, étape Windows non forcée en mode auto." -Level WARN
+                $attempts[$s.Id] = 2
+            }
+            $pending = @($pending | Where-Object { $_.Category -notlike 'windows-*' })
+        }
+        $next = $pending | Select-Object -First 1
         if (-not $next) { break }
         $attempts[$next.Id] = [int]$attempts[$next.Id] + 1
         if ($OnStep) { & $OnStep $next }
@@ -78,6 +98,13 @@
             continue
         }
         $results += $result
+        if ($ForceWindows) {
+            $state = Read-OpSessionState
+            if (-not $state.PSObject.Properties['forceWindows']) {
+                $state | Add-Member -NotePropertyName forceWindows -NotePropertyValue $true
+                Save-OpSessionState -State $state -Confirm:$false
+            }
+        }
         if ($OnStep) { & $OnStep $result }
         if ($result.State -eq 'Error') { continue }
         $succeeded[$next.Id] = $true

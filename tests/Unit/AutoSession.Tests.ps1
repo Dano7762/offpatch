@@ -47,7 +47,7 @@ Describe 'Session automatique simulée de bout en bout' {
         Mock Get-OpSystemInfo {
             [pscustomobject]@{ ComputerName = 'PC-AUTO'; SerialNumber = 'SN9'; Caption = 'Windows 11'; EditionId = 'Core'; DisplayVersion = '25H2'; CurrentBuild = '26200'; Ubr = 9457; Office = $null }
         }
-        Mock Test-OpPreflight { [pscustomobject]@{ Label = 'Espace libre'; Result = 'Ok'; Message = 'ok' } }
+        Mock Test-OpPreflight { [pscustomobject]@{ Label = 'Espace libre'; Result = 'Ok'; Message = 'ok'; Action = $null } }
         $script:plan = @((Get-Row 'def' 'defender'), (Get-Row 'lcu' 'windows-lcu' $true), (Get-Row 'dot' 'dotnet' $true), (Get-Row 'off' 'office-source'))
         # Plan recalculé : une étape installée passe à UpToDate.
         $script:installed = @{}
@@ -192,9 +192,30 @@ Describe 'Session automatique simulée de bout en bout' {
         ) {
             param($Manual, $Blocking, $Pattern)
             if ($Manual) { Invoke-OpInstallStep -StepId 'def' -Root $script:root | Out-Null }
-            if ($Blocking) { Mock Test-OpPreflight { [pscustomobject]@{ Label = 'Droits'; Result = 'Blocking'; Message = 'non élevé' } } }
+            if ($Blocking) { Mock Test-OpPreflight { [pscustomobject]@{ Label = 'Droits'; Result = 'Blocking'; Message = 'non élevé'; Action = $null } } }
             { Invoke-OpAutoSession -Root $script:root -Confirm:$false } | Should -Throw $Pattern
             Should -Invoke Install-OpWindowsPackage -Times 0 -Exactly
+        }
+
+        It 'Windows 10 sans ESU : étapes Windows ignorées et signalées, les autres exécutées' {
+            Mock Test-OpPreflight { [pscustomobject]@{ Label = 'ESU Windows 10'; Result = 'Warning'; Message = 'ESU absent'; Action = 'SkipWindowsInAuto' } }
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false
+            $r.Result | Should -Be 'Restarting'
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('def', 'dot')
+            Should -Invoke Install-OpWindowsPackage -Times 1 -Exactly -ParameterFilter { $Item.id -eq 'dot' }
+            Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -like '*lcu ignorée*ESU*' }
+        }
+
+        It 'Windows 10 sans ESU avec -ForceWindows : étapes Windows exécutées, forçage gardé à la reprise' {
+            Mock Test-OpPreflight { [pscustomobject]@{ Label = 'ESU Windows 10'; Result = 'Warning'; Message = 'ESU absent'; Action = 'SkipWindowsInAuto' } }
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false -ForceWindows
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('def', 'lcu')
+            (Read-OpSessionState).forceWindows | Should -BeTrue
+            $script:plan += Get-Row 'ssu' 'windows-ssu'
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('dot')
+            $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false -WarningAction SilentlyContinue
+            @($r.Steps | ForEach-Object { $_.Id }) | Should -Be @('off', 'ssu')
         }
 
         It 'ne fait rien avec -WhatIf' {
