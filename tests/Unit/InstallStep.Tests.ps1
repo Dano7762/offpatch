@@ -89,6 +89,28 @@ Describe 'Invoke-OpInstallStep et Write-OpInstallReport' {
         Test-Path (Join-Path $script:root 'programdata\state.json.tmp') | Should -BeFalse
     }
 
+    It 'abandonne une étape au deuxième échec et refuse toute nouvelle tentative (8.6)' {
+        $first = Invoke-OpInstallStep -StepId 'off' -Root $script:root
+        $first.Failures | Should -Be 1
+        $first.Abandoned | Should -BeFalse
+        $second = Invoke-OpInstallStep -StepId 'off' -Root $script:root
+        $second.Failures | Should -Be 2
+        $second.Abandoned | Should -BeTrue
+        $second.Reason | Should -Match 'abandonnée après deux échecs'
+        Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -match 'off' } -Times 1 -Exactly
+        { Invoke-OpInstallStep -StepId 'off' -Root $script:root } | Should -Throw '*abandonnée après deux échecs*'
+        Should -Invoke Install-OpOfficeUpdate -Times 2 -Exactly
+        $session = Get-Content -LiteralPath (Join-Path $script:root 'programdata\state.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+        @($session.steps).Count | Should -Be 1
+        $session.steps[0].Abandoned | Should -BeTrue
+        # Les autres étapes restent possibles.
+        (Invoke-OpInstallStep -StepId 'def' -Root $script:root).State | Should -Be 'UpToDate'
+    }
+
+    It 'ne compte pas une réussite comme un échec' {
+        (Invoke-OpInstallStep -StepId 'def' -Root $script:root).Failures | Should -Be 0
+    }
+
     It 'respecte -WhatIf' {
         Invoke-OpInstallStep -StepId 'def' -Root $script:root -WhatIf | Should -BeNullOrEmpty
         Should -Invoke Install-OpDefenderUpdate -Times 0 -Exactly
