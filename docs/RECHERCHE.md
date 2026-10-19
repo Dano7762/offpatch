@@ -79,7 +79,15 @@ Question : sur une installation récente de Windows 11 24H2, 25H2 ou 26H2, quell
 
 Impact : catégorie `windows-checkpoint`, ordre du plan, champ `prerequisites` du manifeste.
 
-- Statut : Ouvert, non bloquant pour la phase 1 (bilan de phase 0, 2026-10-06). Condition de déblocage : relancer `r02-arm64.yml` après le Patch Tuesday du 13 octobre 2026, avec la cumulative d'octobre, sur l'image du runner encore en 9457 ou 9550 (installation réelle de la cible et de ses checkpoints, sans préversion), puis noter les codes et l'état DISM. Documentation dépouillée, essai sur runner GitHub : `docs/essais/R-02-checkpoint.md`.
+- Statut : Vérifié sur runner le 2026-10-19 (installation réelle de la cumulative d'octobre, voir « Installation réelle » plus bas). Restent à constater sur intervention réelle, sans runner possible : build après redémarrage et nombre de redémarrages (T1, T2), et le cas d'une checkpoint absente (support 24H2 antérieur à 26100.1742). Documentation dépouillée, essai sur runner GitHub : `docs/essais/R-02-checkpoint.md`.
+- Installation réelle (2026-10-19), runner `windows-11-arm`, workflow `r02-arm64`, cible KB5127648 (2026-10, 26200.9711) : https://github.com/Dano7762/offpatch/actions/runs/39214182133
+  - Départ : Windows 11 Entreprise 25H2 ARM64, 26200.9457, aucun redémarrage en attente, 123 Go libres. Entrée du catalogue : `2026-10 Cumulative Update for Windows 11, version 25H2 for arm64-based Systems (KB5127648) (26200.9711)`, deux fichiers (cible 4 533 656 052 octets, checkpoint KB5043080 610 638 429 octets), SHA-1 conformes, Authenticode `Valid`, un seul domaine.
+  - Méthode 1, chaque .msu seul dans son dossier, `DISM /Online /Add-Package /NoRestart` : checkpoint déjà présente (UBR 9457 ≥ 1742) **code 0**, 12 s, pas de redémarrage en attente ; cible **code 3010**, 875 s (14 min 35 s), redémarrage en attente. La méthode séquentielle retenue fonctionne.
+  - Seconde passe sur les mêmes fichiers, redémarrage toujours en attente : checkpoint code 0 (15 s), cible de nouveau **3010** (122 s), pas 0 : une cumulative en attente de redémarrage, réappliquée, renvoie 3010 comme une première installation. Confirme qu'il faut juger par la liste DISM et l'UBR, jamais par le code (8.4, R-14).
+  - Liste DISM après : `Package_for_RollupFix~…~arm64~~26100.9711.1.30` **Install Pending**, l'ancienne `26100.9457.1.0` **Uninstall Pending**, la checkpoint `26100.1742.1.10` toujours **Staged**. Nom de paquet en 26100 sur une 25H2, comme relevé le 2026-10-04. UBR inchangé (9457) sans redémarrage.
+  - `Get-HotFix` après : KB5127648 et KB5127647 (non demandé, apporté par le .msu, nature non vérifiée), pas KB5043080 ni KB5129195.
+  - Espace disque (R-12) : pic consommé par DISM 12,13 Go, net 7,15 Go, en plus des 4,8 Go téléchargés.
+  - Décision : la décision provisoire ci-dessous est confirmée (méthode 1, détection par l'UBR, liste DISM pour le diagnostic). Aucun changement de code.
 - Sources (consultées le 2026-10-04) :
   - https://learn.microsoft.com/en-us/windows/deployment/update/catalog-checkpoint-cumulative-updates (« Checkpoint cumulative updates and Microsoft Update Catalog usage », mise à jour du 2025-01-31).
   - https://support.microsoft.com/help/5129195 (KB5129195), section « Microsoft Update Catalog » : tableau « Required checkpoint cumulative update » / « Target cumulative update », méthodes 1 et 2.

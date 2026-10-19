@@ -66,9 +66,17 @@ Describe 'OffPatch-Cli.ps1' {
         @(Get-ChildItem -Path (Join-Path $tool 'ProgramData\OffPatch\logs') -Filter '*.html').Count | Should -Be 1
     }
 
-    It 'Auto -Resume sans étape à faire (dépôt vide) termine par le rapport (code 0)' {
+    # Le contrôle préalable exige l'élévation : la CI tourne en administrateur, un terminal de développement souvent non.
+    It 'Auto -Resume sans étape à faire (dépôt vide) termine par le rapport (code 0), ou refuse sans élévation (code 1)' {
         $tool = Get-ToolCopy
         $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'Auto', '-Resume')
+        $principal = New-Object Security.Principal.WindowsPrincipal ([Security.Principal.WindowsIdentity]::GetCurrent())
+        if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            $r.ExitCode | Should -Be 1 -Because $r.Output
+            $r.Output | Should -Match 'Droits administrateur'
+            @(Get-ChildItem -Path (Join-Path $tool 'rapports') -Filter '*.html' -ErrorAction SilentlyContinue).Count | Should -Be 0
+            return
+        }
         $r.ExitCode | Should -Be 0 -Because $r.Output
         $r.Output | Should -Match 'Session automatique : Completed'
         @(Get-ChildItem -Path (Join-Path $tool 'rapports') -Filter '*.html').Count | Should -Be 1
