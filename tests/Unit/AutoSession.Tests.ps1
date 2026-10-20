@@ -161,6 +161,13 @@ Describe 'Session automatique simulée de bout en bout' {
             $steps.Count | Should -Be 6
         }
 
+        It 'cumulative abandonnée : le plan est recalculé sans elle (essai T2 du 20 octobre, enablement package)' {
+            Mock Install-OpWindowsPackage { [pscustomobject]@{ Id = $Item.id; Category = $Item.category; State = 'Error'; Reason = 'SHA-256 différent'; ExitCode = $null } }
+            Invoke-OpAutoSession -Root $script:root -Confirm:$false -WarningAction SilentlyContinue | Out-Null
+            Should -Invoke Install-OpWindowsPackage -Times 2 -Exactly -ParameterFilter { $Item.id -eq 'lcu' }
+            Should -Invoke Get-OpInstallPlan -ParameterFilter { $ExcludeId -contains 'lcu' }
+        }
+
         It 'limite de redémarrages atteinte : s''arrête et termine par le rapport' {
             $script:maxReboots = 0
             $r = Invoke-OpAutoSession -Root $script:root -Confirm:$false -WarningAction SilentlyContinue

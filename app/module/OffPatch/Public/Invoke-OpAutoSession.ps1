@@ -79,7 +79,10 @@
     $attempts = @{}
     $restart = $null
     while ($true) {
-        $plan = @(Get-OpInstallPlan -Root $Root -SystemInfo (Get-OpSystemInfo -Root $Root))
+        # Étapes qui ne seront plus tentées : elles ne remplissent plus aucun prérequis (enablement package après une
+        # cumulative abandonnée).
+        $excluded = @($attempts.Keys | Where-Object { [int]$attempts[$_] -ge 2 })
+        $plan = @(Get-OpInstallPlan -Root $Root -SystemInfo (Get-OpSystemInfo -Root $Root) -ExcludeId $excluded)
         $pending = @($plan | Where-Object { $_.State -eq 'Pending' -and -not $succeeded.ContainsKey($_.Id) -and [int]$attempts[$_.Id] -lt 2 })
         if ($skipWindows) {
             # .NET aussi : sans ESU, sa cumulative s'installe puis est écartée au redémarrage sans erreur (R-19).
@@ -109,7 +112,10 @@
                 elseif ($previous -and $previous.State -eq 'UpToDate') { $succeeded[$s.Id] = $true }
             }
         }
-        if ($rolledBack.Count -gt 0) { Save-OpSessionState -State $state -Confirm:$false }
+        if ($rolledBack.Count -gt 0) {
+            Save-OpSessionState -State $state -Confirm:$false
+            continue
+        }
         $pending = @($pending | Where-Object { $rolledBack -notcontains $_.Id -and -not $succeeded.ContainsKey($_.Id) })
         $next = $pending | Select-Object -First 1
         if (-not $next) { break }

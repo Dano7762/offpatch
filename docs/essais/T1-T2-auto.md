@@ -13,6 +13,8 @@ Le dépôt du 18 octobre convient : cumulative `KB5127648` (26100.9711, builds 2
 
 Support : une clé USB NTFS ou un second disque virtuel NTFS, avec à la racine une copie de l'outil depuis la dernière version du dépôt git : `app\`, `config\`, `tools\`, `depot\`, `offpatch.root`, `Lancer-OffPatch.cmd`. Dans la suite, `E:` désigne sa lettre dans la VM.
 
+Copier **tout** `depot\` : la clé du 19 octobre n'avait que 9 des 18 dossiers de `depot\files\` et aucune source Office, d'où .NET 26H2 « Absent du dépôt » après le passage en 26H2. Le 20 octobre, deux fichiers sains sur la clé (SHA-256 conformes relus depuis le poste) ont donné dans la VM des SHA-256 faux, et différents d'une lecture à l'autre : la lecture de la clé dans la VM (passage USB de VirtualBox, probablement) n'est pas fiable sur plusieurs gigaoctets. Pour ces essais, préférer un second disque virtuel (VDI) au passage USB ; la clé ne reste nécessaire que pour T7, déjà fait.
+
 ## 2. Préparer les VM
 
 ### VM T1
@@ -75,7 +77,7 @@ Attendu pour T2 (build 26100) :
 
 - Defender comme T1 ; checkpoint « UpToDate » si l'ISO est en 26100.1742 ou plus, sinon « Pending » avant la cumulative ;
 - cumulative « Pending », `RebootAfter` vrai ;
-- enablement package `win11-x64-ekb-26H2` « SkippedPrerequisite » (UBR sous 9550 tant que la cumulative n'est pas passée) : c'est normal, le plan est recalculé après le redémarrage ;
+- enablement package `win11-x64-ekb-26H2` « Pending », `RebootAfter` vrai : son prérequis (UBR ≥ 9550) est comparé à l'UBR projeté après la cumulative prévue (9711) ; le redémarrage de la cumulative passe avant lui, et le plan recalculé à la reprise le ferait passer en « SkippedPrerequisite » si la cumulative n'avait pas pris ;
 - .NET `KB5127690` « Pending » ou « UpToDate » ;
 - Office `office-current-16.0.20430.20182` « Pending », dernière étape.
 
@@ -87,7 +89,7 @@ Double-clic sur `E:\Lancer-OffPatch.cmd`, accepter l'élévation. Le plan s'affi
 
 Déroulé attendu pour T1 : Defender (plateforme puis définitions), cumulative, **redémarrage 1/5**, .NET si « Pending », rapport.
 
-Déroulé attendu pour T2 : Defender, checkpoint si besoin, cumulative, **redémarrage 1/5** ; à la reprise, plan recalculé : enablement package « Pending » (UBR 9711), installé, **redémarrage 2/5** ; à la reprise, build 26300 : .NET `KB5127694` à la place de `KB5127690` si nécessaire, puis Office (`setup.exe /configure` depuis `E:\depot\office\current`, jusqu'à 30 min), rapport.
+Déroulé attendu pour T2 : Defender, checkpoint si besoin, cumulative, **redémarrage 1/5** ; à la reprise, plan recalculé : enablement package toujours « Pending » (UBR réel 9711), installé, **redémarrage 2/5** ; à la reprise, build 26300 : .NET `KB5127694` à la place de `KB5127690` si nécessaire, puis Office (`setup.exe /configure` depuis `E:\depot\office\current`, jusqu'à 30 min), rapport.
 
 Si une étape est abandonnée après deux échecs, la session continue jusqu'au rapport : ne relance rien, garde l'état de la VM et envoie-moi la console et les journaux (section 6).
 
@@ -95,7 +97,7 @@ Si une étape est abandonnée après deux échecs, la session continue jusqu'au 
 
 Pour les deux VM :
 
-- rapport `E:\rapports\AAAA-MM-JJ_<NomPC>_<Série>.html` : aucune étape en erreur, Windows avant et après (T1 : UBR 9711 ; T2 : build 26300.9711), versions Defender, redémarrages comptés (T1 : 1 ; T2 : 2), rappel hors ligne ;
+- rapport `E:\rapports\AAAA-MM-JJ_<NomPC>_<Série>.html` : aucune étape en erreur, Windows avant et après (T1 : UBR 9711 ; T2 : build 26300.9711), versions Defender, rappel hors ligne ; le nombre de redémarrages n'est pas dans le rapport (cahier des charges 8.8) mais dans l'archive `C:\ProgramData\OffPatch\logs\state_*.json`, champ `rebootCount` (T1 : 1 ; T2 : 2) ;
 - `C:\ProgramData\OffPatch\` : plus de `state.json`, de `resume.ps1` ni de `temp\` ; `logs\` contient le journal de session, l'archive `state_*.json`, `resume_*.log` et la copie du rapport ;
 - `Get-ScheduledTask -TaskName OffPatch-Reprise` : erreur « aucune tâche » (attendu) ;
 - `winver` : 26H2, build 26300.9711.

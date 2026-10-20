@@ -101,6 +101,21 @@ Describe 'Get-OpInstallPlan : prérequis et UBR projeté' {
         (Get-StepOf $plan 'net').State | Should -Be 'Pending'
     }
 
+    It 'cumulative abandonnée dans la session (ExcludeId) : ni UBR projeté ni prérequis rempli (essai T2, 20 octobre)' {
+        $steps = @(
+            ConvertTo-TestStep 'cp' 'windows-checkpoint' 19 -Fields $cp
+            ConvertTo-TestStep 'lcu' 'windows-lcu' 20 -Fields $lcu
+            ConvertTo-TestStep 'ekb' 'windows-ekb' 30 -Fields $ekb
+        )
+        $script:testItems = @($steps | ForEach-Object { $_.Item })
+        Mock Read-OpManifest { [pscustomobject]@{ schemaVersion = 1; generatedAt = '2026-10-14T00:00:00Z'; items = $script:testItems } }
+        $info = [pscustomobject]@{ Target = 'win11-x64'; CurrentBuild = 26200; Ubr = 1000; Office = $null }
+        $plan = @(Get-OpInstallPlan -Root $tool -SystemInfo $info -UpdateState @($steps | ForEach-Object { $_.State }) -ExcludeId 'cp', 'lcu')
+        (Get-StepOf $plan 'lcu').State | Should -Be 'SkippedPrerequisite'
+        (Get-StepOf $plan 'ekb').State | Should -Be 'SkippedPrerequisite'
+        (Get-StepOf $plan 'ekb').Reason | Should -Match '1000.*9550'
+    }
+
     It 'prérequis à installer plus tôt dans le plan : rempli' {
         $plan = Get-TestPlan @(
             ConvertTo-TestStep 'cp' 'windows-checkpoint' 19 -Fields $cp

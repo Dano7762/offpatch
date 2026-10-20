@@ -31,6 +31,11 @@
     .PARAMETER UpdateState
         États de Get-OpUpdateState déjà calculés ; recalculés sinon.
 
+    .PARAMETER ExcludeId
+        Étapes qui ne seront plus tentées (abandonnées ou annulées dans la session) : même encore à installer, elles
+        ne remplissent aucun prérequis et ne font pas monter l'UBR projeté. Sans cela, un enablement package serait
+        lancé après une cumulative abandonnée, et annulé par Windows au redémarrage.
+
     .EXAMPLE
         Get-OpInstallPlan | Format-Table Sequence, Category, Id, State, RebootAfter, Reason -AutoSize
     #>
@@ -39,7 +44,8 @@
     param(
         [string]$Root,
         [pscustomobject]$SystemInfo,
-        [object[]]$UpdateState
+        [object[]]$UpdateState,
+        [string[]]$ExcludeId = @()
     )
 
     if (-not $Root) { $Root = Get-OpRoot }
@@ -126,12 +132,12 @@
                 $step.State = 'SkippedPrerequisite'
                 $step.Reason = "Ignorée : $why."
             }
-            elseif (@('windows-checkpoint', 'windows-lcu') -contains $step.Category) {
+            elseif (@('windows-checkpoint', 'windows-lcu') -contains $step.Category -and $ExcludeId -notcontains $step.Id) {
                 $resulting = Get-Prop $step.Item 'resultingUbr'
                 if ($null -ne $resulting -and [int]$resulting -gt $projectedUbr) { $projectedUbr = [int]$resulting }
             }
         }
-        if ($step.Id) { $done[$step.Id] = $true }
+        if ($step.Id -and $ExcludeId -notcontains $step.Id) { $done[$step.Id] = $true }
     }
 
     # Points de redémarrage.
