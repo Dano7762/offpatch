@@ -8,7 +8,7 @@ BeforeAll {
     Set-StrictMode -Version Latest
     $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $private = 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Get-OpRoot', 'Get-OpPath', 'Get-OpConfiguration', 'Read-OpManifest', 'Get-OpNetworkConnection',
-    'New-OpRestorePoint', 'Install-OpDefenderUpdate', 'Install-OpWindowsPackage', 'Install-OpOfficeUpdate', 'ConvertTo-OpReportHtml', 'Save-OpReport',
+    'New-OpRestorePoint', 'Install-OpDefenderUpdate', 'Install-OpWindowsPackage', 'Install-OpOfficeUpdate', 'ConvertTo-OpReportHtml', 'ConvertTo-OpStateLabel', 'Save-OpReport',
     'Get-OpSupportIdentity', 'Get-OpInitialSessionState', 'Read-OpSessionState', 'Save-OpSessionState', 'Complete-OpSessionState', 'Unregister-OpResumeTask',
     'Get-OpPendingReboot', 'Suspend-OpSystemSleep', 'Resume-OpSystemSleep'
     foreach ($name in $private) { . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1") }

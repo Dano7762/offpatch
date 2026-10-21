@@ -19,7 +19,7 @@
             redémarrage (R-02). Le .NET qui renvoie 3010 est traité par l'exécuteur.
         Seules les étapes à l'état Pending sont à exécuter ; les autres lignes restent dans le plan pour le rapport.
         L'état réel est revérifié avant chaque étape par l'exécuteur, pas ici.
-        Renvoie Sequence, Id, Category, State, Reason, Installed, Available, RequiresReboot, RebootAfter,
+        Renvoie Sequence, Id, Category, State, StateLabel (libellé français), Reason, Installed, Available, RequiresReboot, RebootAfter,
         Prerequisites et RunsAfter (identifiants résolus).
 
     .PARAMETER Root
@@ -154,7 +154,7 @@
     foreach ($step in $placed) {
         $sequence++
         [pscustomobject]@{
-            Sequence = $sequence; Id = $step.Id; Category = $step.Category; State = $step.State; Reason = $step.Reason
+            Sequence = $sequence; Id = $step.Id; Category = $step.Category; State = $step.State; StateLabel = ConvertTo-OpStateLabel $step.State; Reason = $step.Reason
             Installed = $step.Installed; Available = $step.Available; RequiresReboot = $step.RequiresReboot; RebootAfter = $step.RebootAfter
             Prerequisites = $step.Prerequisites; RunsAfter = $step.RunsAfter
         }

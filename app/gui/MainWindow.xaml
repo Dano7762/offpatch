@@ -35,7 +35,81 @@
 
         <TabControl x:Name="MainTabs" Margin="8">
             <TabItem x:Name="TabPc" Header="Ce PC">
-                <Grid x:Name="PcRoot" Margin="8" />
+                <Grid x:Name="PcRoot" Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" MinHeight="140" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Bandeau système. -->
+                    <StackPanel Grid.Row="0" Margin="0,0,0,8">
+                        <TextBlock x:Name="PcSystemTitle" FontSize="15" FontWeight="SemiBold" Text="Relevé du PC en cours…" TextWrapping="Wrap" />
+                        <TextBlock x:Name="PcSystemDetail" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+                    </StackPanel>
+
+                    <!-- Contrôles préalables qui ne sont pas Ok. -->
+                    <Border x:Name="PcChecks" Grid.Row="1" Visibility="Collapsed" Padding="8,4" Margin="0,0,0,8" CornerRadius="3" Background="#FFF4CE">
+                        <TextBlock x:Name="PcChecksText" TextWrapping="Wrap" Foreground="#5C4400" />
+                    </Border>
+
+                    <!-- Redémarrage nécessaire. -->
+                    <Border x:Name="PcRebootBanner" Grid.Row="2" Visibility="Collapsed" Padding="8,4" Margin="0,0,0,8" CornerRadius="3" Background="#DEECF9">
+                        <DockPanel>
+                            <Button x:Name="BtnRestart" DockPanel.Dock="Right" Content="Redémarrer maintenant" Padding="12,3" />
+                            <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Text="Un redémarrage est en attente sur ce PC : redémarrer avant d'installer d'autres mises à jour." />
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Étapes du plan ; case à cocher pour le mode manuel. -->
+                    <DataGrid x:Name="PcSteps" Grid.Row="3" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                              CanUserReorderColumns="False" CanUserSortColumns="False" HeadersVisibility="Column" SelectionMode="Single"
+                              GridLinesVisibility="Horizontal" IsReadOnly="False">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="" Width="32">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding Pending}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Étape" Binding="{Binding CategoryLabel}" IsReadOnly="True" Width="Auto" />
+                            <DataGridTextColumn Header="Détail" Binding="{Binding Detail}" IsReadOnly="True" Width="Auto" />
+                            <DataGridTextColumn Header="État" Binding="{Binding StateLabel}" IsReadOnly="True" Width="Auto" />
+                            <DataGridTextColumn Header="Motif" Binding="{Binding Reason}" IsReadOnly="True" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Office (lecture seule). -->
+                    <TextBlock x:Name="PcOfficeText" Grid.Row="4" Margin="0,8,0,0" TextWrapping="Wrap" />
+
+                    <!-- Boutons. -->
+                    <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button x:Name="BtnAuto" Content="Installation automatique" Padding="14,4" Margin="0,0,8,0" IsEnabled="False" />
+                        <Button x:Name="BtnInstallSelection" Content="Installer la sélection" Padding="14,4" Margin="0,0,8,0" IsEnabled="False" />
+                        <Button x:Name="BtnResume" Content="Reprendre la session interrompue" Padding="14,4" Visibility="Collapsed" />
+                    </StackPanel>
+
+                    <!-- Avancement et dernières lignes du journal. -->
+                    <StackPanel Grid.Row="6" Margin="0,10,0,0">
+                        <DockPanel>
+                            <TextBlock x:Name="PcCurrentStep" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ProgressBar x:Name="PcProgress" Height="14" Minimum="0" Maximum="1" Value="0" />
+                        </DockPanel>
+                        <ListBox x:Name="PcLastLog" Height="110" Margin="0,6,0,0" FontFamily="Consolas" FontSize="12" />
+                    </StackPanel>
+                </Grid>
             </TabItem>
             <TabItem x:Name="TabDepot" Header="Dépôt">
                 <Grid x:Name="DepotRoot" Margin="8" />

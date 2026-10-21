@@ -141,7 +141,8 @@ function Register-OpBackgroundPump {
         DispatcherTimer du Dispatcher du thread appelant (celui de la fenêtre) : à chaque intervalle,
         Receive-OpBackgroundTask ; OnMessage reçoit chaque message (Time, Level, Message, Line pour une ligne de
         journal), OnCompleted le résultat final (Output, Errors, Error, Cancelled), puis le minuteur s'arrête.
-        Les deux blocs tournent sur le thread de l'interface : ils peuvent modifier les contrôles directement.
+        Les deux blocs reçoivent Context en second argument (fenêtre, état) plutôt qu'une fermeture, qui les
+        isolerait des fonctions du script. Ils tournent sur le thread de l'interface : ils peuvent modifier les contrôles directement.
         Renvoie le minuteur.
 
     .PARAMETER Task
@@ -152,6 +153,9 @@ function Register-OpBackgroundPump {
 
     .PARAMETER OnCompleted
         Bloc appelé une fois, avec le résultat final.
+
+    .PARAMETER Context
+        Objet transmis en second argument aux deux blocs (par exemple la fenêtre).
 
     .PARAMETER IntervalMilliseconds
         Intervalle de relève (200 ms par défaut).
@@ -165,6 +169,7 @@ function Register-OpBackgroundPump {
         [Parameter(Mandatory)][pscustomobject]$Task,
         [scriptblock]$OnMessage,
         [scriptblock]$OnCompleted,
+        [object]$Context,
         [ValidateRange(20, 5000)][int]$IntervalMilliseconds = 200
     )
 
@@ -173,14 +178,14 @@ function Register-OpBackgroundPump {
     $timer.Interval = [timespan]::FromMilliseconds($IntervalMilliseconds)
     # Tâche et blocs portés par le minuteur ($this dans le gestionnaire) : pas de fermeture, qui isolerait le
     # gestionnaire des fonctions de ce script.
-    $timer.Tag = @{ Task = $Task; OnMessage = $OnMessage; OnCompleted = $OnCompleted }
+    $timer.Tag = @{ Task = $Task; OnMessage = $OnMessage; OnCompleted = $OnCompleted; Context = $Context }
     $timer.Add_Tick({
             $context = $this.Tag
             $r = Receive-OpBackgroundTask -Task $context.Task
-            foreach ($m in $r.Messages) { if ($context.OnMessage) { & $context.OnMessage $m } }
+            foreach ($m in $r.Messages) { if ($context.OnMessage) { & $context.OnMessage $m $context.Context } }
             if ($r.Completed) {
                 $this.Stop()
-                if ($context.OnCompleted) { & $context.OnCompleted $r }
+                if ($context.OnCompleted) { & $context.OnCompleted $r $context.Context }
             }
         })
     $timer.Start()

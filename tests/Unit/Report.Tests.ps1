@@ -6,7 +6,7 @@ param()
 BeforeAll {
     Set-StrictMode -Version Latest
     $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    foreach ($name in 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Get-OpRoot', 'Get-OpPath', 'ConvertTo-OpReportHtml', 'Save-OpReport') {
+    foreach ($name in 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Get-OpRoot', 'Get-OpPath', 'ConvertTo-OpReportHtml', 'ConvertTo-OpStateLabel', 'Save-OpReport') {
         . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1")
     }
     $script:configuration = [pscustomobject]@{ OfficeSources = (Get-Content -LiteralPath (Join-Path $repo 'config\office\sources.json') -Raw -Encoding UTF8 | ConvertFrom-Json) }

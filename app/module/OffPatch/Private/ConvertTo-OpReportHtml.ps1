@@ -49,7 +49,6 @@
     function Add-Row([System.Text.StringBuilder]$Html, [string]$Label, $Value) {
         [void]$Html.AppendLine("<tr><th>$(ConvertTo-HtmlText $Label)</th><td>$(ConvertTo-HtmlText $Value)</td></tr>")
     }
-    $labels = @{ UpToDate = 'À jour'; Pending = 'À installer'; NotApplicable = 'Non applicable'; MissingFromDepot = 'Absent du dépôt'; SkippedPrerequisite = 'Ignorée (prérequis)'; Error = 'Erreur' }
 
     $before = Get-Prop $Session 'Before'
     $after = Get-Prop $Session 'After'
@@ -93,7 +92,7 @@
         $step = @($steps | Where-Object { (Get-Prop $_ 'Category') -eq $pair[0] }) | Select-Object -First 1
         $text = $null
         if ($step -and (Get-Prop $step 'State') -eq 'UpToDate') { $text = "Version $(Get-Prop $step 'Installed')" }
-        elseif ($step) { $text = "$($labels[[string](Get-Prop $step 'State')]) : $(Get-Prop $step 'Reason')" }
+        elseif ($step) { $text = "$(ConvertTo-OpStateLabel ([string](Get-Prop $step 'State'))) : $(Get-Prop $step 'Reason')" }
         Add-Row $html $pair[1] $text
     }
     [void]$html.AppendLine('</table><p>Defender se met à jour seul dès que le PC est connecté à Internet.</p>')
@@ -103,7 +102,7 @@
     Add-Row $html 'Office après' (Format-Office (Get-Prop $after 'Office'))
     $officeStep = @($steps | Where-Object { (Get-Prop $_ 'Category') -eq 'office-source' }) | Select-Object -First 1
     if ($officeStep -and (Get-Prop $officeStep 'State') -ne 'UpToDate') {
-        Add-Row $html 'Motif' "$($labels[[string](Get-Prop $officeStep 'State')]) : $(Get-Prop $officeStep 'Reason')"
+        Add-Row $html 'Motif' "$(ConvertTo-OpStateLabel ([string](Get-Prop $officeStep 'State'))) : $(Get-Prop $officeStep 'Reason')"
         $endOfSupport = Get-Prop (Get-Prop $Configuration 'OfficeSources') 'endOfSupport'
         if ($endOfSupport -and [string](Get-Prop $officeStep 'Reason') -like "*$(Get-Prop $endOfSupport 'reason')*") { Add-Row $html 'Recommandation' (Get-Prop $endOfSupport 'recommendation') }
     }
@@ -114,8 +113,7 @@
     foreach ($step in $steps) {
         $n++
         $state = [string](Get-Prop $step 'State')
-        $label = $labels[$state]
-        if (-not $label) { $label = $state }
+        $label = ConvertTo-OpStateLabel $state
         $seconds = Get-Prop $step 'Seconds'
         $duration = $null
         if ($null -ne $seconds) { $duration = '{0} s' -f [math]::Round([double]$seconds) }
