@@ -12,7 +12,7 @@ BeforeAll {
     foreach ($name in 'ConvertTo-OpManifestItem', 'Read-OpMsuPackage', 'Save-OpDepotFile', 'Save-OpDownload', 'Confirm-OpDownloadIntegrity',
         'Test-OpFileSignature', 'Get-OpFileVersion', 'Invoke-OpProcess', 'Get-OpDepotPlan', 'Get-OpOdtPlan', 'Save-OpOdt', 'Get-OpFreeSpace', 'Write-OpLog', 'Write-OpProgress', 'Format-OpSize', 'ConvertTo-OpMaskedText',
         'Get-OpConfiguration', 'Read-OpJsonFile', 'Test-OpConfiguration', 'Get-OpPath', 'Get-OpRoot', 'Read-OpManifest', 'Test-OpManifest', 'Save-OpManifest',
-        'Get-OpDepotPurgePlan') {
+        'Get-OpDepotPurgePlan', 'Assert-OpNotCancelled') {
         . (Join-Path $module "Private\$name.ps1")
     }
     . (Join-Path $module 'Public\Invoke-OpDepotUpdate.ps1')
@@ -282,6 +282,20 @@ Describe 'Invoke-OpDepotUpdate (téléchargement)' {
         @($r.NewItems | ForEach-Object { $_.id }) | Should -Not -Contain 'win11-x64-lcu-KB1'
         $r.ErrorCount | Should -Be 3
         Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'ERROR' -and $Message -like '*win11-x64-lcu-KB1 : élément non inscrit*SHA-1 faux*' }
+    }
+
+    It 'annulation : garde les éléments déjà inscrits, s''arrête avant le fichier suivant, sans purge' {
+        $tool = Initialize-TestTool 'd-annule'
+        Mock Get-OpDepotPlan $script:plan
+        Mock Invoke-OpDepotPurge {}
+        $script:cts = New-Object System.Threading.CancellationTokenSource
+        # Annulation demandée pendant le premier fichier (clic sur Annuler).
+        Mock Save-OpDepotFile { $script:cts.Cancel(); Get-Entry $File.FileName }
+        { Invoke-OpDepotUpdate -Root $tool -CancellationToken $script:cts.Token } | Should -Throw -ExceptionType ([System.OperationCanceledException])
+        Should -Invoke Save-OpDepotFile -Times 1 -Exactly
+        @((Get-Manifest $tool).items | ForEach-Object { $_.id }) | Should -Be @('win11-x64-lcu-KB1')
+        Should -Invoke Invoke-OpDepotPurge -Times 0 -Exactly
+        Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -like '*annulée*pas de purge*' }
     }
 
     It 's''arrête avant tout téléchargement quand l''espace manque' {

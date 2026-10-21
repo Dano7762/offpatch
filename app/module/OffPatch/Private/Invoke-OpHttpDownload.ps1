@@ -63,6 +63,8 @@
         while (($read = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
             $file.Write($buffer, 0, $read)
             $received += $read
+            # Annulation : le fichier .part reste, la reprise (en-tête Range) repart de là.
+            Assert-OpNotCancelled
             if (((Get-Date) - $lastReport).TotalSeconds -ge 30) { Write-OpProgress '  HttpClient :' -Bytes $received -TotalBytes $total; $lastReport = Get-Date }
         }
         $file.Close()

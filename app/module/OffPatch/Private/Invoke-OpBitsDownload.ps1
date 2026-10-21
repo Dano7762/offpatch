@@ -102,6 +102,14 @@
             Remove-BitsTransfer -BitsJob $job -ErrorAction SilentlyContinue
             throw (New-Object System.NotSupportedException("BITS indisponible : travail resté en file d'attente $QueuedSeconds s sans transfert (session non interactive ?)."))
         }
+        try {
+            Assert-OpNotCancelled
+        } catch [System.OperationCanceledException] {
+            # Travail suspendu, pas supprimé : le lancement suivant le reprend là où il en était.
+            Suspend-BitsTransfer -BitsJob $job -ErrorAction SilentlyContinue | Out-Null
+            Write-OpLog "BITS : travail « $displayName » suspendu à la demande ($bytes octet(s) reçus), reprise au prochain lancement."
+            throw
+        }
         if (((Get-Date) - $lastProgress).TotalSeconds -ge $StallSeconds) {
             throw "Téléchargement BITS sans progrès depuis $StallSeconds s ($state, $bytes octet(s) reçus), $Url : travail « $displayName » conservé, reprise au prochain lancement."
         }

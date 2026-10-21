@@ -60,11 +60,6 @@ function ConvertTo-OpPcStepTable {
         [AllowEmptyCollection()][object[]]$Plan = @()
     )
 
-    $categories = @{
-        'defender-platform' = 'Plateforme Defender'; 'defender' = 'Définitions Defender'; 'windows-ssu' = 'Pile de maintenance'
-        'windows-checkpoint' = 'Cumulative de base (checkpoint)'; 'windows-lcu' = 'Cumulative Windows'; 'windows-ekb' = 'Passage de version (enablement package)'
-        'dotnet' = '.NET Framework'; 'office-source' = 'Office'
-    }
     $table = New-Object System.Data.DataTable 'Steps'
     foreach ($column in 'Id', 'Category', 'CategoryLabel', 'Detail', 'StateLabel', 'Reason') { [void]$table.Columns.Add($column, [string]) }
     foreach ($column in 'Selected', 'Pending', 'RebootAfter') { [void]$table.Columns.Add($column, [bool]) }
@@ -72,8 +67,7 @@ function ConvertTo-OpPcStepTable {
         $row = $table.NewRow()
         $row.Id = [string]$step.Id
         $row.Category = [string]$step.Category
-        $row.CategoryLabel = [string]$categories[[string]$step.Category]
-        if (-not $row.CategoryLabel) { $row.CategoryLabel = [string]$step.Category }
+        $row.CategoryLabel = [string]$step.CategoryLabel
         $row.Detail = [string]$step.Available
         if (-not $row.Detail) { $row.Detail = [string]$step.Id }
         $row.StateLabel = [string]$step.StateLabel
@@ -186,32 +180,6 @@ function Show-OpPcView {
     $Controls.BtnInstallSelection.IsEnabled = $summary.CanInstall
 }
 
-function Add-OpPcLogLine {
-    <#
-    .SYNOPSIS
-        Ajoute une ligne aux dernières lignes du journal de l'onglet « Ce PC » (200 au plus).
-
-    .PARAMETER Controls
-        Éléments nommés de la fenêtre.
-
-    .PARAMETER Line
-        Ligne du journal.
-
-    .EXAMPLE
-        Add-OpPcLogLine -Controls $ui.Controls -Line $message.Line
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)][hashtable]$Controls,
-        [Parameter(Mandatory)][AllowEmptyString()][string]$Line
-    )
-
-    $list = $Controls.PcLastLog
-    [void]$list.Items.Add($Line)
-    while ($list.Items.Count -gt 200) { $list.Items.RemoveAt(0) }
-    $list.ScrollIntoView($list.Items[$list.Items.Count - 1])
-}
-
 function Invoke-OpPcRefresh {
     <#
     .SYNOPSIS
@@ -234,11 +202,11 @@ function Invoke-OpPcRefresh {
     $task = Start-OpBackgroundTask -ScriptBlock $script:OpPcLoadScript -Parameters @{ Root = $Ui.Root } -ModulePath $Ui.ModulePath -Confirm:$false
     [void](Register-OpBackgroundPump -Task $task -OnMessage {
             param($m, $Ui)
-            if ($m.PSObject.Properties['Line']) { Add-OpPcLogLine -Controls $Ui.Controls -Line $m.Line }
+            if ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.PcLastLog -Line $m.Line }
         } -OnCompleted {
             param($r, $Ui)
             if ($r.Error -or $r.Output.Count -eq 0) {
-                $Ui.Controls.PcSystemTitle.Text = "Relevé du PC impossible : $($r.Error)"
+                $Ui.Controls.PcSystemTitle.Text = "Relevé du PC impossible : $(@($r.Error) + @($r.Errors) -join ' ')"
                 return
             }
             Show-OpPcView -Controls $Ui.Controls -View $r.Output[-1]
@@ -277,14 +245,14 @@ function Invoke-OpPcInstall {
             if ($m.PSObject.Properties['Kind'] -and $m.Kind -eq 'Step') {
                 $Ui.Controls.PcCurrentStep.Text = 'Étape {0}/{1} : {2}' -f ($m.Index + 1), $m.Count, $m.Id
                 $Ui.Controls.PcProgress.Value = $m.Index / $m.Count
-            } elseif ($m.PSObject.Properties['Line']) { Add-OpPcLogLine -Controls $Ui.Controls -Line $m.Line }
+            } elseif ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.PcLastLog -Line $m.Line }
         } -OnCompleted {
             param($r, $Ui)
             $c = $Ui.Controls
             $c.PcProgress.Value = 1
             $c.PcCurrentStep.Text = 'Terminé.'
             if ($r.Error) { $c.PcCurrentStep.Text = "Interrompu : $($r.Error)" }
-            elseif ($r.Output.Count -gt 0 -and $r.Output[-1].ReportPath) { Add-OpPcLogLine -Controls $c -Line "Rapport : $($r.Output[-1].ReportPath)" }
+            elseif ($r.Output.Count -gt 0 -and $r.Output[-1].ReportPath) { Add-OpLogLine -ListBox $c.PcLastLog -Line "Rapport : $($r.Output[-1].ReportPath)" }
             foreach ($button in 'BtnRestart', 'BtnResume') { $c[$button].IsEnabled = $true }
             $c.PcSteps.IsEnabled = $true
             Invoke-OpPcRefresh -Ui $Ui

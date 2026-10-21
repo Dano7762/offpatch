@@ -31,6 +31,12 @@
     .PARAMETER Root
         Racine de l'outil ; par défaut, celle retrouvée par le fichier offpatch.root.
 
+    .PARAMETER CancellationToken
+        Jeton d'annulation (interface, bouton Annuler). Consulté pendant chaque transfert et avant chaque fichier ou
+        source Office : le transfert en cours est suspendu (reprise au lancement suivant), les éléments déjà inscrits
+        restent au manifeste, la purge n'a pas lieu, et OperationCanceledException est levée. Une source Office en
+        cours de setup.exe /download va jusqu'au bout.
+
     .EXAMPLE
         Invoke-OpDepotUpdate -ListOnly
 
@@ -45,10 +51,13 @@
     param(
         [switch]$ListOnly,
         [string]$Root,
-        [datetime]$Now = (Get-Date)
+        [datetime]$Now = (Get-Date),
+        [System.Threading.CancellationToken]$CancellationToken = [System.Threading.CancellationToken]::None
     )
 
     if (-not $Root) { $Root = Get-OpRoot }
+    # Jeton consulté par Assert-OpNotCancelled, jusque dans les boucles de transfert ; posé à chaque appel.
+    $script:OpCancellation = $CancellationToken
     $mode = 'téléchargement'
     if ($ListOnly) { $mode = '-ListOnly' }
     try {
@@ -59,7 +68,7 @@
         $items = @(Get-OpDepotPlan -Configuration $configuration -Manifest $manifest -Now $Now)
         # ODT : utile seulement si une source Office est configurée ; une erreur est portée par le plan.
         $odt = $null
-        if (@($configuration.OfficeSources.sources).Count -gt 0) { $odt = Get-OpOdtPlan -Configuration $configuration -Root $Root }
+        if (@($configuration.OfficeSources.sources | Where-Object { -not ($_.PSObject.Properties['enabled'] -and $_.enabled -eq $false) }).Count -gt 0) { $odt = Get-OpOdtPlan -Configuration $configuration -Root $Root }
     } catch {
         # Catalogue injoignable, page non reconnue, manifeste invalide : l'erreur est journalisée puis relancée.
         Write-OpLog -Level ERROR -Message "Mise à jour du dépôt ($mode) interrompue : $($_.Exception.Message)"
@@ -169,11 +178,15 @@
             }
             if (-not $downloaded.ContainsKey($f.Url)) {
                 try {
+                    Assert-OpNotCancelled
                     $fileIndex++
                     Write-OpProgress ('Fichier {0}/{1} : {2} ({3})' -f $fileIndex, $toFetch.Count, $f.FileName, (Format-OpSize $f.SizeBytes))
                     $fileStart = Get-Date
                     $downloaded[$f.Url] = Save-OpDepotFile -Item $item -File $f -Configuration $configuration -Root $Root -Confirm:$false
                     Write-OpProgress ('  terminé et contrôlé en {0:N0} s.' -f ((Get-Date) - $fileStart).TotalSeconds)
+                } catch [System.OperationCanceledException] {
+                    Write-OpLog -Level WARN -Message "Mise à jour du dépôt annulée à la demande : $($new.Count) nouveauté(s) déjà inscrite(s), pas de purge."
+                    throw
                 } catch {
                     $downloaded[$f.Url] = $_.Exception.Message
                     Write-OpProgress "  échec : $($_.Exception.Message)"
@@ -218,6 +231,10 @@
     $office = New-Object System.Collections.Generic.List[object]
     if ($odt) {
         foreach ($src in @(Get-OpOfficeDownloadXml -Configuration $configuration -Root $Root)) {
+            if ($CancellationToken.IsCancellationRequested) {
+                Write-OpLog -Level WARN -Message "Mise à jour du dépôt annulée à la demande avant la source Office $($src.Id) : pas de purge."
+                Assert-OpNotCancelled
+            }
             try {
                 Write-OpProgress "Source Office $($src.Id) ($($src.Channel)) : setup.exe /download en cours ; l'ODT n'indique pas sa progression (plusieurs Go, souvent 10 à 30 min)."
                 $saved = Save-OpOfficeSource -Source $src -SetupPath $odt.SetupPath -Root $Root -Confirm:$false

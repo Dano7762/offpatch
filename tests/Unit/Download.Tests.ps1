@@ -7,7 +7,7 @@ param()
 BeforeAll {
     Set-StrictMode -Version Latest
     $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    foreach ($name in 'Write-OpLog', 'Write-OpProgress', 'Format-OpSize', 'ConvertTo-OpMaskedText', 'Invoke-OpBitsDownload', 'Invoke-OpHttpDownload', 'Save-OpDownload') {
+    foreach ($name in 'Write-OpLog', 'Write-OpProgress', 'Format-OpSize', 'ConvertTo-OpMaskedText', 'Assert-OpNotCancelled', 'Invoke-OpBitsDownload', 'Invoke-OpHttpDownload', 'Save-OpDownload') {
         . (Join-Path $root "app\module\OffPatch\Private\$name.ps1")
     }
     Import-Module -Name BitsTransfer -Verbose:$false
@@ -109,6 +109,18 @@ Describe 'Invoke-OpHttpDownload (serveur local)' {
         { Invoke-OpHttpDownload -Url "$($script:base)/absent" -Destination $dest } | Should -Throw -ExpectedMessage '*HTTP 404*'
         (Get-Item "$dest.part").Length | Should -Be 10
     }
+
+    It 's''arrête à la demande d''annulation et garde le fichier partiel pour la reprise' {
+        $dest = Join-Path $TestDrive 'annule.bin'
+        $source = New-Object System.Threading.CancellationTokenSource
+        $source.Cancel()
+        $script:OpCancellation = $source.Token
+        try {
+            { Invoke-OpHttpDownload -Url "$($script:base)/range" -Destination $dest } | Should -Throw -ExceptionType ([System.OperationCanceledException])
+        } finally { $script:OpCancellation = $null }
+        Test-Path $dest | Should -BeFalse
+        (Get-Item "$dest.part").Length | Should -BeGreaterThan 0
+    }
 }
 
 Describe 'Invoke-OpBitsDownload (BITS simulé)' {
@@ -196,6 +208,20 @@ Describe 'Invoke-OpBitsDownload (BITS simulé)' {
         Mock Get-Date { $script:clock = $script:clock.AddSeconds(5); $script:clock }
         { Invoke-OpBitsDownload -Url $script:url -Destination $script:dest -StallSeconds 30 -PollMilliseconds 10 } | Should -Throw -ExpectedMessage '*conservé, reprise au prochain lancement*'
         Should -Invoke Remove-BitsTransfer -Times 0 -Exactly
+    }
+
+    It 'suspend le travail, sans le supprimer, à la demande d''annulation' {
+        Mock Suspend-BitsTransfer -RemoveParameterType BitsJob {}
+        Use-JobSequence @((Get-FakeJob 'Suspended'), (Get-FakeJob 'Transferring' 10))
+        $source = New-Object System.Threading.CancellationTokenSource
+        $source.Cancel()
+        $script:OpCancellation = $source.Token
+        try {
+            { Invoke-OpBitsDownload -Url $script:url -Destination $script:dest -PollMilliseconds 10 } | Should -Throw -ExceptionType ([System.OperationCanceledException])
+        } finally { $script:OpCancellation = $null }
+        Should -Invoke Suspend-BitsTransfer -Times 1 -Exactly
+        Should -Invoke Remove-BitsTransfer -Times 0 -Exactly
+        Should -Invoke Complete-BitsTransfer -Times 0 -Exactly
     }
 }
 

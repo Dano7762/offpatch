@@ -35,3 +35,28 @@
     }
     [pscustomobject]@{ Window = $window; Controls = $controls }
 }
+
+function Add-OpLogLine {
+    <#
+    .SYNOPSIS
+        Ajoute une ligne à une liste des dernières lignes du journal (200 au plus) et la fait défiler.
+
+    .PARAMETER ListBox
+        Liste des dernières lignes (onglet « Ce PC » ou « Dépôt »).
+
+    .PARAMETER Line
+        Ligne du journal.
+
+    .EXAMPLE
+        Add-OpLogLine -ListBox $ui.Controls.PcLastLog -Line $message.Line
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][System.Windows.Controls.ListBox]$ListBox,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Line
+    )
+
+    [void]$ListBox.Items.Add($Line)
+    while ($ListBox.Items.Count -gt 200) { $ListBox.Items.RemoveAt(0) }
+    $ListBox.ScrollIntoView($ListBox.Items[$ListBox.Items.Count - 1])
+}

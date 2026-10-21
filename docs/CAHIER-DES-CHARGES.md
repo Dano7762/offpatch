@@ -275,6 +275,8 @@ Une entrée peut porter les champs de dépendance `prerequisites` et `runsAfter`
 
 Les langues se règlent par source. Par défaut, la source `current` porte `fr-fr` et `en-us` : les Office en boîte ou Microsoft 365 préinstallés par les fabricants sont souvent bilingues, et une langue installée absente de la source empêche leur mise à jour (8.5, R-08). L'anglais ajoute environ 350 Mo à la source Current (3 955 Mo au lieu de 3 605 Mo, mesuré le 5 octobre 2026). Les sources `perpetualvl2024` et `perpetualvl2021` portent `fr-fr` seul. `installedChannelIds` : identifiants de canal relevés dans `CDNBaseUrl` du registre Click-to-Run, mesurés sur runner (R-08). `downloadProductId` : product ID demandé à l'ODT pour le `/download` de la source, que l'ODT exige ; il ne limite pas la source, qui met à jour tout produit du canal et de la langue (R-08). Valeurs mesurées sur runner (R-07, R-08) : `Home2024Retail` pour `current`, `ProPlus2024Volume` pour `perpetualvl2024` ; `ProPlus2021Volume` (liste officielle de l'ODT) pour `perpetualvl2021`.
 
+Champ facultatif `enabled` d'une source (booléen, absent vaut `true`) : une source décochée dans l'onglet Dépôt porte `"enabled": false` et n'est ni téléchargée ni mise à jour par `setup.exe /download` ; ses éléments déjà au manifeste restent, et l'installation continue de reconnaître son canal (8.3). L'interface n'écrit que les lignes `enabled` et `languages` de la source, et la ligne `targets` de `settings.json` : la présentation des fichiers, tenus à la main, est conservée, et une saisie invalide n'écrit rien (9).
+
 `download.xml.template` sert à générer le XML de `/download` de chaque source, avec le chemin absolu de son dossier dans le dépôt (7.1) :
 
 ```xml
@@ -630,7 +632,7 @@ Fenêtre WPF unique. En-tête : nom et version de l'outil, date du dépôt, aler
 **Onglet « Dépôt »**
 
 - Résumé : date de la dernière mise à jour, taille totale, alerte de fraîcheur.
-- Cibles, sources Office et langues à cocher (enregistrées dans `settings.json` et `config/office/sources.json`).
+- Cibles et sources Office à cocher, langues de chaque source saisies sous la forme `xx-xx` séparées par des virgules, enregistrées dans `settings.json` (`targets`) et `config/office/sources.json` (`enabled`, `languages`, 6.3) par « Enregistrer la sélection ».
 - Tableau du manifeste : cible, catégorie, KB ou version, date, taille, état de l'intégrité.
 - Boutons : « Vérifier les nouveautés » (`-ListOnly`), « Mettre à jour le dépôt », « Purger », « Préparer un support… », « Annuler ».
 
@@ -774,3 +776,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.36 (18 octobre 2026) : Windows 10, installation des .msu par `wusa.exe /quiet /norestart` au lieu de DISM en ligne, que Microsoft ne prend en charge qu'à partir de Windows 11 21H2 (8.4, R-19) ; codes 0, 3010 et 2359302 mesurés sur un Windows 10 22H2. Accord de David du 18 octobre 2026.
 - 1.37 (18 octobre 2026) : Windows 10 sans ESU actif ou détectable, l'étape .NET est ignorée en mode auto comme l'étape Windows, sauf forçage (8.2) : mesuré sur un Windows 10 22H2 non inscrit, la cumulative .NET s'installe puis est écartée au redémarrage, sans erreur (R-19). Accord de David du 18 octobre 2026.
 - 1.38 (21 octobre 2026) : pas de mise en veille automatique pendant la session et les installations (`SetThreadExecutionState`, aucun réglage d'alimentation modifié) ; rappel de redémarrer à l'écran de fin et dans le rapport quand un redémarrage est en attente (8.6, 8.8). Accord de David du 21 octobre 2026, après la session sur VM où le PC hôte s'est mis en veille et où le .NET a fini en code 3010 sans rappel. Rapport : suffixe `_2`, `_3`… au lieu d'écraser un rapport du même jour (8.8), défaut constaté le même jour (le rapport de T3 a remplacé celui de la session auto).
+- 1.39 (21 octobre 2026) : onglet Dépôt (9). Champ facultatif `enabled` des sources Office (6.3), que suppose la case à cocher par source déjà prévue en 9 ; langues saisies par source (forme `xx-xx`) ; seules les lignes `targets`, `enabled` et `languages` sont réécrites, présentation des fichiers conservée. Précision de mise en œuvre, sans changement de périmètre.

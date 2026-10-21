@@ -158,6 +158,7 @@
         elseif ($channels.ContainsKey($src.channel)) { $errors.Add("$label : canal $($src.channel) déjà couvert par une autre source.") } else { $channels[$src.channel] = $true }
         if ([string]$src.folder -notmatch '^office/[a-z0-9]+$') { $errors.Add("$label : folder doit être de la forme office/<nom>.") }
         if (-not (Test-Property $src 'downloadProductId') -or [string]$src.downloadProductId -notmatch '^[A-Za-z0-9]+$') { $errors.Add("$label : downloadProductId absent ou invalide (product ID de l'ODT).") }
+        if ((Test-Property $src 'enabled') -and $src.enabled -isnot [bool]) { $errors.Add("$label : enabled doit valoir true ou false.") }
         $languages = @($src.languages)
         if ($languages.Count -eq 0) { $errors.Add("$label : aucune langue.") }
         foreach ($lang in $languages) { if ($lang -notmatch '^[a-z]{2}-[a-z]{2}$') { $errors.Add("$label : langue « $lang » invalide (forme xx-xx).") } }

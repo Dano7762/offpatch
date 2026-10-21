@@ -5,7 +5,7 @@
 
     .DESCRIPTION
         Fonction sans effet de bord (cahier des charges 6.3, 7.1). Remplit config\office\download.xml.template pour
-        chaque source de office\sources.json : chemin absolu du dossier de la source dans le dépôt, canal, produit
+        chaque source active de office\sources.json (enabled absent ou vrai) : chemin absolu du dossier de la source dans le dépôt, canal, produit
         de téléchargement (downloadProductId) et une ligne Language par langue de la source. Une source d'un canal
         et d'une langue n'est pas propre à un produit (R-08) : le produit ne sert qu'à demander le téléchargement.
         Les valeurs sont échappées pour XML et le résultat est relu comme XML avant d'être renvoyé.
@@ -25,6 +25,8 @@
     $template = Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8 -ErrorAction Stop
     $depot = Get-OpPath -Name Depot -Root $Root
     foreach ($src in @($Configuration.OfficeSources.sources)) {
+        # Source décochée dans l'onglet Dépôt (enabled false) : pas téléchargée.
+        if ($src.PSObject.Properties['enabled'] -and $src.enabled -eq $false) { continue }
         $sourcePath = Join-Path $depot ([string]$src.folder -replace '/', '\')
         $languages = @($src.languages | ForEach-Object { '      <Language ID="{0}" />' -f [Security.SecurityElement]::Escape([string]$_) })
         $xml = $template.Replace('{{SourcePath}}', [Security.SecurityElement]::Escape($sourcePath))

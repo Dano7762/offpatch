@@ -17,7 +17,8 @@ BeforeAll {
 
     function Get-TestRow([string]$Id, [string]$Category, [string]$State = 'Pending', [bool]$RebootAfter = $false) {
         $labels = @{ Pending = 'À installer'; UpToDate = 'À jour'; NotApplicable = 'Non applicable' }
-        [pscustomobject]@{ Sequence = 1; Id = $Id; Category = $Category; State = $State; StateLabel = $labels[$State]; Reason = "motif $Id"; Available = $null; RebootAfter = $RebootAfter }
+        $categories = @{ 'defender' = 'Définitions Defender'; 'windows-lcu' = 'Cumulative Windows'; 'dotnet' = '.NET Framework' }
+        [pscustomobject]@{ Sequence = 1; Id = $Id; Category = $Category; CategoryLabel = $categories[$Category]; State = $State; StateLabel = $labels[$State]; Reason = "motif $Id"; Available = $null; RebootAfter = $RebootAfter }
     }
     function Get-TestView([hashtable]$Info = @{}, [object[]]$Checks = @(), [object[]]$Plan) {
         $i = [ordered]@{
@@ -29,7 +30,7 @@ BeforeAll {
         foreach ($k in $Info.Keys) { $i[$k] = $Info[$k] }
         if ($null -eq $Plan) {
             $Plan = @((Get-TestRow 'def' 'defender'), (Get-TestRow 'lcu' 'windows-lcu' -RebootAfter $true), (Get-TestRow 'net' 'dotnet' 'UpToDate'),
-                [pscustomobject]@{ Sequence = 4; Id = $null; Category = 'office-source'; State = 'NotApplicable'; StateLabel = 'Non applicable'; Reason = 'Aucun Office Click-to-Run.'; Available = $null; RebootAfter = $false })
+                [pscustomobject]@{ Sequence = 4; Id = $null; Category = 'office-source'; CategoryLabel = 'Office'; State = 'NotApplicable'; StateLabel = 'Non applicable'; Reason = 'Aucun Office Click-to-Run.'; Available = $null; RebootAfter = $false })
         }
         $sources = [pscustomobject]@{ sources = @([pscustomobject]@{ id = 'current'; channel = 'Current'; languages = @('fr-fr', 'en-us'); installedChannelIds = @('492350f6-3a01-4f97-b9c0-c7c6ddf67d60') }) }
         [pscustomobject]@{ Info = [pscustomobject]$i; Checks = $Checks; Plan = $Plan; OfficeSources = $sources }
@@ -141,7 +142,7 @@ Describe 'Restart-OpPc' {
     }
 }
 
-Describe 'Show-OpPcView et Add-OpPcLogLine' -Skip:$script:noSta {
+Describe 'Show-OpPcView et Add-OpLogLine' -Skip:$script:noSta {
     BeforeAll { $script:ui = Import-OpMainWindow }
     AfterAll { $script:ui.Window.Close() }
 
@@ -168,7 +169,7 @@ Describe 'Show-OpPcView et Add-OpPcLogLine' -Skip:$script:noSta {
     }
 
     It 'garde les 200 dernières lignes du journal' {
-        foreach ($n in 1..205) { Add-OpPcLogLine -Controls $script:ui.Controls -Line "ligne $n" }
+        foreach ($n in 1..205) { Add-OpLogLine -ListBox $script:ui.Controls.PcLastLog -Line "ligne $n" }
         $script:ui.Controls.PcLastLog.Items.Count | Should -Be 200
         $script:ui.Controls.PcLastLog.Items[0] | Should -Be 'ligne 6'
     }

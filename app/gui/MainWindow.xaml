@@ -112,7 +112,68 @@
                 </Grid>
             </TabItem>
             <TabItem x:Name="TabDepot" Header="Dépôt">
-                <Grid x:Name="DepotRoot" Margin="8" />
+                <Grid x:Name="DepotRoot" Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" MinHeight="140" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Résumé : date, taille totale, fraîcheur. -->
+                    <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                        <Border x:Name="DepotAlert" DockPanel.Dock="Right" Visibility="Collapsed" Padding="8,2" CornerRadius="3" Background="#FFF4CE" VerticalAlignment="Center">
+                            <TextBlock x:Name="DepotAlertText" Foreground="#5C4400" />
+                        </Border>
+                        <TextBlock x:Name="DepotSummary" FontSize="15" FontWeight="SemiBold" Text="Lecture du dépôt en cours…" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <!-- Cibles et sources Office (settings.json, config\office\sources.json). -->
+                    <Grid Grid.Row="1" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <GroupBox Grid.Column="0" Header="Cibles Windows" Padding="6" Margin="0,0,8,0">
+                            <StackPanel x:Name="DepotTargets" />
+                        </GroupBox>
+                        <GroupBox Grid.Column="1" Header="Sources Office (langues séparées par des virgules, forme xx-xx)" Padding="6">
+                            <StackPanel x:Name="DepotSources" />
+                        </GroupBox>
+                        <Button x:Name="BtnSaveSelection" Grid.Column="2" Content="Enregistrer la sélection" Padding="12,4" Margin="8,0,0,0" VerticalAlignment="Bottom" IsEnabled="False" />
+                    </Grid>
+
+                    <!-- Contenu du manifeste. -->
+                    <DataGrid x:Name="DepotItems" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                              HeadersVisibility="Column" GridLinesVisibility="Horizontal" SelectionMode="Single">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Cible" Binding="{Binding Target}" Width="Auto" />
+                            <DataGridTextColumn Header="Catégorie" Binding="{Binding CategoryLabel}" Width="Auto" />
+                            <DataGridTextColumn Header="KB ou version" Binding="{Binding Detail}" Width="Auto" />
+                            <DataGridTextColumn Header="Date" Binding="{Binding ReleaseDate}" Width="Auto" />
+                            <DataGridTextColumn Header="Taille" Binding="{Binding Size}" Width="Auto" />
+                            <DataGridTextColumn Header="Fichiers" Binding="{Binding Integrity}" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <!-- Boutons. -->
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button x:Name="BtnDepotCheck" Content="Vérifier les nouveautés" Padding="14,4" Margin="0,0,8,0" />
+                        <Button x:Name="BtnDepotUpdate" Content="Mettre à jour le dépôt" Padding="14,4" Margin="0,0,8,0" />
+                        <Button x:Name="BtnDepotPurge" Content="Purger" Padding="14,4" Margin="0,0,8,0" />
+                        <Button x:Name="BtnPrepareSupport" Content="Préparer un support…" Padding="14,4" Margin="0,0,8,0" IsEnabled="False" />
+                        <Button x:Name="BtnDepotCancel" Content="Annuler" Padding="14,4" IsEnabled="False"
+                                ToolTipService.ShowOnDisabled="True" ToolTip="Arrête le téléchargement en cours ; il reprendra au prochain lancement. Une source Office en cours va jusqu'au bout." />
+                    </StackPanel>
+
+                    <!-- Avancement et dernières lignes du journal. -->
+                    <StackPanel Grid.Row="4" Margin="0,10,0,0">
+                        <TextBlock x:Name="DepotCurrent" TextTrimming="CharacterEllipsis" />
+                        <ListBox x:Name="DepotLastLog" Height="130" Margin="0,6,0,0" FontFamily="Consolas" FontSize="12" />
+                    </StackPanel>
+                </Grid>
             </TabItem>
             <TabItem x:Name="TabLog" Header="Journal">
                 <Grid x:Name="LogRoot" Margin="8" />
