@@ -112,15 +112,12 @@
     } elseif (-not $i.Power) { ConvertTo-Check 'Battery' 'Alimentation' 'Warning' 'Alimentation illisible.' 'ConfirmAutoMode' }
     else { ConvertTo-Check 'Battery' 'Alimentation' 'Ok' 'Sur secteur ou sans batterie.' $null }
 
-    $read = Read-Safe { Read-OpManifest -Path (Get-OpPath -Name Manifest -Root $Root) }
-    $manifest = $read.Value | Select-Object -First 1
-    if ($read.Error) { ConvertTo-Check 'DepotAge' 'Âge du dépôt' 'Warning' "Manifeste illisible. $($read.Error)" $null }
-    elseif (@($manifest.items).Count -eq 0 -or -not $manifest.generatedAt) { ConvertTo-Check 'DepotAge' 'Âge du dépôt' 'Warning' 'Dépôt vide : rien à installer.' $null }
-    else {
-        $generated = [datetime]::Parse([string]$manifest.generatedAt, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AdjustToUniversal)
-        $days = [int][math]::Floor(($Now.ToUniversalTime() - $generated).TotalDays)
-        if ($days -gt [int]$client.staleDepotWarningDays) { ConvertTo-Check 'DepotAge' 'Âge du dépôt' 'Warning' "Dépôt mis à jour il y a $days jours (au-delà de $($client.staleDepotWarningDays)) : des mises à jour plus récentes existent sans doute." $null }
-        else { ConvertTo-Check 'DepotAge' 'Âge du dépôt' 'Ok' "Dépôt mis à jour il y a $days jour(s)." $null }
+    $depot = Get-OpDepotStatus -Root $Root -StaleDays ([int]$client.staleDepotWarningDays) -Now $Now
+    switch ($depot.State) {
+        'Unreadable' { ConvertTo-Check 'DepotAge' 'Âge du dépôt' 'Warning' "Manifeste illisible. $($depot.Error)" $null }
+        'Empty' { ConvertTo-Check 'DepotAge' 'Âge du dépôt' 'Warning' 'Dépôt vide : rien à installer.' $null }
+        'Stale' { ConvertTo-Check 'DepotAge' 'Âge du dépôt' 'Warning' "Dépôt mis à jour il y a $($depot.AgeDays) jours (au-delà de $($depot.StaleDays)) : des mises à jour plus récentes existent sans doute." $null }
+        default { ConvertTo-Check 'DepotAge' 'Âge du dépôt' 'Ok' "Dépôt mis à jour il y a $($depot.AgeDays) jour(s)." $null }
     }
 
     if (-not $client.createRestorePointBeforeSession) { ConvertTo-Check 'RestorePoint' 'Point de restauration' 'Ok' 'Désactivé dans settings.json (createRestorePointBeforeSession).' $null }
