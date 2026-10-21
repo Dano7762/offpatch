@@ -5,7 +5,8 @@
 
     .DESCRIPTION
         Cahier des charges 8.8. Nom : rapports\AAAA-MM-JJ_NomPC_NumeroDeSerie.html (date du début de session ;
-        caractères interdits dans un nom de fichier remplacés par « _ »). Écriture atomique (fichier temporaire puis
+        caractères interdits dans un nom de fichier remplacés par « _ » ; rapport du même nom déjà présent : suffixe
+        _2, _3…). Écriture atomique (fichier temporaire puis
         renommage), UTF-8. Un échec de la copie dans ProgramData est journalisé sans annuler le rapport du support.
         Renvoie le chemin du rapport sur le support.
     #>
@@ -39,7 +40,11 @@
     if (-not $start) { $start = Get-Date }
     $before = Get-Prop $Session 'Before'
     $fileName = '{0}_{1}_{2}.html' -f ([datetime]$start).ToString('yyyy-MM-dd'), (Get-SafeName (Get-Prop $before 'ComputerName')), (Get-SafeName (Get-Prop $before 'SerialNumber'))
-    $path = Join-Path (Get-OpPath -Name Reports -Root $Root) $fileName
+    # Deuxième rapport du jour sur ce PC (session puis contrôle) : suffixe _2, _3… plutôt qu'un rapport écrasé.
+    $reports = Get-OpPath -Name Reports -Root $Root
+    $base = [System.IO.Path]::GetFileNameWithoutExtension($fileName)
+    for ($n = 2; Test-Path -LiteralPath (Join-Path $reports $fileName); $n++) { $fileName = "${base}_$n.html" }
+    $path = Join-Path $reports $fileName
     if (-not $PSCmdlet.ShouldProcess($path, 'Écriture du rapport d''intervention')) { return }
 
     $html = ConvertTo-OpReportHtml -Session $Session -Configuration $Configuration

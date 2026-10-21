@@ -589,8 +589,9 @@ Pendant la session :
 - `C:\ProgramData\OffPatch\state.json` contient l'identifiant de session, l'état de chaque étape, le nombre de redémarrages, le numéro de série du volume du support et le chemin relatif de la racine.
 - Avant un redémarrage : copie de `resume.ps1` dans ProgramData, création de la tâche planifiée `OffPatch-Reprise` (à l'ouverture de session de l'utilisateur courant, privilèges les plus élevés), compte à rebours de `rebootCountdownSeconds` avec bouton Annuler, puis redémarrage.
 - À l'ouverture de session suivante, `resume.ps1` cherche le support sur tous les lecteurs (fichier `offpatch.root` et numéro de série du volume) et relance l'interface avec `-Resume`. Si le support est absent, une petite fenêtre demande de le rebrancher et vérifie toutes les 5 secondes.
+- Pas de mise en veille automatique du PC pendant la session et pendant chaque installation (mode auto et étapes de la CLI) : demande d'activité du processus (`SetThreadExecutionState`), retirée en fin de traitement, aucun réglage d'alimentation modifié. La fermeture du capot d'un portable reste prioritaire.
 - Garde-fous : au plus `maxAutoReboots` redémarrages. Une étape qui échoue deux fois est abandonnée et signalée, la session continue avec les suivantes.
-- En fin de session : suppression de la tâche, de `resume.ps1` et de `temp\`, archivage de `state.json` dans les journaux, bilan à l'écran, rapport écrit. Si le PC est hors ligne (aucune connexion réseau active), l'écran de fin rappelle de désactiver le mode Avion ou de rebrancher le réseau, pour que Windows et Defender se mettent à jour d'eux-mêmes.
+- En fin de session : suppression de la tâche, de `resume.ps1` et de `temp\`, archivage de `state.json` dans les journaux, bilan à l'écran, rapport écrit. Si le PC est hors ligne (aucune connexion réseau active), l'écran de fin rappelle de désactiver le mode Avion ou de rebrancher le réseau ; si un redémarrage est en attente (une dernière étape en code 3010, comme .NET), il rappelle de redémarrer pour terminer l'installation, pour que Windows et Defender se mettent à jour d'eux-mêmes.
 - Pas d'ouverture de session automatique : je rouvre la session moi-même après chaque redémarrage.
 - Si je ferme la fenêtre en cours de route, l'outil demande confirmation et conserve l'état. Un bouton « Reprendre la session interrompue » apparaît au lancement suivant.
 
@@ -600,7 +601,7 @@ Le même plan est affiché avec une case à cocher par étape. « Installer la s
 
 ### 8.8 Rapport d'intervention
 
-En fin de session, ou en cas d'abandon, un rapport HTML autonome et imprimable est écrit dans `rapports/AAAA-MM-JJ_NomPC_NumeroDeSerie.html` sur le support, avec une copie dans `C:\ProgramData\OffPatch\logs\`. Il contient :
+En fin de session, ou en cas d'abandon, un rapport HTML autonome et imprimable est écrit dans `rapports/AAAA-MM-JJ_NomPC_NumeroDeSerie.html` sur le support (suffixe `_2`, `_3`… si un rapport de ce nom existe déjà, pour ne jamais en écraser un), avec une copie dans `C:\ProgramData\OffPatch\logs\`. Il contient :
 
 - date et heures de début et de fin ;
 - nom du PC, fabricant, modèle, numéro de série BIOS ;
@@ -610,6 +611,7 @@ En fin de session, ou en cas d'abandon, un rapport HTML autonome et imprimable e
 - Office détecté (produits, canal, langues), version avant et après, ou motif de non-application (« aucun Office Click-to-Run », « Office 2016/2019 : fin de support Microsoft (octobre 2025) » avec la recommandation de passer à une version prise en charge, « canal absent du dépôt », « langue absente de la source ») ;
 - erreurs et avertissements ;
 - si le PC était hors ligne en fin de session : rappel de désactiver le mode Avion ou de rebrancher le réseau ;
+- si un redémarrage était en attente en fin de session : rappel de redémarrer pour terminer l'installation ;
 - point de restauration : point créé par OffPatch (description, date), ou point existant de moins de 24 heures cité à sa place, ou motif de l'absence (protection du système inactive, indicateurs en désaccord, option désactivée) ; le cas échéant, « protection du système activée par Checkpoint-Computer, à vérifier » ;
 - version de l'outil et date du dépôt utilisé.
 
@@ -771,3 +773,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.35 (18 octobre 2026) : Defender sur une plateforme ancienne sans `AMRunningMode` (4.18.1909.6, relevé sur un Windows 10 22H2) : jugé actif si `AMServiceEnabled` et `AntivirusEnabled` sont vrais (8.3). Accord de David du 18 octobre 2026, suite du relevé R-06.
 - 1.36 (18 octobre 2026) : Windows 10, installation des .msu par `wusa.exe /quiet /norestart` au lieu de DISM en ligne, que Microsoft ne prend en charge qu'à partir de Windows 11 21H2 (8.4, R-19) ; codes 0, 3010 et 2359302 mesurés sur un Windows 10 22H2. Accord de David du 18 octobre 2026.
 - 1.37 (18 octobre 2026) : Windows 10 sans ESU actif ou détectable, l'étape .NET est ignorée en mode auto comme l'étape Windows, sauf forçage (8.2) : mesuré sur un Windows 10 22H2 non inscrit, la cumulative .NET s'installe puis est écartée au redémarrage, sans erreur (R-19). Accord de David du 18 octobre 2026.
+- 1.38 (21 octobre 2026) : pas de mise en veille automatique pendant la session et les installations (`SetThreadExecutionState`, aucun réglage d'alimentation modifié) ; rappel de redémarrer à l'écran de fin et dans le rapport quand un redémarrage est en attente (8.6, 8.8). Accord de David du 21 octobre 2026, après la session sur VM où le PC hôte s'est mis en veille et où le .NET a fini en code 3010 sans rappel. Rapport : suffixe `_2`, `_3`… au lieu d'écraser un rapport du même jour (8.8), défaut constaté le même jour (le rapport de T3 a remplacé celui de la session auto).

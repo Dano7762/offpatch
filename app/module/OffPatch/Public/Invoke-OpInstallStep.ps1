@@ -67,10 +67,16 @@
     $depot = Get-OpPath -Name Depot -Root $Root
     Write-OpLog "Étape $StepId ($($step.Category)) : début."
     $start = Get-Date
-    switch ($step.Category) {
-        { $_ -in 'defender-platform', 'defender' } { $result = Install-OpDefenderUpdate -Item $item -Depot $depot -Confirm:$false }
-        'office-source' { $result = Install-OpOfficeUpdate -Item $item -LogDirectory $logDirectory -Root $Root -Configuration $configuration -Confirm:$false }
-        default { $result = Install-OpWindowsPackage -Item $item -Depot $depot -LogDirectory $logDirectory -Confirm:$false }
+    # Pas de mise en veille pendant l'installation (une cumulative prend jusqu'à 30 min).
+    $sleep = Suspend-OpSystemSleep -Confirm:$false
+    try {
+        switch ($step.Category) {
+            { $_ -in 'defender-platform', 'defender' } { $result = Install-OpDefenderUpdate -Item $item -Depot $depot -Confirm:$false }
+            'office-source' { $result = Install-OpOfficeUpdate -Item $item -LogDirectory $logDirectory -Root $Root -Configuration $configuration -Confirm:$false }
+            default { $result = Install-OpWindowsPackage -Item $item -Depot $depot -LogDirectory $logDirectory -Confirm:$false }
+        }
+    } finally {
+        Resume-OpSystemSleep -PreviousState $sleep -Confirm:$false
     }
     $result | Add-Member -NotePropertyName StartTime -NotePropertyValue $start.ToString('o') -Force
     $result | Add-Member -NotePropertyName Seconds -NotePropertyValue ([math]::Round(((Get-Date) - $start).TotalSeconds, 1)) -Force

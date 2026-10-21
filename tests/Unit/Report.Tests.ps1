@@ -77,6 +77,11 @@ Describe 'ConvertTo-OpReportHtml' {
         $h | Should -Match 'Session interrompue'
         $h | Should -Match 'Aucun\.'
         $h | Should -Not -Match 'mode Avion'
+        $h | Should -Not -Match 'Redémarrage nécessaire'
+    }
+
+    It 'rappelle le redémarrage en attente' {
+        ConvertTo-OpReportHtml -Session (Get-Session @{ RebootPending = $true }) | Should -Match 'Redémarrage nécessaire pour terminer'
     }
 }
 
@@ -95,6 +100,16 @@ Describe 'Save-OpReport' {
         Get-Content -LiteralPath $path -Raw -Encoding UTF8 | Should -Match 'Modèle 14'
         Test-Path (Join-Path $script:clientLogs '2026-10-17_PC-ATELIER_SN_12_34.html') | Should -BeTrue
         @(Get-ChildItem -Path (Split-Path -Parent $path) -Filter '*.tmp').Count | Should -Be 0
+    }
+
+    It 'n''écrase pas un rapport du même jour (essai T3 du 21 octobre) : suffixe _2, puis _3' {
+        $first = Save-OpReport -Session (Get-Session) -Root $script:root
+        $second = Save-OpReport -Session (Get-Session) -Root $script:root
+        $third = Save-OpReport -Session (Get-Session) -Root $script:root
+        Split-Path -Leaf $second | Should -Be '2026-10-17_PC-ATELIER_SN_12_34_2.html'
+        Split-Path -Leaf $third | Should -Be '2026-10-17_PC-ATELIER_SN_12_34_3.html'
+        Test-Path $first | Should -BeTrue
+        Test-Path (Join-Path $script:clientLogs '2026-10-17_PC-ATELIER_SN_12_34_2.html') | Should -BeTrue
     }
 
     It 'garde le rapport du support si la copie dans ProgramData échoue' {

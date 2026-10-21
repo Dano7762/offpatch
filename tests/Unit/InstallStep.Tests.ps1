@@ -9,7 +9,8 @@ BeforeAll {
     $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $private = 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Get-OpRoot', 'Get-OpPath', 'Get-OpConfiguration', 'Read-OpManifest', 'Get-OpNetworkConnection',
     'New-OpRestorePoint', 'Install-OpDefenderUpdate', 'Install-OpWindowsPackage', 'Install-OpOfficeUpdate', 'ConvertTo-OpReportHtml', 'Save-OpReport',
-    'Get-OpSupportIdentity', 'Get-OpInitialSessionState', 'Read-OpSessionState', 'Save-OpSessionState', 'Complete-OpSessionState', 'Unregister-OpResumeTask'
+    'Get-OpSupportIdentity', 'Get-OpInitialSessionState', 'Read-OpSessionState', 'Save-OpSessionState', 'Complete-OpSessionState', 'Unregister-OpResumeTask',
+    'Get-OpPendingReboot', 'Suspend-OpSystemSleep', 'Resume-OpSystemSleep'
     foreach ($name in $private) { . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1") }
     foreach ($name in 'Get-OpSystemInfo', 'Test-OpPreflight', 'Get-OpInstallPlan', 'Invoke-OpInstallStep', 'Write-OpInstallReport') {
         . (Join-Path $repo "app\module\OffPatch\Public\$name.ps1")
@@ -48,6 +49,26 @@ Describe 'Invoke-OpInstallStep et Write-OpInstallReport' {
         Mock Install-OpWindowsPackage { $r = Get-Result $Item.id 'windows-lcu'; $r | Add-Member RebootRequired $true; $r }
         Mock Install-OpOfficeUpdate { Get-Result $Item.id 'office-source' 'Error' }
         Mock Get-OpNetworkConnection { }
+        Mock Get-OpPendingReboot { }
+        Mock Suspend-OpSystemSleep { [uint32]2147483648 }
+        Mock Resume-OpSystemSleep {}
+    }
+
+    It 'suspend la mise en veille pendant l''exécuteur et la rétablit, même en cas d''exception' {
+        Invoke-OpInstallStep -StepId 'def' -Root $script:root | Out-Null
+        Should -Invoke Suspend-OpSystemSleep -Times 1 -Exactly
+        Should -Invoke Resume-OpSystemSleep -Times 1 -Exactly -ParameterFilter { $PreviousState -eq 2147483648 }
+        Mock Install-OpWindowsPackage { throw 'DISM introuvable' }
+        { Invoke-OpInstallStep -StepId 'lcu' -Root $script:root } | Should -Throw '*DISM introuvable*'
+        Should -Invoke Resume-OpSystemSleep -Times 2 -Exactly
+    }
+
+    It 'rappelle le redémarrage en attente en fin de session, à l''écran et dans le rapport' {
+        Mock Get-OpPendingReboot { 'CBS' }
+        Invoke-OpInstallStep -StepId 'def' -Root $script:root | Out-Null
+        $path = Write-OpInstallReport -Root $script:root -WarningVariable warnings -WarningAction SilentlyContinue
+        "$warnings" | Should -Match 'Redémarrage nécessaire.*CBS'
+        Get-Content -LiteralPath $path -Raw -Encoding UTF8 | Should -Match 'Redémarrage nécessaire pour terminer'
     }
 
     It 'choisit l''exécuteur de la catégorie et complète le résultat' -TestCases @(

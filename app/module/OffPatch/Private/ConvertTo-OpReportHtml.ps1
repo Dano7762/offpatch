@@ -12,6 +12,7 @@
             plan et résultats des exécuteurs ;
           - LogPath : journaux de la session (un ou plusieurs), dont les lignes [WARN] et [ERROR] sont reprises ;
           - Offline : vrai si le PC était hors ligne en fin de session ;
+          - RebootPending : vrai si un redémarrage était en attente en fin de session ;
           - RestorePoint : Status (Created, Existing ou None), Description, CreationTime, Reason,
             ProtectionEnabled (protection du système activée par Checkpoint-Computer) ;
           - ToolVersion, DepotDate.
@@ -130,6 +131,7 @@
     if ($issues.Count -eq 0) { [void]$html.AppendLine('<p>Aucun.</p>') }
     else { [void]$html.AppendLine("<ul>$(($issues | ForEach-Object { "<li>$(ConvertTo-HtmlText $_)</li>" }) -join '')</ul>") }
 
+    if (Get-Prop $Session 'RebootPending') { [void]$html.AppendLine('<p class="note">Redémarrage nécessaire pour terminer l''installation des mises à jour.</p>') }
     if (Get-Prop $Session 'Offline') { [void]$html.AppendLine('<p class="note">Le PC était hors ligne en fin de session : désactiver le mode Avion ou rebrancher le réseau, pour que Windows et Defender se mettent à jour d''eux-mêmes.</p>') }
 
     [void]$html.AppendLine('<h2>Point de restauration</h2><table>')

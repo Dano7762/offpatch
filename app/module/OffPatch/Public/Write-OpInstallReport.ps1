@@ -11,7 +11,8 @@
         l'état du PC sans étape exécutée. Écrit le rapport par Save-OpReport, puis clôt la session : state.json est
         archivé dans les journaux (Complete-OpSessionState), la tâche OffPatch-Reprise, resume.ps1 et le dossier temp
         de ProgramData sont supprimés. PC hors ligne : avertissement à l'écran qui rappelle de désactiver le mode Avion
-        ou de rebrancher le réseau.
+        ou de rebrancher le réseau. Redémarrage en attente (Get-OpPendingReboot) : rappel de redémarrer, à l'écran et
+        dans le rapport.
         Renvoie le chemin du rapport sur le support.
 
     .PARAMETER Root
@@ -50,6 +51,9 @@
 
     $offline = $false
     try { $offline = @(Get-OpNetworkConnection).Count -eq 0 } catch { Write-OpLog "État du réseau illisible : $($_.Exception.Message)" -Level WARN }
+    # Redémarrage en attente en fin de session (par exemple .NET en 3010 en dernière étape) : rappel.
+    $rebootPending = @()
+    try { $rebootPending = @(Get-OpPendingReboot) } catch { Write-OpLog "Redémarrage en attente illisible : $($_.Exception.Message)" -Level WARN }
     $log = Get-Variable -Name OpLog -Scope Script -ValueOnly -ErrorAction SilentlyContinue
     # Un journal par appel de la CLI : ceux des étapes, puis celui du rapport.
     if ($log -and $log.Path -and $logPaths -notcontains $log.Path) { $logPaths += $log.Path }
@@ -63,6 +67,7 @@
         Steps        = $steps
         LogPath      = $logPaths
         Offline      = $offline
+        RebootPending = $rebootPending.Count -gt 0
         RestorePoint = $restore
         ToolVersion  = [string](Get-Module -Name OffPatch | Select-Object -First 1 -ExpandProperty Version)
         DepotDate    = $manifest.generatedAt
@@ -83,6 +88,11 @@
     if ($offline) {
         $reminder = 'PC hors ligne : désactiver le mode Avion ou rebrancher le réseau, pour que Windows et Defender se mettent à jour d''eux-mêmes.'
         Write-OpLog $reminder
+        Write-Warning $reminder
+    }
+    if ($rebootPending.Count -gt 0) {
+        $reminder = "Redémarrage nécessaire pour terminer l'installation des mises à jour ($($rebootPending -join ', '))."
+        Write-OpLog $reminder -Level WARN
         Write-Warning $reminder
     }
     $path

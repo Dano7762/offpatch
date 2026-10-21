@@ -11,7 +11,7 @@ BeforeAll {
     $private = 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Get-OpRoot', 'Get-OpPath', 'Get-OpConfiguration', 'Read-OpManifest', 'Get-OpNetworkConnection',
     'New-OpRestorePoint', 'Install-OpDefenderUpdate', 'Install-OpWindowsPackage', 'Install-OpOfficeUpdate', 'ConvertTo-OpReportHtml', 'Save-OpReport',
     'Get-OpSupportIdentity', 'Get-OpInitialSessionState', 'Read-OpSessionState', 'Save-OpSessionState', 'Complete-OpSessionState',
-    'Register-OpResumeTask', 'Unregister-OpResumeTask'
+    'Register-OpResumeTask', 'Unregister-OpResumeTask', 'Get-OpPendingReboot', 'Suspend-OpSystemSleep', 'Resume-OpSystemSleep'
     foreach ($name in $private) { . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1") }
     foreach ($name in 'Get-OpSystemInfo', 'Test-OpPreflight', 'Get-OpInstallPlan', 'Invoke-OpInstallStep', 'Restart-OpSession', 'Write-OpInstallReport', 'Invoke-OpAutoSession') {
         . (Join-Path $repo "app\module\OffPatch\Public\$name.ps1")
@@ -58,6 +58,9 @@ Describe 'Session automatique simulée de bout en bout' {
         Mock Install-OpWindowsPackage { $r = Get-Result $Item.id $Item.category; $r | Add-Member RebootRequired $true; $r }
         Mock Install-OpOfficeUpdate { Get-Result $Item.id 'office-source' }
         Mock Get-OpNetworkConnection { }
+        Mock Get-OpPendingReboot { }
+        Mock Suspend-OpSystemSleep { [uint32]2147483648 }
+        Mock Resume-OpSystemSleep {}
         # Planificateur de tâches simulé : la tâche existe entre son enregistrement et sa suppression.
         $script:task = $null
         Mock Register-ScheduledTask { $script:task = [pscustomobject]@{ TaskName = $TaskName } }
@@ -166,6 +169,13 @@ Describe 'Session automatique simulée de bout en bout' {
             Invoke-OpAutoSession -Root $script:root -Confirm:$false -WarningAction SilentlyContinue | Out-Null
             Should -Invoke Install-OpWindowsPackage -Times 2 -Exactly -ParameterFilter { $Item.id -eq 'lcu' }
             Should -Invoke Get-OpInstallPlan -ParameterFilter { $ExcludeId -contains 'lcu' }
+        }
+
+        It 'suspend la mise en veille pendant toute la session et la rétablit, redémarrage compris' {
+            (Invoke-OpAutoSession -Root $script:root -Confirm:$false).Result | Should -Be 'Restarting'
+            # Une fois pour la session, une fois par étape (def, lcu) ; autant de rétablissements.
+            Should -Invoke Suspend-OpSystemSleep -Times 3 -Exactly
+            Should -Invoke Resume-OpSystemSleep -Times 3 -Exactly
         }
 
         It 'limite de redémarrages atteinte : s''arrête et termine par le rapport' {
