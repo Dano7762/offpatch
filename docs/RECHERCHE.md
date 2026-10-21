@@ -158,6 +158,11 @@ Impact : catégorie `windows-ekb`, regroupement des redémarrages.
   - Règle actuelle maintenue : enablement package après le redémarrage de la cumulative, une fois l'UBR réel ≥ `minUbr`.
   - Essai de regroupement inscrit en tête de ce fichier (« À valider sur intervention réelle ») : PC Windows 11 fraîchement installé sous 9550, point de restauration juste avant, un seul redémarrage. S'il réussit, le planificateur pourra regrouper les deux étapes avec l'UBR projeté (8.3).
   - DISM acceptant le paquet sous le prérequis, `minUbr` est contrôlé par OffPatch seul (cahier des charges 1.15, 8.3) ; cas de test P6 (12).
+- Constat sur intervention réelle (VM VirtualBox de David, Windows 11 Famille 25H2 26200.8037, x64, journaux `C:\ProgramData\OffPatch\logs` relevés le 2026-10-21) :
+  - **19 octobre**, ordre prévu : cumulative KB5127648 (3010, 32 min), redémarrage, KB5121794 (3010), redémarrage : 26300.9711. Installation effective et passage en 26300 validés (point « Reste à valider » ci-dessus).
+  - **20 octobre**, ordre inverse par défaut (corrigé depuis, `Get-OpInstallPlan -ExcludeId`) : cumulative refusée (lecture du support faussée), KB5121794 installé sous l'UBR requis (8037) : DISM 3010 en 4 s, `Package_for_KB5121794~…~26100.8966.1.0 : InstallPending`. Après le redémarrage, toujours 26200.8037 : OffPatch l'a jugé « non appliqué (retour arrière probable) ».
+  - **21 octobre**, même VM, sans nouvelle installation de KB5121794 : cumulative KB5127648 seule (3010, 24 min 28 s), un redémarrage : **26300.9711**, enablement package `NotApplicable` (déjà en 26300).
+  - Conclusion : installé sous l'UBR requis, l'enablement package **n'est pas annulé** ; il reste en sommeil et prend effet au redémarrage qui suit la cumulative. Le jugement « retour arrière probable » du 20 octobre était faux pour cette catégorie (inoffensif : pas de nouvelle tentative, et la catégorie passe `NotApplicable` dès le passage en 26300). Ce n'est pas l'essai de regroupement prévu (un seul redémarrage pour les deux), mais c'en est un indice favorable. Règle actuelle inchangée : enablement package après la cumulative et son redémarrage.
 
 ## R-04 Windows 10 22H2 et ESU
 
