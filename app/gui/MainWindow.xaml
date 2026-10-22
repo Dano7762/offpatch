@@ -174,7 +174,7 @@
                         <Button x:Name="BtnDepotCheck" Content="Vérifier les nouveautés" Padding="14,4" Margin="0,0,8,0" />
                         <Button x:Name="BtnDepotUpdate" Content="Mettre à jour le dépôt" Padding="14,4" Margin="0,0,8,0" />
                         <Button x:Name="BtnDepotPurge" Content="Purger" Padding="14,4" Margin="0,0,8,0" />
-                        <Button x:Name="BtnPrepareSupport" Content="Préparer un support…" Padding="14,4" Margin="0,0,8,0" IsEnabled="False" />
+                        <Button x:Name="BtnPrepareSupport" Content="Préparer un support…" Padding="14,4" Margin="0,0,8,0" />
                         <Button x:Name="BtnDepotCancel" Content="Annuler" Padding="14,4" IsEnabled="False"
                                 ToolTipService.ShowOnDisabled="True" ToolTip="Arrête le téléchargement en cours ; il reprendra au prochain lancement. Une source Office en cours va jusqu'au bout." />
                     </StackPanel>

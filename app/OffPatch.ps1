@@ -28,7 +28,7 @@ $modulePath = Join-Path $PSScriptRoot 'module\OffPatch\OffPatch.psd1'
 try {
     Import-Module -Name $modulePath -Force -ErrorAction Stop
     [void](Initialize-OpSession -Kind Session -Root $root -Unblock)
-    foreach ($name in 'MainWindow', 'Background', 'Header', 'PcTab', 'DepotTab', 'LogTab', 'Dialogs\AutoSummary') { . (Join-Path $PSScriptRoot "gui\$name.ps1") }
+    foreach ($name in 'MainWindow', 'Background', 'Header', 'PcTab', 'DepotTab', 'LogTab', 'Dialogs\AutoSummary', 'Dialogs\PrepareSupport') { . (Join-Path $PSScriptRoot "gui\$name.ps1") }
     $ui = Import-OpMainWindow
     Register-OpHeader -Ui $ui
     Show-OpHeader -Controls $ui.Controls -Status (Get-OpDepotStatus -Root $root)

@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.40 du 22 octobre 2026.
+Version 1.41 du 22 octobre 2026.
 
 ## 1. Contexte
 
@@ -448,9 +448,9 @@ Assistant accessible depuis l'onglet Dépôt :
 
 1. Choisir le lecteur de destination (clé ou disque externe).
 2. Choisir les cibles et les sources Office à embarquer, pour ne copier que l'utile.
-3. Contrôler le système de fichiers : NTFS ou exFAT. Le FAT32 est refusé, car la cumulative Windows 11 x64 dépasse 4 Gio (4 639 422 594 octets en septembre 2026, R-12). Contrôler l'espace libre. Taille de support recommandée : 64 Go pour un dépôt complet (trois cibles Windows, trois sources Office, rétention par défaut : environ 23 Gio en octobre 2026 ; un support de 32 Go, soit environ 29 Gio utiles, laisse trop peu de marge pour la croissance des cumulatives) ; 32 Go suffisent pour un dépôt filtré, par exemple une cible Windows 11 et une source Office (environ 9 Gio).
+3. Contrôler le lecteur : prêt, autre que celui de l'outil ; contrôler le système de fichiers : NTFS ou exFAT. Le FAT32 est refusé, car la cumulative Windows 11 x64 dépasse 4 Gio (4 639 422 594 octets en septembre 2026, R-12). Contrôler l'espace libre. Taille de support recommandée : 64 Go pour un dépôt complet (trois cibles Windows, trois sources Office, rétention par défaut : environ 23 Gio en octobre 2026 ; un support de 32 Go, soit environ 29 Gio utiles, laisse trop peu de marge pour la croissance des cumulatives) ; 32 Go suffisent pour un dépôt filtré, par exemple une cible Windows 11 et une source Office (environ 9 Gio). L'assistant avertit quand le support fait moins du double du dépôt retenu, et refuse quand l'espace libre ne suffit pas pour les fichiers à copier (ceux déjà présents avec la bonne taille ne comptent pas).
 4. Si le support contient déjà OffPatch, rapatrier d'abord ses rapports dans `rapports/` du poste.
-5. Copier `app/`, `config/`, `tools/`, `offpatch.root`, `README.md` et les dossiers du dépôt retenus, avec robocopy en miroir dossier par dossier. Le dossier `rapports/` du support n'est jamais mis en miroir, pour ne pas effacer de rapports.
+5. Copier à la racine du support `Lancer-OffPatch.cmd`, `offpatch.root`, `README.md`, `LICENSE`, `app/`, `config/`, `tools/` et les fichiers du dépôt retenus (un élément incomplet au dépôt est écarté, avec un avertissement), avec robocopy en miroir dossier par dossier. Le dossier `rapports/` du support n'est jamais mis en miroir, pour ne pas effacer de rapports.
 6. Écrire sur le support un manifeste filtré qui ne contient que les éléments copiés.
 7. Vérifier la copie (tailles, puis hash des fichiers du manifeste) et afficher un bilan.
 
@@ -779,3 +779,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.38 (21 octobre 2026) : pas de mise en veille automatique pendant la session et les installations (`SetThreadExecutionState`, aucun réglage d'alimentation modifié) ; rappel de redémarrer à l'écran de fin et dans le rapport quand un redémarrage est en attente (8.6, 8.8). Accord de David du 21 octobre 2026, après la session sur VM où le PC hôte s'est mis en veille et où le .NET a fini en code 3010 sans rappel. Rapport : suffixe `_2`, `_3`… au lieu d'écraser un rapport du même jour (8.8), défaut constaté le même jour (le rapport de T3 a remplacé celui de la session auto).
 - 1.39 (21 octobre 2026) : onglet Dépôt (9). Champ facultatif `enabled` des sources Office (6.3), que suppose la case à cocher par source déjà prévue en 9 ; langues saisies par source (forme `xx-xx`) ; seules les lignes `targets`, `enabled` et `languages` sont réécrites, présentation des fichiers conservée. Précision de mise en œuvre, sans changement de périmètre.
 - 1.40 (22 octobre 2026) : logo de l'outil dans l'en-tête et comme icône de la fenêtre (`app/gui/OffPatch.png`, fond transparent), pied de fenêtre avec l'auteur, la licence MIT et le lien vers le dépôt GitHub du projet (5, 9). Demande et accord de David du 22 octobre 2026. Ligne de version en tête du document remise à jour (elle indiquait encore 1.34).
+- 1.41 (22 octobre 2026) : préparation d'un support (7.4), précisions de mise en œuvre sans changement de périmètre : `Lancer-OffPatch.cmd` et `LICENSE` copiés avec l'outil (le lanceur manquait à la liste), OffPatch à la racine du support, lecteur de l'outil refusé comme support, élément incomplet au dépôt écarté avec un avertissement, avertissement sous le double du dépôt retenu, espace demandé sans les fichiers déjà présents. À valider par David.

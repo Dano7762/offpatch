@@ -151,7 +151,7 @@ function Set-OpDepotBusy {
     )
 
     if (-not $PSCmdlet.ShouldProcess('onglet Dépôt', 'État des commandes')) { return }
-    foreach ($name in 'BtnDepotCheck', 'BtnDepotUpdate', 'BtnDepotPurge') { $Controls[$name].IsEnabled = -not $Busy }
+    foreach ($name in 'BtnDepotCheck', 'BtnDepotUpdate', 'BtnDepotPurge', 'BtnPrepareSupport') { $Controls[$name].IsEnabled = -not $Busy }
     $Controls.DepotTargets.IsEnabled = -not $Busy
     $Controls.DepotSources.IsEnabled = -not $Busy
     if ($Busy) { $Controls.BtnSaveSelection.IsEnabled = $false }
@@ -303,7 +303,8 @@ function Register-OpDepotTab {
 
     $Ui | Add-Member -NotePropertyName Root -NotePropertyValue $Root -Force
     $Ui | Add-Member -NotePropertyName ModulePath -NotePropertyValue $ModulePath -Force
-    foreach ($name in 'BtnDepotCheck', 'BtnDepotUpdate', 'BtnDepotPurge', 'BtnDepotCancel', 'BtnSaveSelection') { $Ui.Controls[$name].Tag = $Ui }
+    foreach ($name in 'BtnDepotCheck', 'BtnDepotUpdate', 'BtnDepotPurge', 'BtnDepotCancel', 'BtnSaveSelection', 'BtnPrepareSupport') { $Ui.Controls[$name].Tag = $Ui }
+    $Ui.Controls.BtnPrepareSupport.Add_Click({ Show-OpPrepareSupport -Root $this.Tag.Root -Owner $this.Tag.Window })
     $Ui.Controls.BtnDepotCheck.Add_Click({ Invoke-OpDepotRun -Ui $this.Tag -ListOnly })
     $Ui.Controls.BtnDepotUpdate.Add_Click({ Invoke-OpDepotRun -Ui $this.Tag })
     $Ui.Controls.BtnDepotPurge.Add_Click({ Invoke-OpDepotPurgeRun -Ui $this.Tag })
