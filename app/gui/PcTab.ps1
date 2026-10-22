@@ -47,7 +47,39 @@ $script:OpPcAutoScript = {
     [void](Initialize-OpSession -Kind Session -Queue $OpQueue -Root $Root)
     $onStep = { param($s) $OpQueue.Enqueue([pscustomobject]@{ Kind = 'AutoStep'; Id = $s.Id; Done = [bool]$s.PSObject.Properties['Seconds']; State = $s.State }) }
     $onTick = { param($left) $OpQueue.Enqueue([pscustomobject]@{ Kind = 'Countdown'; Seconds = $left }) }
-    Invoke-OpAutoSession -Root $Root -ForceWindows:$ForceWindows -OnStep $onStep -OnTick $onTick -IsCancelled { $OpCancel.IsCancellationRequested } -Confirm:$false
+    # Rappels de fin (mode Avion, redémarrage), émis en avertissements par Write-OpInstallReport : gardés pour le bilan.
+    $notes = $null
+    $r = Invoke-OpAutoSession -Root $Root -ForceWindows:$ForceWindows -OnStep $onStep -OnTick $onTick -IsCancelled { $OpCancel.IsCancellationRequested } -Confirm:$false -WarningVariable notes -WarningAction SilentlyContinue
+    if ($r) { $r | Add-Member -NotePropertyName Reminders -NotePropertyValue @($notes | ForEach-Object { [string]$_ }) -Force }
+    $r
+}
+
+function Get-OpAutoEndText {
+    <#
+    .SYNOPSIS
+        Texte du bilan affiché à la fin d'une session automatique.
+
+    .DESCRIPTION
+        Cahier des charges 8.6 : nombre d'étapes exécutées dans le dernier passage, chemin du rapport, rappels de fin
+        (désactiver le mode Avion ou rebrancher le réseau, redémarrer pour terminer l'installation).
+
+    .PARAMETER Result
+        Résultat de la session ($script:OpPcAutoScript) : Steps, ReportPath, Reminders.
+
+    .EXAMPLE
+        [System.Windows.MessageBox]::Show((Get-OpAutoEndText -Result $result), 'OffPatch')
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Result
+    )
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("Session automatique terminée : $(@($Result.Steps).Count) étape(s) exécutée(s) depuis le dernier redémarrage.")
+    if ($Result.ReportPath) { $lines.Add("Rapport : $($Result.ReportPath)") }
+    if ($Result.PSObject.Properties['Reminders']) { foreach ($note in @($Result.Reminders)) { if ($note) { $lines.Add('') ; $lines.Add($note) } } }
+    $lines -join [Environment]::NewLine
 }
 
 function ConvertTo-OpPcStepTable {
@@ -315,6 +347,7 @@ function Invoke-OpPcAuto {
                 $c.PcProgress.Value = 1
                 $c.PcCurrentStep.Text = 'Session automatique terminée.'
                 if ($result.ReportPath) { Add-OpLogLine -ListBox $c.PcLastLog -Line "Rapport : $($result.ReportPath)" }
+                [void][System.Windows.MessageBox]::Show((Get-OpAutoEndText -Result $result), 'OffPatch', 'OK', 'Information')
             }
             foreach ($button in 'BtnRestart', 'BtnResume') { $c[$button].IsEnabled = $true }
             $c.PcSteps.IsEnabled = $true

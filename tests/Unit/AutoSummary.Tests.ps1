@@ -99,7 +99,8 @@ Describe 'Session automatique (script du runspace)' {
             & $OnStep ([pscustomobject]@{ Id = 'lcu'; Category = 'windows-lcu'; State = 'Pending' })
             & $OnStep ([pscustomobject]@{ Id = 'lcu'; State = 'UpToDate'; Seconds = 3.0 })
             & $OnTick 2
-            [pscustomobject]@{ Result = 'Cancelled'; Cancelled = (& $IsCancelled) }
+            Write-Warning 'Redémarrage nécessaire pour terminer l''installation des mises à jour (CBS).'
+            [pscustomobject]@{ Result = 'Cancelled'; Cancelled = (& $IsCancelled); Steps = @(); ReportPath = $null }
         }
     }
 
@@ -107,6 +108,7 @@ Describe 'Session automatique (script du runspace)' {
         $source.Cancel()
         $r = & $script:OpPcAutoScript -Root 'X:\' -ForceWindows $true
         $r.Cancelled | Should -BeTrue
+        $r.Reminders | Should -Be @('Redémarrage nécessaire pour terminer l''installation des mises à jour (CBS).')
         Should -Invoke Invoke-OpAutoSession -Times 1 -Exactly -ParameterFilter { $ForceWindows -and $Root -eq 'X:\' }
         $all = @(); $m = $null; while ($OpQueue.TryDequeue([ref]$m)) { $all += $m }
         @($all | ForEach-Object { "$($_.Kind) $(if ($_.Kind -eq 'AutoStep') { "$($_.Id) $($_.Done)" } else { $_.Seconds })" }) | Should -Be @('AutoStep lcu False', 'AutoStep lcu True', 'Countdown 2')
@@ -115,5 +117,18 @@ Describe 'Session automatique (script du runspace)' {
     It 'sans annulation, le jeton n''arrête rien' {
         (& $script:OpPcAutoScript -Root 'X:\' -ForceWindows $false).Cancelled | Should -BeFalse
         Should -Invoke Invoke-OpAutoSession -Times 1 -Exactly -ParameterFilter { -not $ForceWindows }
+    }
+}
+
+Describe 'Get-OpAutoEndText' {
+    It 'bilan : étapes, rapport, rappels de fin' {
+        $text = Get-OpAutoEndText -Result ([pscustomobject]@{ Steps = @(1, 2); ReportPath = 'C:\OffPatch\rapports\r.html'; Reminders = @('PC hors ligne : désactiver le mode Avion.', 'Redémarrage nécessaire.') })
+        $text | Should -Match '^Session automatique terminée : 2 étape\(s\)'
+        $text | Should -BeLike '*Rapport : C:?OffPatch?rapports?r.html*'
+        $text | Should -Match 'mode Avion\.\r?\n\r?\nRedémarrage nécessaire\.$'
+    }
+
+    It 'sans rappel ni rapport : la première ligne seule' {
+        Get-OpAutoEndText -Result ([pscustomobject]@{ Steps = @(); ReportPath = $null }) | Should -Be 'Session automatique terminée : 0 étape(s) exécutée(s) depuis le dernier redémarrage.'
     }
 }
