@@ -112,7 +112,7 @@ Describe 'Test-OpPreflight' {
     It 'bloque sous minFreeSpaceGB ou si l''espace est illisible' {
         $info = Get-TestInfo
         $info.FreeSpaceBytes = [long]16GB
-        (Get-Check $info 'FreeSpace').Message | Should -BeLike '*16,0 Go libres, 17 Go*'
+        (Get-Check $info 'FreeSpace').Message | Should -Match '16[.,]0 Go libres, 17 Go' -Because 'séparateur décimal de la langue du système'
         (Get-Check $info 'FreeSpace').Result | Should -Be 'Blocking'
         $info.FreeSpaceBytes = $null
         (Get-Check $info 'FreeSpace').Result | Should -Be 'Blocking'

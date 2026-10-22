@@ -66,14 +66,17 @@ Describe 'OffPatch-Cli.ps1' {
         @(Get-ChildItem -Path (Join-Path $tool 'ProgramData\OffPatch\logs') -Filter '*.html').Count | Should -Be 1
     }
 
-    # Le contrôle préalable exige l'élévation : la CI tourne en administrateur, un terminal de développement souvent non.
-    It 'Auto -Resume sans étape à faire (dépôt vide) termine par le rapport (code 0), ou refuse sans élévation (code 1)' {
+    # Contrôles préalables bloquants selon la machine : élévation (un terminal de développement souvent non élevé) et
+    # système pris en charge (les runners de la CI sont des Windows Server, hors périmètre). Refus attendu dans ces cas.
+    It 'Auto -Resume sans étape à faire (dépôt vide) termine par le rapport (code 0), ou refuse sur un contrôle bloquant (code 1)' {
         $tool = Get-ToolCopy
         $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'Auto', '-Resume')
         $principal = New-Object Security.Principal.WindowsPrincipal ([Security.Principal.WindowsIdentity]::GetCurrent())
-        if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        $elevated = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        $server = (Get-CimInstance -ClassName Win32_OperatingSystem).ProductType -ne 1
+        if (-not $elevated -or $server) {
             $r.ExitCode | Should -Be 1 -Because $r.Output
-            $r.Output | Should -Match 'Droits administrateur'
+            if (-not $elevated) { $r.Output | Should -Match 'Droits administrateur' } else { $r.Output | Should -Match 'Hors p.rim.tre : Windows Server' }
             @(Get-ChildItem -Path (Join-Path $tool 'rapports') -Filter '*.html' -ErrorAction SilentlyContinue).Count | Should -Be 0
             return
         }

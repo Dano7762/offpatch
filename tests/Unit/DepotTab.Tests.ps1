@@ -50,9 +50,9 @@ Describe 'Set-OpDepotSelection' {
         $r.Targets | Should -Be @('win11-x64', 'win10-x64')
         $after = Get-TextLine $path
         $after.Count | Should -Be $before.Count
-        @(for ($i = 0; $i -lt $after.Count; $i++) { if ($after[$i] -cne $before[$i]) { $after[$i] } }) | Should -Be @('  "targets": ["win11-x64", "win10-x64"],')
+        @(for ($i = 0; $i -lt $after.Count; $i++) { if ($after[$i] -cne $before[$i]) { $after[$i].TrimEnd("`r") } }) | Should -Be @('  "targets": ["win11-x64", "win10-x64"],')
         [System.IO.File]::ReadAllBytes($path)[0] | Should -Be 0x7B -Because 'pas de BOM'
-        [System.IO.File]::ReadAllText($path) | Should -Not -Match "`r`n"
+        ([System.IO.File]::ReadAllText($path) -match "`r`n") | Should -Be $before[0].EndsWith("`r") -Because 'fins de ligne du fichier conservées (LF dans le dépôt, CRLF après une extraction git avec autocrlf)'
         Test-Path "$path.tmp" | Should -BeFalse
     }
 
