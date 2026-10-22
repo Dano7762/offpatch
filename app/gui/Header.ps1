@@ -67,3 +67,50 @@ function Show-OpHeader {
     $Controls.HeaderAlert.Visibility = 'Collapsed'
     if ($text.Alert) { $Controls.HeaderAlert.Visibility = 'Visible' }
 }
+
+function Register-OpHeader {
+    <#
+    .SYNOPSIS
+        Affiche le logo dans l'en-tête et comme icône de la fenêtre, et câble le lien du pied vers le dépôt du projet.
+
+    .DESCRIPTION
+        Logo lu dans OffPatch.jpg à côté de ce script, une seule fois (image figée, fichier libéré). Logo absent ou
+        illisible : en-tête et icône par défaut, sans erreur. Le lien du pied s'ouvre dans le navigateur par défaut ;
+        sans connexion, le navigateur affiche simplement une erreur.
+
+    .PARAMETER Ui
+        Fenêtre renvoyée par Import-OpMainWindow.
+
+    .PARAMETER LogoPath
+        Image du logo ; par défaut OffPatch.jpg à côté de ce script.
+
+    .EXAMPLE
+        Register-OpHeader -Ui $ui
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Ui,
+        [string]$LogoPath = (Join-Path $PSScriptRoot 'OffPatch.jpg')
+    )
+
+    if (Test-Path -LiteralPath $LogoPath -PathType Leaf) {
+        try {
+            $image = New-Object System.Windows.Media.Imaging.BitmapImage
+            $image.BeginInit()
+            $image.UriSource = New-Object System.Uri $LogoPath
+            $image.CacheOption = 'OnLoad'
+            $image.DecodePixelHeight = 256
+            $image.EndInit()
+            $image.Freeze()
+            $Ui.Controls.HeaderLogo.Source = $image
+            $Ui.Controls.HeaderLogo.Visibility = 'Visible'
+            $Ui.Window.Icon = $image
+        } catch {
+            $Ui.Controls.HeaderLogo.Visibility = 'Collapsed'
+        }
+    }
+    $Ui.Controls.FooterLink.Add_RequestNavigate({
+            Start-Process -FilePath $_.Uri.AbsoluteUri
+            $_.Handled = $true
+        })
+}

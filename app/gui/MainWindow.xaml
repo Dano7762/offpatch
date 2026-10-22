@@ -15,13 +15,15 @@
         </Style>
     </Window.Resources>
     <DockPanel>
-        <!-- En-tête : nom et version, date du dépôt, alerte de fraîcheur. -->
-        <Border x:Name="Header" DockPanel.Dock="Top" Padding="16,10" BorderThickness="0,0,0,1"
+        <!-- En-tête : logo, nom et version, date du dépôt, alerte de fraîcheur. -->
+        <Border x:Name="Header" DockPanel.Dock="Top" Padding="16,6" BorderThickness="0,0,0,1"
                 BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="HeaderTitle" Text="OffPatch" FontSize="18" FontWeight="SemiBold" />
-                    <TextBlock x:Name="HeaderVersion" Margin="8,0,0,0" VerticalAlignment="Bottom" Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
+                    <!-- Logo chargé par Register-OpHeader (OffPatch.jpg), masqué s'il manque. -->
+                    <Image x:Name="HeaderLogo" Height="56" Margin="0,0,12,0" Visibility="Collapsed" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock x:Name="HeaderTitle" Text="OffPatch" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock x:Name="HeaderVersion" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Border x:Name="HeaderAlert" Visibility="Collapsed" Padding="8,2" Margin="0,0,12,0" CornerRadius="3" Background="#FFF4CE">
@@ -30,6 +32,15 @@
                     <TextBlock x:Name="HeaderDepotDate" VerticalAlignment="Center" />
                 </StackPanel>
             </DockPanel>
+        </Border>
+
+        <!-- Pied : auteur, licence, dépôt du projet (lien ouvert par Register-OpHeader). -->
+        <Border DockPanel.Dock="Bottom" Padding="16,4" BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
+            <TextBlock x:Name="Footer" FontSize="12" Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}">
+                <Run Text="© 2026 David Informaticien · Licence MIT · " />
+                <Hyperlink x:Name="FooterLink" NavigateUri="https://github.com/Dano7762/offpatch" ToolTip="Ouvrir le dépôt du projet dans le navigateur">github.com/Dano7762/offpatch</Hyperlink>
+            </TextBlock>
         </Border>
 
         <TabControl x:Name="MainTabs" Margin="8">

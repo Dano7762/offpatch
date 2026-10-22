@@ -5,8 +5,9 @@
 
 .DESCRIPTION
     Cahier des charges 8.1, 8.6, 9. Charge le module, ouvre le journal, retire la marque « fichier téléchargé » des
-    fichiers de l'outil, charge la fenêtre et câble l'en-tête et les trois onglets. Avec -Resume, la session
-    automatique en cours (state.json) reprend d'elle-même une fois le relevé du PC fait, sans question.
+    fichiers de l'outil, charge la fenêtre et câble l'en-tête (logo, lien du dépôt du projet) et les trois onglets.
+    Avec -Resume, la session automatique en cours (state.json) reprend d'elle-même une fois le relevé du PC fait,
+    sans question.
     Démarrage impossible (configuration invalide, fenêtre illisible) : message, code de sortie 1.
 
 .PARAMETER Resume
@@ -29,6 +30,7 @@ try {
     [void](Initialize-OpSession -Kind Session -Root $root -Unblock)
     foreach ($name in 'MainWindow', 'Background', 'Header', 'PcTab', 'DepotTab', 'LogTab', 'Dialogs\AutoSummary') { . (Join-Path $PSScriptRoot "gui\$name.ps1") }
     $ui = Import-OpMainWindow
+    Register-OpHeader -Ui $ui
     Show-OpHeader -Controls $ui.Controls -Status (Get-OpDepotStatus -Root $root)
     Register-OpPcTab -Ui $ui -Root $root -ModulePath $modulePath -Resume:$Resume
     Register-OpDepotTab -Ui $ui -Root $root -ModulePath $modulePath

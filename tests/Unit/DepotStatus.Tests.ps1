@@ -91,3 +91,28 @@ Describe 'Show-OpHeader' -Skip:$script:noSta {
         $script:ui.Controls.HeaderAlert.ToolTip | Should -Be 'JSON invalide'
     }
 }
+
+Describe 'Register-OpHeader' -Skip:$script:noSta {
+    It 'logo dans l''en-tête et en icône, pied avec l''auteur, la licence et le lien du dépôt' {
+        $ui = Import-OpMainWindow
+        try {
+            Register-OpHeader -Ui $ui
+            $ui.Controls.HeaderLogo.Visibility | Should -Be 'Visible'
+            $ui.Controls.HeaderLogo.Source.PixelHeight | Should -Be 256
+            $ui.Window.Icon | Should -Not -BeNullOrEmpty
+            $text = -join @($ui.Controls.Footer.Inlines | ForEach-Object { if ($_ -is [System.Windows.Documents.Run]) { $_.Text } })
+            $text | Should -Match '© 2026 David Informaticien · Licence MIT'
+            $ui.Controls.FooterLink.NavigateUri.Host | Should -Be 'github.com'
+            $ui.Controls.FooterLink.NavigateUri.AbsolutePath | Should -Be '/Dano7762/offpatch'
+        } finally { $ui.Window.Close() }
+    }
+
+    It 'logo absent : en-tête sans logo, sans erreur' {
+        $ui = Import-OpMainWindow
+        try {
+            Register-OpHeader -Ui $ui -LogoPath (Join-Path $TestDrive 'absent.jpg')
+            $ui.Controls.HeaderLogo.Visibility | Should -Be 'Collapsed'
+            $ui.Window.Icon | Should -BeNullOrEmpty
+        } finally { $ui.Window.Close() }
+    }
+}
