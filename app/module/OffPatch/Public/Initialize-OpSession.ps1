@@ -19,6 +19,10 @@
     .PARAMETER Console
         Affiche dans la console l'avancement des traitements longs (téléchargements, sources Office) : CLI seulement.
 
+    .PARAMETER Unblock
+        Retire la marque « fichier téléchargé » des fichiers de l'outil (8.1) : au lancement de l'interface. Un échec
+        est journalisé en avertissement, sans arrêter le lancement.
+
     .EXAMPLE
         $context = Initialize-OpSession -Kind Depot
 
@@ -31,6 +35,7 @@
         [Parameter(Mandatory)][ValidateSet('Depot', 'Session')][string]$Kind,
         [System.Collections.Concurrent.ConcurrentQueue[object]]$Queue,
         [switch]$Console,
+        [switch]$Unblock,
         [string]$Root
     )
 
@@ -46,6 +51,14 @@
     if ($Kind -eq 'Depot') { $logDirectory = Get-OpPath -Name Logs -Root $Root }
     $log = Start-OpLog -Kind $Kind -Level $level -Queue $Queue -Directory $logDirectory -Console:$Console
     Write-OpLog "OffPatch, opération $Kind, racine $Root"
+    if ($Unblock) {
+        try {
+            $count = Unblock-OpToolFile -Root $Root -Confirm:$false
+            if ($count -gt 0) { Write-OpLog "Marque « fichier téléchargé » retirée de $count fichier(s) de l'outil." }
+        } catch {
+            Write-OpLog "Marque « fichier téléchargé » non retirée : $($_.Exception.Message)" -Level WARN
+        }
+    }
 
     try {
         $configuration = Get-OpConfiguration -Root $Root

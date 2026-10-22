@@ -6,7 +6,7 @@ param()
 BeforeAll {
     Set-StrictMode -Version Latest
     $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    foreach ($name in 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Get-OpSupportIdentity', 'Get-OpInitialSessionState', 'Read-OpSessionState', 'Save-OpSessionState', 'Complete-OpSessionState') {
+    foreach ($name in 'ConvertTo-OpMaskedText', 'Write-OpLog', 'Get-OpSupportIdentity', 'Get-OpInitialSessionState', 'Read-OpSessionState', 'Save-OpSessionState', 'Complete-OpSessionState', 'Get-OpPath') {
         . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1")
     }
     function Get-Info { [pscustomobject]@{ ComputerName = 'PC'; Office = [pscustomobject]@{ Version = [version]'16.0.1.2' } } }
@@ -104,5 +104,29 @@ Describe 'state.json' {
         Save-OpSessionState -State $s -Path $script:path
         Complete-OpSessionState -Path $script:path -LogDirectory $script:logs -WhatIf | Should -BeNullOrEmpty
         Test-Path $script:path | Should -BeTrue
+    }
+}
+
+Describe 'Get-OpSessionStatus' {
+    BeforeAll { . (Join-Path $repo 'app\module\OffPatch\Public\Get-OpSessionStatus.ps1') }
+
+    It 'aucune session : rien' {
+        Get-OpSessionStatus -Path (Join-Path $TestDrive 'absent.json') | Should -BeNullOrEmpty
+    }
+
+    It 'session automatique : mode, redémarrages, étapes' {
+        $path = Join-Path $TestDrive 'auto.json'
+        Set-Content -LiteralPath $path -Encoding UTF8 -Value '{"schemaVersion":1,"sessionId":"s1","mode":"Auto","startTime":"2026-10-22T08:00:00","rebootCount":2,"steps":[{"Id":"a"},{"Id":"b"}]}'
+        $s = Get-OpSessionStatus -Path $path
+        "$($s.SessionId) $($s.Mode) $($s.RebootCount) $($s.StepCount)" | Should -Be 's1 Auto 2 2'
+        $s.Error | Should -BeNullOrEmpty
+    }
+
+    It 'état illisible : motif dans Error, pas d''exception' {
+        $path = Join-Path $TestDrive 'casse.json'
+        Set-Content -LiteralPath $path -Encoding UTF8 -Value '{"schemaVersion":2}'
+        $s = Get-OpSessionStatus -Path $path
+        $s.Mode | Should -BeNullOrEmpty
+        $s.Error | Should -Match 'non reconnu'
     }
 }

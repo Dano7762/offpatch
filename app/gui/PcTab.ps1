@@ -14,6 +14,7 @@ $script:OpPcLoadScript = {
         Checks        = @(Test-OpPreflight -Root $Root -SystemInfo $info)
         Plan          = @(Get-OpInstallPlan -Root $Root -SystemInfo $info)
         OfficeSources = $context.Configuration.OfficeSources
+        Session       = Get-OpSessionStatus
     }
 }
 
@@ -131,6 +132,9 @@ function Get-OpPcSummary {
             if ($_.Result -eq 'Blocking') { $prefix = 'Bloquant — ' }
             "$prefix$($_.Label) : $($_.Message)"
         })
+    $session = $null
+    if ($View.PSObject.Properties['Session']) { $session = $View.Session }
+    if ($session -and $session.Error) { $checks += "Session interrompue : $($session.Error)" }
 
     $office = 'Office : aucun Office Click-to-Run.'
     $step = @($View.Plan | Where-Object { $_.Category -eq 'office-source' }) | Select-Object -First 1
@@ -151,6 +155,7 @@ function Get-OpPcSummary {
     [pscustomobject]@{
         Title = $title; Detail = ($parts -join ' · '); Checks = $checks; Office = $office
         RebootPending = $reboot; CanInstall = $pending -and -not $blocking
+        CanResume = [bool]($session -and $session.Mode -eq 'Auto') -and -not $blocking
     }
 }
 
@@ -189,6 +194,9 @@ function Show-OpPcView {
     $Controls.PcOfficeText.Text = $summary.Office
     $Controls.BtnInstallSelection.IsEnabled = $summary.CanInstall
     $Controls.BtnAuto.IsEnabled = $summary.CanInstall
+    $Controls.BtnResume.Visibility = 'Collapsed'
+    if ($summary.CanResume) { $Controls.BtnResume.Visibility = 'Visible' }
+    $Controls.BtnResume.IsEnabled = $summary.CanResume
 }
 
 function Invoke-OpPcRefresh {
@@ -224,6 +232,12 @@ function Invoke-OpPcRefresh {
             # Relevé gardé pour le récapitulatif du mode automatique.
             $Ui | Add-Member -NotePropertyName PcView -NotePropertyValue $r.Output[-1] -Force
             Show-OpPcView -Controls $Ui.Controls -View $r.Output[-1]
+            # Relance par resume.ps1 (-Resume) : reprise sans récapitulatif ni question, une seule fois.
+            if ($Ui.PSObject.Properties['ResumePending'] -and $Ui.ResumePending) {
+                $Ui.ResumePending = $false
+                if ((Get-OpPcSummary -View $r.Output[-1]).CanResume) { Invoke-OpPcAuto -Ui $Ui -Resume }
+                else { Add-OpLogLine -ListBox $Ui.Controls.PcLastLog -Line 'Aucune session automatique à reprendre.' }
+            }
         } -Context $Ui)
 }
 
@@ -241,17 +255,25 @@ function Invoke-OpPcAuto {
     .PARAMETER Ui
         Fenêtre complétée de Root, ModulePath (Register-OpPcTab) et PcView (Invoke-OpPcRefresh).
 
+    .PARAMETER Resume
+        Reprise de la session interrompue (state.json) : pas de récapitulatif, les décisions ont été prises au départ ;
+        le forçage Windows 10 est relu dans state.json par Invoke-OpAutoSession.
+
     .EXAMPLE
         Invoke-OpPcAuto -Ui $ui
     #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][pscustomobject]$Ui
+        [Parameter(Mandatory)][pscustomobject]$Ui,
+        [switch]$Resume
     )
 
-    if (-not $Ui.PSObject.Properties['PcView'] -or -not $Ui.PcView) { return }
-    $choice = Show-OpAutoSummary -View $Ui.PcView -Owner $Ui.Window
-    if (-not $choice) { return }
+    if ($Resume) { $choice = [pscustomobject]@{ ForceWindows = $false } }
+    else {
+        if (-not $Ui.PSObject.Properties['PcView'] -or -not $Ui.PcView) { return }
+        $choice = Show-OpAutoSummary -View $Ui.PcView -Owner $Ui.Window
+        if (-not $choice) { return }
+    }
     $c = $Ui.Controls
     foreach ($button in 'BtnInstallSelection', 'BtnAuto', 'BtnRestart', 'BtnResume') { $c[$button].IsEnabled = $false }
     $c.PcSteps.IsEnabled = $false
@@ -358,14 +380,41 @@ function Restart-OpPc {
     if ($PSCmdlet.ShouldProcess($env:COMPUTERNAME, 'Redémarrage immédiat')) { Restart-Computer -Force }
 }
 
+function Get-OpPcCloseQuestion {
+    <#
+    .SYNOPSIS
+        Question à poser avant de fermer la fenêtre, ou rien si la fermeture ne coupe aucune session automatique.
+
+    .DESCRIPTION
+        Cahier des charges 8.6 : fermer la fenêtre en cours de session automatique demande confirmation ; l'état
+        (state.json) est conservé et « Reprendre la session interrompue » apparaît au lancement suivant.
+
+    .PARAMETER Ui
+        Fenêtre complétée de AutoTask (Invoke-OpPcAuto) le cas échéant.
+
+    .EXAMPLE
+        Get-OpPcCloseQuestion -Ui $ui
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Ui
+    )
+
+    if (-not $Ui.PSObject.Properties['AutoTask'] -or -not $Ui.AutoTask -or $Ui.AutoTask.Done) { return }
+    'Une session automatique est en cours. Fermer OffPatch quand même ? L''état de la session est conservé : « Reprendre la session interrompue » apparaîtra au prochain lancement.'
+}
+
 function Register-OpPcTab {
     <#
     .SYNOPSIS
         Câble l'onglet « Ce PC » et lance le premier relevé.
 
     .DESCRIPTION
-        Complète la fenêtre de Root et ModulePath, branche « Installer la sélection » et « Redémarrer maintenant »
-        (confirmation par une boîte de dialogue), puis lance le relevé en arrière-plan.
+        Complète la fenêtre de Root et ModulePath, branche « Installation automatique », « Installer la sélection »,
+        « Reprendre la session interrompue » et « Redémarrer maintenant » (confirmation par une boîte de dialogue),
+        demande confirmation avant de fermer la fenêtre pendant une session automatique, puis lance le relevé en
+        arrière-plan. Avec -Resume, la session automatique reprend d'elle-même une fois le relevé fait.
 
     .PARAMETER Ui
         Fenêtre renvoyée par Import-OpMainWindow.
@@ -376,6 +425,9 @@ function Register-OpPcTab {
     .PARAMETER ModulePath
         Manifeste du module OffPatch, chargé par chaque runspace.
 
+    .PARAMETER Resume
+        Lancement par resume.ps1 après un redémarrage : reprise de la session automatique sans question.
+
     .EXAMPLE
         Register-OpPcTab -Ui $ui -Root $root -ModulePath $modulePath
     #>
@@ -383,11 +435,22 @@ function Register-OpPcTab {
     param(
         [Parameter(Mandatory)][pscustomobject]$Ui,
         [Parameter(Mandatory)][string]$Root,
-        [Parameter(Mandatory)][string]$ModulePath
+        [Parameter(Mandatory)][string]$ModulePath,
+        [switch]$Resume
     )
 
     $Ui | Add-Member -NotePropertyName Root -NotePropertyValue $Root -Force
     $Ui | Add-Member -NotePropertyName ModulePath -NotePropertyValue $ModulePath -Force
+    $Ui | Add-Member -NotePropertyName ResumePending -NotePropertyValue ([bool]$Resume) -Force
+    $Ui.Controls.BtnResume.Tag = $Ui
+    $Ui.Controls.BtnResume.Add_Click({ Invoke-OpPcAuto -Ui $this.Tag -Resume })
+    $Ui.Window.Tag = $Ui
+    $Ui.Window.Add_Closing({
+            $question = Get-OpPcCloseQuestion -Ui $this.Tag
+            if (-not $question) { return }
+            $answer = [System.Windows.MessageBox]::Show($question, 'OffPatch', 'YesNo', 'Warning')
+            if ($answer -ne 'Yes') { $_.Cancel = $true }
+        })
     $Ui.Controls.BtnInstallSelection.Tag = $Ui
     $Ui.Controls.BtnInstallSelection.Add_Click({ Invoke-OpPcInstall -Ui $this.Tag })
     $Ui.Controls.BtnAuto.Tag = $Ui

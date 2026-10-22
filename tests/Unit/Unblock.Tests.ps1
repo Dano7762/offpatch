@@ -37,3 +37,31 @@ Describe 'Unblock-OpToolFile' {
         Get-Item -Path (Join-Path $tool 'app\OffPatch.ps1') -Stream 'Zone.Identifier' | Should -Not -BeNullOrEmpty
     }
 }
+
+Describe 'Initialize-OpSession -Unblock' {
+    BeforeAll {
+        Import-Module (Join-Path $root 'app\module\OffPatch\OffPatch.psd1') -Force
+    }
+    AfterAll { Remove-Module OffPatch -ErrorAction SilentlyContinue }
+    BeforeEach {
+        Mock -ModuleName OffPatch Start-OpLog { [pscustomobject]@{ Path = 'journal' } }
+        Mock -ModuleName OffPatch Write-OpLog {}
+        Mock -ModuleName OffPatch Read-OpJsonFile { [pscustomobject]@{ logging = [pscustomobject]@{ level = 'INFO' } } }
+        Mock -ModuleName OffPatch Get-OpConfiguration { [pscustomobject]@{ Settings = [pscustomobject]@{ targets = @() } } }
+        Mock -ModuleName OffPatch Unblock-OpToolFile { 3 }
+    }
+
+    It 'débloque les fichiers de l''outil seulement avec -Unblock, et le journalise' {
+        [void](Initialize-OpSession -Kind Session -Root $TestDrive)
+        Should -Invoke -ModuleName OffPatch Unblock-OpToolFile -Times 0 -Exactly
+        [void](Initialize-OpSession -Kind Session -Root $TestDrive -Unblock)
+        Should -Invoke -ModuleName OffPatch Unblock-OpToolFile -Times 1 -Exactly -ParameterFilter { $Root -eq $TestDrive }
+        Should -Invoke -ModuleName OffPatch Write-OpLog -ParameterFilter { $Message -match 'retirée de 3 fichier' }
+    }
+
+    It 'un échec du déblocage n''arrête pas le lancement' {
+        Mock -ModuleName OffPatch Unblock-OpToolFile { throw 'accès refusé' }
+        (Initialize-OpSession -Kind Session -Root $TestDrive -Unblock).Root | Should -Be $TestDrive
+        Should -Invoke -ModuleName OffPatch Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -match 'accès refusé' }
+    }
+}

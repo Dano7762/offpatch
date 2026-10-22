@@ -176,3 +176,46 @@ Describe 'Show-OpPcView et Add-OpLogLine' -Skip:$script:noSta {
         $script:ui.Controls.PcLastLog.Items[0] | Should -Be 'ligne 6'
     }
 }
+
+Describe 'Reprise de la session interrompue' {
+    It 'session automatique en cours : reprise proposée, sauf contrôle bloquant' {
+        $view = Get-TestView
+        $view | Add-Member -NotePropertyName Session -NotePropertyValue ([pscustomobject]@{ Mode = 'Auto'; Error = $null })
+        (Get-OpPcSummary -View $view).CanResume | Should -BeTrue
+        $view.Checks = @([pscustomobject]@{ Id = 'Elevation'; Label = 'Droits administrateur'; Result = 'Blocking'; Message = 'Session non élevée.' })
+        (Get-OpPcSummary -View $view).CanResume | Should -BeFalse
+    }
+
+    It 'pas de reprise sans session, ni pour une session manuelle ; état illisible signalé' {
+        (Get-OpPcSummary -View (Get-TestView)).CanResume | Should -BeFalse
+        $view = Get-TestView
+        $view | Add-Member -NotePropertyName Session -NotePropertyValue ([pscustomobject]@{ Mode = 'Manual'; Error = $null })
+        (Get-OpPcSummary -View $view).CanResume | Should -BeFalse
+        $view.Session = [pscustomobject]@{ Mode = $null; Error = 'État de session non reconnu' }
+        $s = Get-OpPcSummary -View $view
+        $s.CanResume | Should -BeFalse
+        $s.Checks | Should -Contain 'Session interrompue : État de session non reconnu'
+    }
+
+    It 'fermeture : question seulement pendant une session automatique' {
+        Get-OpPcCloseQuestion -Ui ([pscustomobject]@{}) | Should -BeNullOrEmpty
+        Get-OpPcCloseQuestion -Ui ([pscustomobject]@{ AutoTask = [pscustomobject]@{ Done = $true } }) | Should -BeNullOrEmpty
+        Get-OpPcCloseQuestion -Ui ([pscustomobject]@{ AutoTask = [pscustomobject]@{ Done = $false } }) | Should -Match 'état de la session est conservé'
+    }
+}
+
+Describe 'Bouton « Reprendre la session interrompue »' -Skip:$script:noSta {
+    BeforeAll { $script:ui2 = Import-OpMainWindow }
+    AfterAll { $script:ui2.Window.Close() }
+
+    It 'visible et actif seulement avec une session automatique à reprendre' {
+        $c = $script:ui2.Controls
+        Show-OpPcView -Controls $c -View (Get-TestView)
+        $c.BtnResume.Visibility | Should -Be 'Collapsed'
+        $view = Get-TestView
+        $view | Add-Member -NotePropertyName Session -NotePropertyValue ([pscustomobject]@{ Mode = 'Auto'; Error = $null })
+        Show-OpPcView -Controls $c -View $view
+        $c.BtnResume.Visibility | Should -Be 'Visible'
+        $c.BtnResume.IsEnabled | Should -BeTrue
+    }
+}
