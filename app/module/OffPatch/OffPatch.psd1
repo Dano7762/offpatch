@@ -1,6 +1,6 @@
 ﻿@{
     RootModule           = 'OffPatch.psm1'
-    ModuleVersion        = '0.1.0'
+    ModuleVersion        = '0.6.0'
     GUID                 = '5cb849d6-934f-4dcf-a221-b1ad671fbef1'
     Author               = 'David Informaticien'
     Copyright            = '(c) 2026 David Informaticien. Licence MIT.'
