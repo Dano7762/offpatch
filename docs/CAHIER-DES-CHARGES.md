@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.34 du 18 octobre 2026.
+Version 1.40 du 22 octobre 2026.
 
 ## 1. Contexte
 
@@ -106,6 +106,7 @@ OffPatch/
 │   │   └── Private/
 │   └── gui/
 │       ├── MainWindow.xaml
+│       ├── OffPatch.jpg           Logo (en-tête et icône de la fenêtre)
 │       ├── Dialogs/               Récapitulatif du mode auto, préparation de support, attente du support
 │       └── *.ps1                  Câblage des événements
 ├── config/
@@ -619,7 +620,7 @@ En fin de session, ou en cas d'abandon, un rapport HTML autonome et imprimable e
 
 ## 9. Interface graphique
 
-Fenêtre WPF unique. En-tête : nom et version de l'outil, date du dépôt, alerte si le dépôt est ancien. Trois onglets.
+Fenêtre WPF unique. En-tête : logo, nom et version de l'outil, date du dépôt, alerte si le dépôt est ancien. Le logo sert aussi d'icône de la fenêtre ; s'il manque, l'outil démarre sans lui. Pied de fenêtre : « © 2026 David Informaticien · Licence MIT » et lien vers le dépôt du projet sur GitHub, ouvert dans le navigateur par défaut. Trois onglets.
 
 **Onglet « Ce PC »**
 
@@ -777,3 +778,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.37 (18 octobre 2026) : Windows 10 sans ESU actif ou détectable, l'étape .NET est ignorée en mode auto comme l'étape Windows, sauf forçage (8.2) : mesuré sur un Windows 10 22H2 non inscrit, la cumulative .NET s'installe puis est écartée au redémarrage, sans erreur (R-19). Accord de David du 18 octobre 2026.
 - 1.38 (21 octobre 2026) : pas de mise en veille automatique pendant la session et les installations (`SetThreadExecutionState`, aucun réglage d'alimentation modifié) ; rappel de redémarrer à l'écran de fin et dans le rapport quand un redémarrage est en attente (8.6, 8.8). Accord de David du 21 octobre 2026, après la session sur VM où le PC hôte s'est mis en veille et où le .NET a fini en code 3010 sans rappel. Rapport : suffixe `_2`, `_3`… au lieu d'écraser un rapport du même jour (8.8), défaut constaté le même jour (le rapport de T3 a remplacé celui de la session auto).
 - 1.39 (21 octobre 2026) : onglet Dépôt (9). Champ facultatif `enabled` des sources Office (6.3), que suppose la case à cocher par source déjà prévue en 9 ; langues saisies par source (forme `xx-xx`) ; seules les lignes `targets`, `enabled` et `languages` sont réécrites, présentation des fichiers conservée. Précision de mise en œuvre, sans changement de périmètre.
+- 1.40 (22 octobre 2026) : logo de l'outil dans l'en-tête et comme icône de la fenêtre (`app/gui/OffPatch.jpg`), pied de fenêtre avec l'auteur, la licence MIT et le lien vers le dépôt GitHub du projet (5, 9). Demande et accord de David du 22 octobre 2026. Ligne de version en tête du document remise à jour (elle indiquait encore 1.34).
