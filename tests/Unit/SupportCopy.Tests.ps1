@@ -8,10 +8,10 @@ param()
 BeforeAll {
     Set-StrictMode -Version Latest
     $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    foreach ($name in 'Get-OpRoot', 'Get-OpPath', 'Read-OpJsonFile', 'Read-OpManifest', 'Save-OpManifest', 'Format-OpSize', 'Get-OpVolumeInfo', 'Invoke-OpProcess', 'Assert-OpNotCancelled', 'Write-OpLog', 'Write-OpProgress', 'ConvertTo-OpMaskedText') {
+    foreach ($name in 'Get-OpRoot', 'Get-OpPath', 'Read-OpJsonFile', 'Read-OpManifest', 'Save-OpManifest', 'Format-OpSize', 'Get-OpVolumeInfo', 'Get-OpToolFileList', 'Test-OpItemFileHash', 'Invoke-OpProcess', 'Assert-OpNotCancelled', 'Write-OpLog', 'Write-OpProgress', 'ConvertTo-OpMaskedText') {
         . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1")
     }
-    foreach ($name in 'Get-OpSupportPlan', 'Copy-OpSupportReport', 'Copy-OpSupport') { . (Join-Path $repo "app\module\OffPatch\Public\$name.ps1") }
+    foreach ($name in 'Get-OpSupportPlan', 'Copy-OpSupportReport', 'Copy-OpSupport', 'Test-OpSupport') { . (Join-Path $repo "app\module\OffPatch\Public\$name.ps1") }
     . (Join-Path $repo 'app\gui\Dialogs\PrepareSupport.ps1')
     function Get-OpDepotSelection { param($Root) }
 
@@ -94,19 +94,36 @@ Describe 'Copy-OpSupport' {
         $done = [pscustomobject]@{ Destination = 'F:\'; Cancelled = $false; Folders = @([pscustomobject]@{ Seconds = 90 }, [pscustomobject]@{ Seconds = 30 })
             Reports = @([pscustomobject]@{ Status = 'Copied' }, [pscustomobject]@{ Status = 'AlreadyPresent' }); Removed = @('depot\files\zz')
         }
-        Get-OpSupportCopyText -Result $done | Should -Be 'Support F:\ préparé en 2 min : 2 copie(s), 1 rapport(s) rapatrié(s) sur ce poste, 1 dossier(s) obsolète(s) supprimé(s).'
+        $copy = 'Support F:\ copié en 2 min : 2 copie(s), 1 rapport(s) rapatrié(s) sur ce poste, 1 dossier(s) obsolète(s) supprimé(s).'
+        Get-OpSupportCopyText -Result $done | Should -Be $copy
         Get-OpSupportCopyText -Result ([pscustomobject]@{ Destination = 'F:\'; Cancelled = $true }) | Should -Match '^Préparation du support F:\\ annulée'
+        $done | Add-Member -NotePropertyName Verification -NotePropertyValue ([pscustomobject]@{ Ok = $true; Cancelled = $false; FileCount = 3; Bytes = [long]1GB; Problems = @() })
+        Get-OpSupportCopyText -Result $done | Should -BeLike "$copy*Vérification : 3 fichier(s) du dépôt conformes (tailles et SHA-256, 1?0 Go), outil complet. Le support est prêt."
+        $done.Verification = [pscustomobject]@{ Ok = $false; Cancelled = $false; FileCount = 3; Bytes = 1; Problems = @(1..7 | ForEach-Object { "écart $_" }) }
+        $text = Get-OpSupportCopyText -Result $done
+        $text | Should -Match 'Vérification : 7 écart\(s\), support à ne pas utiliser en l.état'
+        $text | Should -Match 'écart 5\r?\n… et 2 autre\(s\)'
+        $text | Should -Not -Match 'écart 6'
+        $done.Verification = [pscustomobject]@{ Ok = $false; Cancelled = $true; FileCount = 3; Bytes = 1; Problems = @() }
+        Get-OpSupportCopyText -Result $done | Should -Match 'Vérification annulée'
     }
 
-    It 'script du runspace : Copy-OpSupport avec la sélection et le jeton d''annulation, sans confirmation' {
+    It 'script du runspace : copie avec la sélection et le jeton, sans confirmation, puis vérification si elle est allée au bout' {
         function Initialize-OpSession { param($Kind, $Queue, $Root) }
         Mock Initialize-OpSession {}
-        Mock Copy-OpSupport { 'copié' }
+        Mock Copy-OpSupport { [pscustomobject]@{ Destination = 'F:\'; Cancelled = $false } }
+        Mock Test-OpSupport { [pscustomobject]@{ Ok = $true } }
         $OpQueue = New-Object 'System.Collections.Concurrent.ConcurrentQueue[object]'
         $OpCancel = (New-Object System.Threading.CancellationTokenSource).Token
-        & $script:OpSupportCopyScript -Root 'X:\' -Destination 'F:\' -Targets @('win11-x64') -OfficeSources @('current') | Should -Be 'copié'
+        $r = & $script:OpSupportCopyScript -Root 'X:\' -Destination 'F:\' -Targets @('win11-x64') -OfficeSources @('current')
+        $r.Verification.Ok | Should -BeTrue
         Should -Invoke Initialize-OpSession -Times 1 -Exactly -ParameterFilter { $Kind -eq 'Depot' }
         Should -Invoke Copy-OpSupport -Times 1 -Exactly -ParameterFilter { $Destination -eq 'F:\' -and "$Targets" -eq 'win11-x64' -and "$OfficeSources" -eq 'current' -and $null -ne $CancellationToken -and $Confirm -eq $false }
+        Should -Invoke Test-OpSupport -Times 1 -Exactly -ParameterFilter { $Destination -eq 'F:\' -and $Root -eq 'X:\' }
+        Mock Copy-OpSupport { [pscustomobject]@{ Destination = 'F:\'; Cancelled = $true } }
+        $r = & $script:OpSupportCopyScript -Root 'X:\' -Destination 'F:\' -Targets @() -OfficeSources @()
+        $r.PSObject.Properties['Verification'] | Should -BeNullOrEmpty -Because 'copie annulée : rien à vérifier'
+        Should -Invoke Test-OpSupport -Times 1 -Exactly
     }
 
     It 'annulation : arrêt avant le dossier suivant, manifeste non écrit' {
@@ -116,5 +133,72 @@ Describe 'Copy-OpSupport' {
         $r.Cancelled | Should -BeTrue
         $r.Folders.Count | Should -Be 0
         Should -Invoke Save-OpManifest -Times 0 -Exactly
+    }
+}
+
+Describe 'Test-OpSupport' {
+    BeforeEach {
+        # Support conforme : outil copié, deux éléments du dépôt, manifeste du support avec les vraies empreintes.
+        $script:tool = Join-Path $TestDrive ('outil-' + [guid]::NewGuid().ToString('N'))
+        $script:support = Join-Path $TestDrive ('support-' + [guid]::NewGuid().ToString('N'))
+        Initialize-TestTool $script:tool
+        New-Item -ItemType Directory -Path $script:support | Out-Null
+        foreach ($f in 'Lancer-OffPatch.cmd', 'offpatch.root', 'README.md', 'LICENSE', 'app', 'config', 'tools') {
+            Copy-Item -LiteralPath (Join-Path $script:tool $f) -Destination (Join-Path $script:support $f) -Recurse
+        }
+        $entries = foreach ($p in 'files/aa/lcu.msu', 'files/bb/def.exe') {
+            $source = Join-Path $script:tool ('depot\' + ($p -replace '/', '\'))
+            $target = Join-Path $script:support ('depot\' + ($p -replace '/', '\'))
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+            Copy-Item -LiteralPath $source -Destination $target
+            '{{ "path": "{0}", "sha256": "{1}", "size": {2} }}' -f $p, (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant(), (Get-Item -LiteralPath $source).Length
+        }
+        $manifest = '{{ "schemaVersion": 1, "generatedAt": "2026-10-18T07:40:58Z", "items": [ {{ "id": "lcu", "files": [ {0} ] }}, {{ "id": "def", "files": [ {1} ] }} ] }}' -f @($entries)
+        [IO.File]::WriteAllText((Join-Path $script:support 'depot\manifest.json'), $manifest)
+    }
+
+    It 'support conforme : tailles et empreintes vérifiées' {
+        $r = Test-OpSupport -Destination $script:support -Root $script:tool
+        $r.Ok | Should -BeTrue -Because ($r.Problems -join ' ; ')
+        $r.ItemCount | Should -Be 2
+        $r.FileCount | Should -Be 2
+        $r.Bytes | Should -Be 1100
+    }
+
+    It 'taille différente ou fichier absent : écarts, empreintes non calculées' {
+        Mock Test-OpItemFileHash {}
+        [IO.File]::WriteAllBytes((Join-Path $script:support 'depot\files\aa\lcu.msu'), (New-Object byte[] 999))
+        Remove-Item -LiteralPath (Join-Path $script:support 'app\gui\x.xaml')
+        $r = Test-OpSupport -Destination $script:support -Root $script:tool
+        $r.Ok | Should -BeFalse
+        $r.Problems | Should -Contain 'app\gui\x.xaml : absent du support.'
+        $r.Problems | Should -Contain 'depot/files/aa/lcu.msu : 999 octets au lieu de 1000.'
+        Should -Invoke Test-OpItemFileHash -Times 0 -Exactly
+    }
+
+    It 'même taille, contenu différent : écart d''empreinte' {
+        $bytes = New-Object byte[] 100
+        $bytes[0] = 7
+        [IO.File]::WriteAllBytes((Join-Path $script:support 'depot\files\bb\def.exe'), $bytes)
+        $r = Test-OpSupport -Destination $script:support -Root $script:tool
+        $r.Ok | Should -BeFalse
+        @($r.Problems).Count | Should -Be 1
+        $r.Problems[0] | Should -Match '^depot/files/bb/def\.exe : SHA-256 '
+    }
+
+    It 'marqueur ou manifeste absents : écarts' {
+        Remove-Item -LiteralPath (Join-Path $script:support 'offpatch.root'), (Join-Path $script:support 'depot\manifest.json')
+        $r = Test-OpSupport -Destination $script:support -Root $script:tool
+        $r.Ok | Should -BeFalse
+        $r.Problems | Should -Contain 'offpatch.root absent du support.'
+        $r.Problems -match '^Manifeste du support illisible' | Should -Not -BeNullOrEmpty
+    }
+
+    It 'annulation entre deux éléments' {
+        $source = New-Object System.Threading.CancellationTokenSource
+        $source.Cancel()
+        $r = Test-OpSupport -Destination $script:support -Root $script:tool -CancellationToken $source.Token
+        $r.Cancelled | Should -BeTrue
+        $r.Ok | Should -BeFalse
     }
 }

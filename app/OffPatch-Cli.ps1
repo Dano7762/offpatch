@@ -17,8 +17,9 @@
         -Resume : reprise après redémarrage, sans confirmation (relancée par resume.ps1 via OffPatch.ps1) ;
         -ForceWindows : Windows 10 sans ESU actif, étapes Windows et .NET exécutées quand même (sinon ignorées) ;
       - Support -Destination <lecteur> : préparation d'un support (rapports rapatriés, outil et dépôt filtré copiés,
-        manifeste filtré), avec -Targets et -OfficeSources (par défaut la sélection du dépôt) ; avec -WhatIf, plan
-        de copie seul (contrôles, tailles) ; code 1 si le plan est refusé ou si une copie échoue.
+        manifeste filtré, puis vérification : tailles et SHA-256), avec -Targets et -OfficeSources (par défaut la
+        sélection du dépôt) ; avec -WhatIf, plan de copie seul (contrôles, tailles) ; code 1 si le plan est refusé, si
+        une copie échoue ou si la vérification trouve un écart.
     OffPatch installe uniquement des mises à jour : aucun paramètre de clé de produit, de profil ou de retrait
     (cahier des charges 2, 3.3).
     Codes de sortie : 0 réussite, 1 erreur (configuration invalide, étape refusée ou en échec).
@@ -163,9 +164,16 @@ switch ($Action) {
             Write-Host "OffPatch : $($_.Exception.Message)"
             exit 1
         }
-        if ($result) {
-            Write-Host ('Support {0} : {1} copie(s), {2} dossier(s) obsolète(s) supprimé(s){3}.' -f $result.Destination, @($result.Folders).Count, @($result.Removed).Count, $(if ($result.Cancelled) { ', préparation annulée' } else { '' }))
+        if (-not $result) { exit 0 }
+        Write-Host ('Support {0} : {1} copie(s), {2} dossier(s) obsolète(s) supprimé(s){3}.' -f $result.Destination, @($result.Folders).Count, @($result.Removed).Count, $(if ($result.Cancelled) { ', préparation annulée' } else { '' }))
+        if ($result.Cancelled) { exit 1 }
+        $check = Test-OpSupport -Destination $result.Destination -Root $context.Root
+        if (-not $check.Ok) {
+            Write-Host "Vérification du support : $(@($check.Problems).Count) écart(s), support à ne pas utiliser en l'état."
+            foreach ($p in $check.Problems) { Write-Host "  $p" }
+            exit 1
         }
+        Write-Host ('Vérification du support : {0} fichier(s) du dépôt conformes (tailles et SHA-256), outil complet, en {1:N0} s.' -f $check.FileCount, $check.Seconds)
         exit 0
     }
 }

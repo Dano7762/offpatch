@@ -2,11 +2,14 @@
 # embarquer, contrôle du système de fichiers et de l'espace libre, copie. Affichage et câblage seulement : le contenu et
 # les contrôles viennent de Get-OpSupportPlan (module, lecture seule), la copie de Copy-OpSupport, dans un runspace.
 
-# Copie sur le support (runspace) : journal de la face Dépôt, annulation entre deux dossiers par $OpCancel.
+# Copie sur le support puis vérification (runspace) : journal de la face Dépôt, annulation entre deux dossiers ou deux
+# éléments par $OpCancel. La vérification est jointe au résultat de la copie (Verification).
 $script:OpSupportCopyScript = {
     param([string]$Root, [string]$Destination, [string[]]$Targets, [string[]]$OfficeSources)
     [void](Initialize-OpSession -Kind Depot -Queue $OpQueue -Root $Root)
-    Copy-OpSupport -Destination $Destination -Targets $Targets -OfficeSources $OfficeSources -Root $Root -CancellationToken $OpCancel -Confirm:$false
+    $r = Copy-OpSupport -Destination $Destination -Targets $Targets -OfficeSources $OfficeSources -Root $Root -CancellationToken $OpCancel -Confirm:$false
+    if ($r -and -not $r.Cancelled) { $r | Add-Member -NotePropertyName Verification -NotePropertyValue (Test-OpSupport -Destination $Destination -Root $Root -CancellationToken $OpCancel) -Force }
+    $r
 }
 
 function Get-OpSupportDriveList {
@@ -192,7 +195,8 @@ function Get-OpSupportCopyText {
         Bilan affiché à la fin de la copie sur le support.
 
     .PARAMETER Result
-        Résultat de Copy-OpSupport : Destination, Reports, Folders, Removed, Cancelled.
+        Résultat de Copy-OpSupport (Destination, Reports, Folders, Removed, Cancelled), complété de Verification
+        (Test-OpSupport) quand la copie est allée au bout.
 
     .EXAMPLE
         Get-OpSupportCopyText -Result $result
@@ -207,7 +211,16 @@ function Get-OpSupportCopyText {
     $seconds = [double]0
     foreach ($f in @($Result.Folders)) { $seconds += [double]$f.Seconds }
     $copied = @($Result.Reports | Where-Object { $_.Status -eq 'Copied' }).Count
-    'Support {0} préparé en {1:N0} min : {2} copie(s), {3} rapport(s) rapatrié(s) sur ce poste, {4} dossier(s) obsolète(s) supprimé(s).' -f $Result.Destination, ($seconds / 60), @($Result.Folders).Count, $copied, @($Result.Removed).Count
+    $text = 'Support {0} copié en {1:N0} min : {2} copie(s), {3} rapport(s) rapatrié(s) sur ce poste, {4} dossier(s) obsolète(s) supprimé(s).' -f $Result.Destination, ($seconds / 60), @($Result.Folders).Count, $copied, @($Result.Removed).Count
+    $v = $null
+    if ($Result.PSObject.Properties['Verification']) { $v = $Result.Verification }
+    if (-not $v) { return $text }
+    if ($v.Cancelled) { return "$text`r`n`r`nVérification annulée : relancer la préparation pour vérifier le support." }
+    if ($v.Ok) { return ("$text`r`n`r`nVérification : {0} fichier(s) du dépôt conformes (tailles et SHA-256, {1:N1} Go), outil complet. Le support est prêt." -f $v.FileCount, ($v.Bytes / 1GB)) }
+    $shown = @($v.Problems | Select-Object -First 5)
+    $more = ''
+    if (@($v.Problems).Count -gt 5) { $more = "`r`n… et $(@($v.Problems).Count - 5) autre(s), détail dans le journal." }
+    "$text`r`n`r`nVérification : $(@($v.Problems).Count) écart(s), support à ne pas utiliser en l'état (relancer la préparation) :`r`n$($shown -join "`r`n")$more"
 }
 
 function Start-OpSupportCopy {
@@ -251,9 +264,12 @@ function Start-OpSupportCopy {
                 $c.SupportProgress.Text = ''
                 [void][System.Windows.MessageBox]::Show("Support non préparé : $(@($r.Error) + @($r.Errors) -join ' ')", 'OffPatch', 'OK', 'Error')
             } else {
-                $text = Get-OpSupportCopyText -Result $r.Output[-1]
-                $c.SupportProgress.Text = $text
-                [void][System.Windows.MessageBox]::Show($text, 'OffPatch', 'OK', 'Information')
+                $result = $r.Output[-1]
+                $text = Get-OpSupportCopyText -Result $result
+                $c.SupportProgress.Text = ($text -split "`r?`n")[0]
+                $icon = 'Information'
+                if ($result.Cancelled -or ($result.PSObject.Properties['Verification'] -and -not $result.Verification.Ok)) { $icon = 'Warning' }
+                [void][System.Windows.MessageBox]::Show($text, 'OffPatch', 'OK', $icon)
             }
             Show-OpSupportView -Dialog $Dialog
         } -Context $Dialog)

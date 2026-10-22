@@ -51,19 +51,8 @@
     $OfficeSources = @($OfficeSources | Where-Object { $_ })
     $blocking = New-Object System.Collections.Generic.List[string]
     $warnings = New-Object System.Collections.Generic.List[string]
-    $files = [ordered]@{}
-
-    # Outil : fichiers de la racine et dossiers app, config, tools (journaux, rapports et dépôt n'en font pas partie).
+    $files = Get-OpToolFileList -Root $Root
     $toolBytes = [long]0
-    foreach ($name in 'Lancer-OffPatch.cmd', 'offpatch.root', 'README.md', 'LICENSE') {
-        $path = Join-Path $Root $name
-        if (Test-Path -LiteralPath $path -PathType Leaf) { $files[$name] = (Get-Item -LiteralPath $path).Length }
-    }
-    foreach ($folder in 'app', 'config', 'tools') {
-        $path = Join-Path $Root $folder
-        if (-not (Test-Path -LiteralPath $path -PathType Container)) { continue }
-        foreach ($f in @(Get-ChildItem -LiteralPath $path -Recurse -File)) { $files[$f.FullName.Substring($Root.TrimEnd('\').Length + 1)] = $f.Length }
-    }
     foreach ($size in $files.Values) { $toolBytes += [long]$size }
 
     # Dépôt filtré : éléments des cibles et des sources retenues, complets au dépôt.

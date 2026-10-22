@@ -12,7 +12,7 @@ BeforeDiscovery {
 BeforeAll {
     Set-StrictMode -Version Latest
     $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    foreach ($name in 'Get-OpRoot', 'Get-OpPath', 'Read-OpJsonFile', 'Read-OpManifest', 'Format-OpSize', 'Get-OpVolumeInfo') { . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1") }
+    foreach ($name in 'Get-OpRoot', 'Get-OpPath', 'Read-OpJsonFile', 'Read-OpManifest', 'Format-OpSize', 'Get-OpVolumeInfo', 'Get-OpToolFileList') { . (Join-Path $repo "app\module\OffPatch\Private\$name.ps1") }
     . (Join-Path $repo 'app\module\OffPatch\Public\Get-OpSupportPlan.ps1')
     foreach ($name in 'MainWindow', 'Dialogs\PrepareSupport') { . (Join-Path $repo "app\gui\$name.ps1") }
     function Get-OpDepotSelection { param($Root) }
