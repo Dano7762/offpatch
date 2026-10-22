@@ -7,14 +7,16 @@
         Le manifeste est d'abord contrôlé (Test-OpManifest) : un manifeste incohérent n'est jamais écrit. Il est
         ensuite écrit dans un fichier temporaire du même dossier (manifest.json.tmp), puis substitué au manifeste en
         une seule opération (File.Replace s'il existe déjà, File.Move sinon) : une coupure pendant l'écriture laisse
-        l'ancien manifeste intact (CLAUDE.md, cahier des charges 7.1). generatedAt est mis à l'heure UTC courante.
+        l'ancien manifeste intact (CLAUDE.md, cahier des charges 7.1). generatedAt est mis à l'heure UTC courante, sauf
+        GeneratedAt (manifeste filtré d'un support : date du dépôt d'origine, 7.4).
         UTF-8 sans marque.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)][pscustomobject]$Manifest,
         [string]$Path,
-        [string]$ToolVersion
+        [string]$ToolVersion,
+        [string]$GeneratedAt
     )
 
     if (-not $Path) { $Path = Get-OpPath -Name Manifest }
@@ -25,7 +27,7 @@
 
     $document = [ordered]@{
         schemaVersion = 1
-        generatedAt   = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture)
+        generatedAt   = $(if ($GeneratedAt) { $GeneratedAt } else { (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture) })
         toolVersion   = $(if ($ToolVersion) { $ToolVersion } else { $Manifest.toolVersion })
         items         = @($Manifest.items | Where-Object { $null -ne $_ })
     }

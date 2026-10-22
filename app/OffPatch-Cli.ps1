@@ -15,7 +15,10 @@
       - Report : rapport d'intervention de la session (étapes exécutées et plan du moment), puis fin de session ;
       - Auto : session automatique (plan affiché, une confirmation, étapes, redémarrages avec reprise, rapport) ;
         -Resume : reprise après redémarrage, sans confirmation (relancée par resume.ps1 via OffPatch.ps1) ;
-        -ForceWindows : Windows 10 sans ESU actif, étapes Windows et .NET exécutées quand même (sinon ignorées).
+        -ForceWindows : Windows 10 sans ESU actif, étapes Windows et .NET exécutées quand même (sinon ignorées) ;
+      - Support -Destination <lecteur> : préparation d'un support (rapports rapatriés, outil et dépôt filtré copiés,
+        manifeste filtré), avec -Targets et -OfficeSources (par défaut la sélection du dépôt) ; avec -WhatIf, plan
+        de copie seul (contrôles, tailles) ; code 1 si le plan est refusé ou si une copie échoue.
     OffPatch installe uniquement des mises à jour : aucun paramètre de clé de produit, de profil ou de retrait
     (cahier des charges 2, 3.3).
     Codes de sortie : 0 réussite, 1 erreur (configuration invalide, étape refusée ou en échec).
@@ -26,6 +29,10 @@
     InstallStep : exécution d'une étape du plan (-StepId).
     Report : écriture du rapport d'intervention.
     Auto : session automatique ; avec -Resume, reprise sans confirmation.
+    Support : préparation d'un support (-Destination, -Targets, -OfficeSources).
+
+.EXAMPLE
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\app\OffPatch-Cli.ps1 -Action Support -Destination F:\ -WhatIf
 
 .EXAMPLE
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\app\OffPatch-Cli.ps1 -Action Plan
@@ -38,11 +45,14 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [Parameter(Mandatory)][ValidateSet('DepotUpdate', 'Plan', 'InstallStep', 'Report', 'Auto')][string]$Action,
+    [Parameter(Mandatory)][ValidateSet('DepotUpdate', 'Plan', 'InstallStep', 'Report', 'Auto', 'Support')][string]$Action,
     [switch]$ListOnly,
     [string]$StepId,
     [switch]$Resume,
-    [switch]$ForceWindows
+    [switch]$ForceWindows,
+    [string]$Destination,
+    [string[]]$Targets,
+    [string[]]$OfficeSources
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -50,7 +60,7 @@ $ErrorActionPreference = 'Stop'
 try {
     Import-Module -Name (Join-Path $PSScriptRoot 'module\OffPatch\OffPatch.psd1') -Force -ErrorAction Stop
     $kind = 'Session'
-    if ($Action -eq 'DepotUpdate') { $kind = 'Depot' }
+    if (@('DepotUpdate', 'Support') -contains $Action) { $kind = 'Depot' }
     $context = Initialize-OpSession -Kind $kind -Root (Split-Path -Parent $PSScriptRoot) -Console
     Write-Host "Journal : $($context.Log.Path)"
 } catch {
@@ -131,6 +141,30 @@ switch ($Action) {
         if ($result) {
             Write-Host "Session automatique : $($result.Result)."
             if ($result.ReportPath) { Write-Host "Rapport : $($result.ReportPath)" }
+        }
+        exit 0
+    }
+    'Support' {
+        if (-not $Destination) {
+            Write-Host 'OffPatch : -Destination obligatoire avec -Action Support (racine du lecteur, par exemple F:\).'
+            exit 1
+        }
+        $selection = @{}
+        if ($PSBoundParameters.ContainsKey('Targets')) { $selection.Targets = $Targets }
+        if ($PSBoundParameters.ContainsKey('OfficeSources')) { $selection.OfficeSources = $OfficeSources }
+        try {
+            $plan = Get-OpSupportPlan -Destination $Destination -Root $context.Root @selection
+            Write-Host ('Support {0} : {1} élément(s) du dépôt, {2:N2} Go ; à copier {3:N2} Go.' -f $plan.Destination, @($plan.Items).Count, ($plan.DepotBytes / 1GB), ($plan.ToCopyBytes / 1GB))
+            foreach ($w in $plan.Warnings) { Write-Host "Avertissement : $w" }
+            foreach ($b in $plan.Blocking) { Write-Host "Refus : $b" }
+            if (-not $plan.CanPrepare) { exit 1 }
+            $result = Copy-OpSupport -Destination $Destination -Root $context.Root -WhatIf:$WhatIfPreference @selection
+        } catch {
+            Write-Host "OffPatch : $($_.Exception.Message)"
+            exit 1
+        }
+        if ($result) {
+            Write-Host ('Support {0} : {1} copie(s), {2} dossier(s) obsolète(s) supprimé(s){3}.' -f $result.Destination, @($result.Folders).Count, @($result.Removed).Count, $(if ($result.Cancelled) { ', préparation annulée' } else { '' }))
         }
         exit 0
     }

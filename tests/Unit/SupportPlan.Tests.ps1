@@ -45,6 +45,8 @@ BeforeAll {
     $script:tool = Initialize-TestTool 'outil'
     $script:support = Join-Path $TestDrive 'support'
     New-Item -ItemType Directory -Force -Path $script:support | Out-Null
+    # Support déjà préparé par OffPatch : ses dossiers peuvent être mis en miroir.
+    [IO.File]::WriteAllText((Join-Path $script:support 'offpatch.root'), '')
 }
 
 Describe 'Get-OpSupportPlan' {
@@ -101,6 +103,16 @@ Describe 'Get-OpSupportPlan' {
         (Get-OpSupportPlan -Destination $script:support -Targets 'win11-x64' -OfficeSources @() -Root $script:tool).Blocking | Should -Match 'autre lecteur que celui de l.outil'
         Mock Get-OpVolumeInfo { Get-TestVolume }
         (Get-OpSupportPlan -Destination $script:support -Targets @() -OfficeSources @() -Root $script:tool).Blocking | Should -Match '^Rien à embarquer'
+    }
+
+    It 'refuse un lecteur qui a déjà des dossiers app, config, tools ou depot sans être un support OffPatch' {
+        $other = Join-Path $TestDrive 'disque-photos'
+        New-Item -ItemType Directory -Force -Path (Join-Path $other 'app'), (Join-Path $other 'tools') | Out-Null
+        $p = Get-OpSupportPlan -Destination $other -Targets 'win11-x64' -OfficeSources @() -Root $script:tool
+        $p.CanPrepare | Should -BeFalse
+        $p.Blocking | Should -Match 'dossiers app, tools qui n.appartiennent pas à OffPatch'
+        [IO.File]::WriteAllText((Join-Path $other 'offpatch.root'), '')
+        (Get-OpSupportPlan -Destination $other -Targets 'win11-x64' -OfficeSources @() -Root $script:tool).CanPrepare | Should -BeTrue
     }
 
     It 'avertit quand le support fait moins du double du dépôt retenu' {

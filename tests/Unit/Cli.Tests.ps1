@@ -116,4 +116,15 @@ Describe 'OffPatch-Cli.ps1' {
         $tool = Get-ToolCopy
         (Invoke-Cli -Tool $tool -Arguments @('-Action', 'InstallOffice')).ExitCode | Should -Not -Be 0
     }
+
+    It 'Support : -Destination obligatoire, refus du lecteur de l''outil (code 1), rien d''écrit' {
+        $tool = Get-ToolCopy
+        $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'Support')
+        $r.ExitCode | Should -Be 1
+        $r.Output | Should -Match '-Destination obligatoire'
+        $r = Invoke-Cli -Tool $tool -Arguments @('-Action', 'Support', '-Destination', (Join-Path $tool 'cle'))
+        $r.ExitCode | Should -Be 1 -Because $r.Output
+        $r.Output | Should -Match 'Refus : Le support doit .tre un autre lecteur'
+        Join-Path $tool 'cle' | Should -Not -Exist
+    }
 }

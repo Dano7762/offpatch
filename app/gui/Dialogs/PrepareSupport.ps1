@@ -1,6 +1,13 @@
 ﻿# Assistant « Préparer un support » (cahier des charges 7.4) : lecteur de destination, cibles et sources Office à
-# embarquer, contrôle du système de fichiers et de l'espace libre. Affichage et câblage seulement : le contenu et les
-# contrôles viennent de Get-OpSupportPlan (module, lecture seule). La copie arrive avec la tâche suivante de la phase 7.
+# embarquer, contrôle du système de fichiers et de l'espace libre, copie. Affichage et câblage seulement : le contenu et
+# les contrôles viennent de Get-OpSupportPlan (module, lecture seule), la copie de Copy-OpSupport, dans un runspace.
+
+# Copie sur le support (runspace) : journal de la face Dépôt, annulation entre deux dossiers par $OpCancel.
+$script:OpSupportCopyScript = {
+    param([string]$Root, [string]$Destination, [string[]]$Targets, [string[]]$OfficeSources)
+    [void](Initialize-OpSession -Kind Depot -Queue $OpQueue -Root $Root)
+    Copy-OpSupport -Destination $Destination -Targets $Targets -OfficeSources $OfficeSources -Root $Root -CancellationToken $OpCancel -Confirm:$false
+}
 
 function Get-OpSupportDriveList {
     <#
@@ -96,6 +103,7 @@ function Show-OpSupportView {
     $c.SupportSummary.Text = $text.Summary
     if ($text.Blocking) { $c.SupportBlockingText.Text = $text.Blocking; $c.SupportBlocking.Visibility = 'Visible' }
     if ($text.Warnings) { $c.SupportWarningsText.Text = $text.Warnings; $c.SupportWarnings.Visibility = 'Visible' }
+    $c.BtnSupportPrepare.IsEnabled = $plan.CanPrepare
     $Dialog | Add-Member -NotePropertyName Plan -NotePropertyValue $plan -Force
 }
 
@@ -107,7 +115,9 @@ function Import-OpPrepareSupportWindow {
     .DESCRIPTION
         PrepareSupport.xaml par Import-OpMainWindow -Path. Lecteurs proposés (Get-OpSupportDriveList), cibles et
         sources Office cochées comme dans la sélection du dépôt (Get-OpDepotSelection), contrôles recalculés à
-        chaque changement. « Préparer le support » reste grisé jusqu'à la tâche de copie. Thread STA requis.
+        chaque changement. « Préparer le support » (actif si le plan l'accepte) demande confirmation puis copie en
+        arrière-plan (Start-OpSupportCopy) ; fermer la fenêtre pendant la copie demande son annulation, qui prend
+        effet entre deux dossiers. Thread STA requis.
 
     .PARAMETER Root
         Racine de l'outil.
@@ -158,9 +168,95 @@ function Import-OpPrepareSupportWindow {
             if ($dialog.Controls.SupportDrive.Items.Count -gt 0) { $dialog.Controls.SupportDrive.SelectedIndex = 0 }
             Show-OpSupportView -Dialog $dialog
         })
-    $c.BtnSupportPrepare.ToolTip = 'La copie sur le support arrive avec la prochaine version.'
+    $c.BtnSupportPrepare.Tag = $d
+    $c.BtnSupportPrepare.Add_Click({
+            $dialog = $this.Tag
+            $question = "Préparer le support $($dialog.Plan.Destination) ? Les dossiers app, config, tools et ceux du dépôt y seront remplacés ; les rapports du support sont d'abord rapatriés sur ce poste."
+            if ([System.Windows.MessageBox]::Show($question, 'OffPatch', 'YesNo', 'Question') -eq 'Yes') { Start-OpSupportCopy -Dialog $dialog }
+        })
+    $d.Window.Tag = $d
+    $d.Window.Add_Closing({
+            $dialog = $this.Tag
+            if (-not $dialog.PSObject.Properties['CopyTask'] -or -not $dialog.CopyTask -or $dialog.CopyTask.Done) { return }
+            $_.Cancel = $true
+            Stop-OpBackgroundTask -Task $dialog.CopyTask -Confirm:$false
+            $dialog.Controls.SupportProgress.Text = 'Annulation demandée : arrêt après le dossier en cours.'
+        })
     Show-OpSupportView -Dialog $d
     $d
+}
+
+function Get-OpSupportCopyText {
+    <#
+    .SYNOPSIS
+        Bilan affiché à la fin de la copie sur le support.
+
+    .PARAMETER Result
+        Résultat de Copy-OpSupport : Destination, Reports, Folders, Removed, Cancelled.
+
+    .EXAMPLE
+        Get-OpSupportCopyText -Result $result
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Result
+    )
+
+    if ($Result.Cancelled) { return "Préparation du support $($Result.Destination) annulée : le support n'est pas utilisable tant qu'elle n'a pas été refaite jusqu'au bout." }
+    $seconds = [double]0
+    foreach ($f in @($Result.Folders)) { $seconds += [double]$f.Seconds }
+    $copied = @($Result.Reports | Where-Object { $_.Status -eq 'Copied' }).Count
+    'Support {0} préparé en {1:N0} min : {2} copie(s), {3} rapport(s) rapatrié(s) sur ce poste, {4} dossier(s) obsolète(s) supprimé(s).' -f $Result.Destination, ($seconds / 60), @($Result.Folders).Count, $copied, @($Result.Removed).Count
+}
+
+function Start-OpSupportCopy {
+    <#
+    .SYNOPSIS
+        Lance la copie sur le support en arrière-plan et affiche son avancement dans l'assistant.
+
+    .DESCRIPTION
+        Commandes grisées pendant la copie, « Fermer » devient « Annuler » (annulation entre deux dossiers). À la fin :
+        bilan (Get-OpSupportCopyText), puis contrôles recalculés.
+
+    .PARAMETER Dialog
+        Assistant renvoyé par Import-OpPrepareSupportWindow, avec son plan (Show-OpSupportView).
+
+    .EXAMPLE
+        Start-OpSupportCopy -Dialog $d
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Dialog
+    )
+
+    $plan = $Dialog.Plan
+    if (-not $PSCmdlet.ShouldProcess($plan.Destination, 'Copie sur le support')) { return }
+    $c = $Dialog.Controls
+    foreach ($name in 'SupportDrive', 'SupportTargets', 'SupportSources', 'BtnSupportRefresh', 'BtnSupportPrepare') { $c[$name].IsEnabled = $false }
+    $c.BtnSupportClose.Content = 'Annuler'
+    $c.SupportProgress.Text = 'Copie sur le support…'
+    $parameters = @{ Root = $Dialog.Root; Destination = $plan.Destination; Targets = @($plan.Targets); OfficeSources = @($plan.OfficeSources) }
+    $task = Start-OpBackgroundTask -ScriptBlock $script:OpSupportCopyScript -Parameters $parameters -Confirm:$false
+    $Dialog | Add-Member -NotePropertyName CopyTask -NotePropertyValue $task -Force
+    [void](Register-OpBackgroundPump -Task $task -OnMessage {
+            param($m, $Dialog)
+            if ($m.PSObject.Properties['Kind'] -and $m.Kind -eq 'Progress') { $Dialog.Controls.SupportProgress.Text = $m.Message }
+        } -OnCompleted {
+            param($r, $Dialog)
+            $c = $Dialog.Controls
+            foreach ($name in 'SupportDrive', 'SupportTargets', 'SupportSources', 'BtnSupportRefresh') { $c[$name].IsEnabled = $true }
+            $c.BtnSupportClose.Content = 'Fermer'
+            if ($r.Error -or $r.Output.Count -eq 0) {
+                $c.SupportProgress.Text = ''
+                [void][System.Windows.MessageBox]::Show("Support non préparé : $(@($r.Error) + @($r.Errors) -join ' ')", 'OffPatch', 'OK', 'Error')
+            } else {
+                $text = Get-OpSupportCopyText -Result $r.Output[-1]
+                $c.SupportProgress.Text = $text
+                [void][System.Windows.MessageBox]::Show($text, 'OffPatch', 'OK', 'Information')
+            }
+            Show-OpSupportView -Dialog $Dialog
+        } -Context $Dialog)
 }
 
 function Show-OpPrepareSupport {

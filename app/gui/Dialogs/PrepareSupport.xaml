@@ -21,10 +21,14 @@
                    Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
                    Text="OffPatch est copié à la racine du lecteur. Les rapports déjà présents sur le support sont conservés." />
 
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Name="BtnSupportPrepare" Content="Préparer le support" Padding="14,4" Margin="0,0,8,0" IsEnabled="False" ToolTipService.ShowOnDisabled="True" />
-            <Button x:Name="BtnSupportClose" Content="Fermer" Padding="14,4" IsCancel="True" />
-        </StackPanel>
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="BtnSupportPrepare" Content="Préparer le support" Padding="14,4" Margin="0,0,8,0" IsEnabled="False" />
+                <Button x:Name="BtnSupportClose" Content="Fermer" Padding="14,4" IsCancel="True" />
+            </StackPanel>
+            <!-- Avancement de la copie (dossier en cours), puis bilan. -->
+            <TextBlock x:Name="SupportProgress" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+        </DockPanel>
 
         <!-- 3. Contrôles : système de fichiers, espace, refus et avertissements. -->
         <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">

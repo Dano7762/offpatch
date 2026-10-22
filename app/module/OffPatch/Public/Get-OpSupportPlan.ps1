@@ -9,8 +9,9 @@
         Office retenues, chacun avec ses fichiers ; un élément dont un fichier manque au dépôt ou n'a pas la taille du
         manifeste est écarté, avec un avertissement. Les fichiers partagés ne comptent qu'une fois.
         Refus (Blocking) : lecteur absent ou pas prêt, même volume que l'outil, système de fichiers autre que NTFS
-        ou exFAT (FAT32 : la cumulative Windows 11 x64 dépasse 4 Gio, R-12), espace libre insuffisant, rien à
-        embarquer. L'espace demandé ne compte pas les fichiers déjà présents sur le support avec la bonne taille.
+        ou exFAT (FAT32 : la cumulative Windows 11 x64 dépasse 4 Gio, R-12), espace libre insuffisant, dossiers app,
+        config, tools ou depot étrangers à OffPatch (lecteur sans offpatch.root : la copie en miroir les viderait),
+        rien à embarquer. L'espace demandé ne compte pas les fichiers déjà présents sur le support avec la bonne taille.
         Avertissement si le support fait moins du double du dépôt retenu : trop peu de marge pour la croissance des
         cumulatives (64 Go recommandés pour un dépôt complet, 32 Go pour un dépôt filtré).
         Renvoie Destination, Volume, Targets, OfficeSources, Items (éléments retenus du manifeste), Files (chemins
@@ -107,6 +108,12 @@
         else {
             if (@('NTFS', 'exFAT') -notcontains $volume.FileSystem) {
                 $blocking.Add("Système de fichiers $($volume.FileSystem) refusé : NTFS ou exFAT requis (en FAT32, un fichier ne peut pas dépasser 4 Gio, et la cumulative Windows 11 x64 les dépasse).")
+            }
+            # La copie met app, config, tools et les dossiers du dépôt en miroir : sur un lecteur qui n'est pas déjà un
+            # support OffPatch, des dossiers de ces noms seraient vidés.
+            if (-not (Test-Path -LiteralPath ([System.IO.Path]::Combine($Destination, 'offpatch.root')) -PathType Leaf)) {
+                $foreign = @('app', 'config', 'tools', 'depot' | Where-Object { Test-Path -LiteralPath ([System.IO.Path]::Combine($Destination, $_)) })
+                if ($foreign.Count -gt 0) { $blocking.Add("Le lecteur contient déjà des dossiers $($foreign -join ', ') qui n'appartiennent pas à OffPatch : la copie les remplacerait. Choisir un autre lecteur ou les déplacer.") }
             }
             foreach ($relative in $files.Keys) {
                 $existing = Get-Item -LiteralPath ([System.IO.Path]::Combine($Destination, $relative)) -ErrorAction SilentlyContinue
