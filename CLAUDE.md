@@ -99,6 +99,11 @@ Les fichiers se modifient avec l'outil d'édition natif, pas avec des scripts Py
 - Aide intégrée : une ligne qui commence par un point (« .NET … ») est lue comme un mot-clé inconnu et invalide toute l'aide de la fonction (`Socle.Tests.ps1` échoue sur `.SYNOPSIS`). Reformuler pour que la ligne commence autrement.
 - `expand.exe -F:<motif>` est ignoré sur un cabinet d'un seul fichier (décompressé sous son propre nom) : un .msu ou un .cab de test fabriqué avec makecab doit contenir au moins deux fichiers (`DepotUpdate.Tests.ps1`). Dans Git Bash, `expand` désigne l'outil GNU : appeler `%SystemRoot%\System32\expand.exe`.
 - Tests HTTP : `HttpListener` sur `http://localhost:<port>/` fonctionne sans droits d'administrateur (`Download.Tests.ps1`).
+- Interface WPF : pas de `.GetNewClosure()` dans un gestionnaire d'événement ou un bloc relayé par `Register-OpBackgroundPump` (module dynamique : les fonctions de `app/gui/` y sont invisibles). Passer la fenêtre par `Tag` (`$this.Tag`) ou par `-Context` (second argument du bloc).
+- Fonction factice de test : ne pas déclarer `[switch]$Confirm` à la main, la règle `PSUseSupportsShouldProcess` fait planter PSScriptAnalyzer (« Reference Position should begin before start Position ») ; mettre `[CmdletBinding(SupportsShouldProcess)]`.
+- Fichiers de `config/` réécrits par l'outil : ne modifier que les lignes concernées (`Set-OpDepotSelection`), jamais `ConvertTo-Json` (PowerShell 5.1 réindente tout et échappe `&`).
+- Scripts d'essai de `scratch/` avec accents : BOM UTF-8 aussi, sinon un motif comme `'Relevé*'` ne correspond plus.
+- Essais sur les VM VirtualBox de David : pas de dépôt lu par le passage USB (SHA-256 faux, différents à chaque lecture) ; dossier partagé puis `robocopy` vers `C:\OffPatch`, en excluant `depot\office` par son chemin complet (`/XD office` écarte aussi `config\office`).
 
 ## Git
 
