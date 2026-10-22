@@ -218,7 +218,7 @@ function Invoke-OpDepotRun {
     [void](Register-OpBackgroundPump -Task $task -Context $Ui -OnMessage {
             param($m, $Ui)
             if ($m.PSObject.Properties['Kind'] -and $m.Kind -eq 'Progress') { $Ui.Controls.DepotCurrent.Text = $m.Message }
-            elseif ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.DepotLastLog -Line $m.Line }
+            elseif ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.DepotLastLog -Line $m.Line; Add-OpJournalEntry -Controls $Ui.Controls -Message $m }
         } -OnCompleted {
             param($r, $Ui)
             $c = $Ui.Controls
@@ -259,7 +259,7 @@ function Invoke-OpDepotPurgeRun {
     $task = Start-OpBackgroundTask -ScriptBlock $script:OpDepotPurgeScript -Parameters @{ Root = $Ui.Root; RemoveOrphans = [bool]$RemoveOrphans } -ModulePath $Ui.ModulePath -Confirm:$false
     [void](Register-OpBackgroundPump -Task $task -Context $Ui -OnMessage {
             param($m, $Ui)
-            if ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.DepotLastLog -Line $m.Line }
+            if ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.DepotLastLog -Line $m.Line; Add-OpJournalEntry -Controls $Ui.Controls -Message $m }
         } -OnCompleted {
             param($r, $Ui)
             $c = $Ui.Controls

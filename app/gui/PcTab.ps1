@@ -202,7 +202,7 @@ function Invoke-OpPcRefresh {
     $task = Start-OpBackgroundTask -ScriptBlock $script:OpPcLoadScript -Parameters @{ Root = $Ui.Root } -ModulePath $Ui.ModulePath -Confirm:$false
     [void](Register-OpBackgroundPump -Task $task -OnMessage {
             param($m, $Ui)
-            if ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.PcLastLog -Line $m.Line }
+            if ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.PcLastLog -Line $m.Line; Add-OpJournalEntry -Controls $Ui.Controls -Message $m }
         } -OnCompleted {
             param($r, $Ui)
             if ($r.Error -or $r.Output.Count -eq 0) {
@@ -245,7 +245,7 @@ function Invoke-OpPcInstall {
             if ($m.PSObject.Properties['Kind'] -and $m.Kind -eq 'Step') {
                 $Ui.Controls.PcCurrentStep.Text = 'Étape {0}/{1} : {2}' -f ($m.Index + 1), $m.Count, $m.Id
                 $Ui.Controls.PcProgress.Value = $m.Index / $m.Count
-            } elseif ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.PcLastLog -Line $m.Line }
+            } elseif ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.PcLastLog -Line $m.Line; Add-OpJournalEntry -Controls $Ui.Controls -Message $m }
         } -OnCompleted {
             param($r, $Ui)
             $c = $Ui.Controls

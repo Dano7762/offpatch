@@ -1,7 +1,6 @@
 <!--
   Fenêtre principale d'OffPatch (cahier des charges 9). Chargée par XamlReader (MainWindow.ps1) : ni classe compilée
-  ni gestionnaire d'événement ici, le câblage se fait en PowerShell par les noms (x:Name). Le contenu des onglets est
-  ajouté par les tâches suivantes de la phase 6.
+  ni gestionnaire d'événement ici, le câblage se fait en PowerShell par les noms (x:Name).
 -->
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -176,7 +175,32 @@
                 </Grid>
             </TabItem>
             <TabItem x:Name="TabLog" Header="Journal">
-                <Grid x:Name="LogRoot" Margin="8" />
+                <Grid x:Name="LogRoot" Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Filtre par niveau et dossiers. -->
+                    <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button x:Name="BtnOpenLogs" Content="Ouvrir le dossier des journaux" Padding="14,4" Margin="0,0,8,0" />
+                            <Button x:Name="BtnOpenReports" Content="Ouvrir le dossier des rapports" Padding="14,4" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Niveau :" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ComboBox x:Name="LogLevelFilter" SelectedIndex="0" MinWidth="260">
+                                <ComboBoxItem Tag="DEBUG" Content="Tous les niveaux" />
+                                <ComboBoxItem Tag="INFO" Content="Informations, avertissements et erreurs" />
+                                <ComboBoxItem Tag="WARN" Content="Avertissements et erreurs" />
+                                <ComboBoxItem Tag="ERROR" Content="Erreurs seulement" />
+                            </ComboBox>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- Journal en direct de tous les traitements lancés depuis la fenêtre. -->
+                    <ListBox x:Name="LogList" Grid.Row="1" FontFamily="Consolas" FontSize="12" />
+                </Grid>
             </TabItem>
         </TabControl>
     </DockPanel>
