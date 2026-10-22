@@ -1,6 +1,6 @@
 # OffPatch
 
-<p align="center"><img src="app/gui/OffPatch.png" alt="Logo OffPatch" width="360"></p>
+<p align="center"><img src="app/gui/OffPatch.jpeg" alt="Logo OffPatch" width="360"></p>
 
 Outil Windows portable qui prépare une fois par mois un dépôt de mises à jour Microsoft, puis les installe **sans connexion Internet** sur des PC traités un par un : en atelier, ou chez un client. Il prend la suite de WSUS Offline Update, qui n'est plus maintenu.
 
