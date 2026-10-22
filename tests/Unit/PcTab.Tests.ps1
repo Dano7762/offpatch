@@ -186,6 +186,14 @@ Describe 'Reprise de la session interrompue' {
         (Get-OpPcSummary -View $view).CanResume | Should -BeFalse
     }
 
+    It 'redémarrage en attente (redémarrage annulé) : bouton en attente, relance -Resume toujours possible' {
+        $view = Get-TestView -Checks @([pscustomobject]@{ Id = 'PendingReboot'; Label = 'Redémarrage en attente'; Result = 'Warning'; Message = 'CBS' })
+        $view | Add-Member -NotePropertyName Session -NotePropertyValue ([pscustomobject]@{ Mode = 'Auto'; Error = $null })
+        $s = Get-OpPcSummary -View $view
+        $s.CanResume | Should -BeFalse
+        $s.ResumeAvailable | Should -BeTrue
+    }
+
     It 'pas de reprise sans session, ni pour une session manuelle ; état illisible signalé' {
         (Get-OpPcSummary -View (Get-TestView)).CanResume | Should -BeFalse
         $view = Get-TestView
@@ -217,5 +225,11 @@ Describe 'Bouton « Reprendre la session interrompue »' -Skip:$script:noSta {
         Show-OpPcView -Controls $c -View $view
         $c.BtnResume.Visibility | Should -Be 'Visible'
         $c.BtnResume.IsEnabled | Should -BeTrue
+        $c.BtnResume.ToolTip | Should -BeNullOrEmpty
+        $view.Checks = @([pscustomobject]@{ Id = 'PendingReboot'; Label = 'Redémarrage en attente'; Result = 'Warning'; Message = 'CBS' })
+        Show-OpPcView -Controls $c -View $view
+        $c.BtnResume.Visibility | Should -Be 'Visible'
+        $c.BtnResume.IsEnabled | Should -BeFalse
+        $c.BtnResume.ToolTip | Should -Match 'Redémarrer d.abord'
     }
 }

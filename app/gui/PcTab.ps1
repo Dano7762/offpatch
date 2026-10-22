@@ -155,7 +155,11 @@ function Get-OpPcSummary {
     [pscustomobject]@{
         Title = $title; Detail = ($parts -join ' · '); Checks = $checks; Office = $office
         RebootPending = $reboot; CanInstall = $pending -and -not $blocking
-        CanResume = [bool]($session -and $session.Mode -eq 'Auto') -and -not $blocking
+        ResumeAvailable = [bool]($session -and $session.Mode -eq 'Auto') -and -not $blocking
+        # Redémarrage en attente (redémarrage annulé) : une étape installée mais pas encore appliquée serait vue à
+        # installer et jugée annulée par Windows. Le bouton attend le redémarrage ; la relance -Resume, elle, suit un
+        # redémarrage réel et ne dépend que de ResumeAvailable.
+        CanResume = [bool]($session -and $session.Mode -eq 'Auto') -and -not $blocking -and -not $reboot
     }
 }
 
@@ -195,7 +199,9 @@ function Show-OpPcView {
     $Controls.BtnInstallSelection.IsEnabled = $summary.CanInstall
     $Controls.BtnAuto.IsEnabled = $summary.CanInstall
     $Controls.BtnResume.Visibility = 'Collapsed'
-    if ($summary.CanResume) { $Controls.BtnResume.Visibility = 'Visible' }
+    if ($summary.ResumeAvailable) { $Controls.BtnResume.Visibility = 'Visible' }
+    $Controls.BtnResume.ToolTip = $null
+    if ($summary.ResumeAvailable -and -not $summary.CanResume) { $Controls.BtnResume.ToolTip = 'Redémarrer d''abord le PC : la session reprendra ensuite.' }
     $Controls.BtnResume.IsEnabled = $summary.CanResume
 }
 
@@ -235,7 +241,7 @@ function Invoke-OpPcRefresh {
             # Relance par resume.ps1 (-Resume) : reprise sans récapitulatif ni question, une seule fois.
             if ($Ui.PSObject.Properties['ResumePending'] -and $Ui.ResumePending) {
                 $Ui.ResumePending = $false
-                if ((Get-OpPcSummary -View $r.Output[-1]).CanResume) { Invoke-OpPcAuto -Ui $Ui -Resume }
+                if ((Get-OpPcSummary -View $r.Output[-1]).ResumeAvailable) { Invoke-OpPcAuto -Ui $Ui -Resume }
                 else { Add-OpLogLine -ListBox $Ui.Controls.PcLastLog -Line 'Aucune session automatique à reprendre.' }
             }
         } -Context $Ui)
@@ -304,7 +310,7 @@ function Invoke-OpPcAuto {
             elseif ($result.Result -eq 'Restarting') {
                 $c.PcCurrentStep.Text = 'Redémarrage du PC : la session reprendra à l''ouverture de session.'
                 return
-            } elseif ($result.Result -eq 'Cancelled') { $c.PcCurrentStep.Text = 'Redémarrage annulé : état de la session conservé, à reprendre plus tard.' }
+            } elseif ($result.Result -eq 'Cancelled') { $c.PcCurrentStep.Text = 'Redémarrage annulé : état conservé. Redémarrer le PC, puis « Reprendre la session interrompue ».' }
             else {
                 $c.PcProgress.Value = 1
                 $c.PcCurrentStep.Text = 'Session automatique terminée.'

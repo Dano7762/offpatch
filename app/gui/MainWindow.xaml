@@ -108,7 +108,7 @@
                     <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,10,0,0">
                         <Button x:Name="BtnAuto" Content="Installation automatique" Padding="14,4" Margin="0,0,8,0" IsEnabled="False" />
                         <Button x:Name="BtnInstallSelection" Content="Installer la sélection" Padding="14,4" Margin="0,0,8,0" IsEnabled="False" />
-                        <Button x:Name="BtnResume" Content="Reprendre la session interrompue" Padding="14,4" Visibility="Collapsed" />
+                        <Button x:Name="BtnResume" Content="Reprendre la session interrompue" Padding="14,4" Visibility="Collapsed" ToolTipService.ShowOnDisabled="True" />
                     </StackPanel>
 
                     <!-- Avancement et dernières lignes du journal. -->
