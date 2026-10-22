@@ -26,7 +26,7 @@ robocopy $s C:\OffPatch offpatch.root Lancer-OffPatch.cmd
 
 `/XD` reçoit le chemin complet de `depot\office` : avec `/XD office` seul, robocopy écarterait aussi `config\office`. Si la VM a un Office Click-to-Run, supprime cette option : la source Office est alors nécessaire.
 
-Contrôle : `Test-Path C:\OffPatch\app\gui\OffPatch.jpg` doit répondre `True` (sinon la copie date d'avant le logo).
+Contrôle : `Test-Path C:\OffPatch\app\gui\OffPatch.png` doit répondre `True` (sinon la copie date d'avant le logo).
 
 ## 2. Plan en lecture seule
 

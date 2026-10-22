@@ -20,7 +20,7 @@
                 BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Logo chargé par Register-OpHeader (OffPatch.jpg), masqué s'il manque. -->
+                    <!-- Logo chargé par Register-OpHeader (OffPatch.png), masqué s'il manque. -->
                     <Image x:Name="HeaderLogo" Height="56" Margin="0,0,12,0" Visibility="Collapsed" RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock x:Name="HeaderTitle" Text="OffPatch" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                     <TextBlock x:Name="HeaderVersion" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" />

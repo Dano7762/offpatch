@@ -74,7 +74,7 @@ function Register-OpHeader {
         Affiche le logo dans l'en-tête et comme icône de la fenêtre, et câble le lien du pied vers le dépôt du projet.
 
     .DESCRIPTION
-        Logo lu dans OffPatch.jpg à côté de ce script, une seule fois (image figée, fichier libéré). Logo absent ou
+        Logo lu dans OffPatch.png à côté de ce script, une seule fois (image figée, fichier libéré). Logo absent ou
         illisible : en-tête et icône par défaut, sans erreur. Le lien du pied s'ouvre dans le navigateur par défaut ;
         sans connexion, le navigateur affiche simplement une erreur.
 
@@ -82,7 +82,7 @@ function Register-OpHeader {
         Fenêtre renvoyée par Import-OpMainWindow.
 
     .PARAMETER LogoPath
-        Image du logo ; par défaut OffPatch.jpg à côté de ce script.
+        Image du logo ; par défaut OffPatch.png à côté de ce script.
 
     .EXAMPLE
         Register-OpHeader -Ui $ui
@@ -90,7 +90,7 @@ function Register-OpHeader {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][pscustomobject]$Ui,
-        [string]$LogoPath = (Join-Path $PSScriptRoot 'OffPatch.jpg')
+        [string]$LogoPath = (Join-Path $PSScriptRoot 'OffPatch.png')
     )
 
     if (Test-Path -LiteralPath $LogoPath -PathType Leaf) {
