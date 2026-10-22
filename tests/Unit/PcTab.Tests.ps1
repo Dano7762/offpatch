@@ -155,6 +155,7 @@ Describe 'Show-OpPcView et Add-OpLogLine' -Skip:$script:noSta {
         @($c.PcSteps.ItemsSource).Count | Should -Be 4
         $c.PcOfficeText.Text | Should -Match 'aucun Office'
         $c.BtnInstallSelection.IsEnabled | Should -BeTrue
+        $c.BtnAuto.IsEnabled | Should -BeTrue
     }
 
     It 'montre les contrôles et le bandeau de redémarrage, désactive l''installation sur un contrôle bloquant' {
@@ -166,6 +167,7 @@ Describe 'Show-OpPcView et Add-OpLogLine' -Skip:$script:noSta {
         $c.PcChecks.Visibility | Should -Be 'Visible'
         $c.PcRebootBanner.Visibility | Should -Be 'Visible'
         $c.BtnInstallSelection.IsEnabled | Should -BeFalse
+        $c.BtnAuto.IsEnabled | Should -BeFalse
     }
 
     It 'garde les 200 dernières lignes du journal' {

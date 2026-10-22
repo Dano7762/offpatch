@@ -1,8 +1,8 @@
 ﻿# Onglet « Ce PC » (cahier des charges 8.7, 9) : bandeau système, contrôles préalables, étapes du plan avec cases à
 # cocher, bloc Office, installation de la sélection, redémarrage, avancement et dernières lignes du journal.
 # Affichage et câblage seulement : relevé, plan et installation passent par le module, dans un runspace séparé
-# (Background.ps1). « Installation automatique » et « Reprendre la session interrompue » sont branchés par le
-# récapitulatif du mode auto et la reprise (-Resume).
+# (Background.ps1). « Installation automatique » passe par le récapitulatif (Dialogs/AutoSummary.ps1) ;
+# « Reprendre la session interrompue » est branché par la reprise (-Resume).
 
 # Relevé du PC, contrôles préalables et plan (runspace). Lecture seule.
 $script:OpPcLoadScript = {
@@ -37,6 +37,16 @@ $script:OpPcInstallScript = {
         }
     }
     [pscustomobject]@{ Results = $results; ReportPath = (Write-OpInstallReport -Root $Root -Confirm:$false -WarningAction SilentlyContinue) }
+}
+
+# Session automatique validée au récapitulatif (runspace, 8.6) : plus aucune question. Étapes et compte à rebours
+# déposés dans la file ; le redémarrage s'annule par $OpCancel (bouton « Annuler le redémarrage »).
+$script:OpPcAutoScript = {
+    param([string]$Root, [bool]$ForceWindows)
+    [void](Initialize-OpSession -Kind Session -Queue $OpQueue -Root $Root)
+    $onStep = { param($s) $OpQueue.Enqueue([pscustomobject]@{ Kind = 'AutoStep'; Id = $s.Id; Done = [bool]$s.PSObject.Properties['Seconds']; State = $s.State }) }
+    $onTick = { param($left) $OpQueue.Enqueue([pscustomobject]@{ Kind = 'Countdown'; Seconds = $left }) }
+    Invoke-OpAutoSession -Root $Root -ForceWindows:$ForceWindows -OnStep $onStep -OnTick $onTick -IsCancelled { $OpCancel.IsCancellationRequested } -Confirm:$false
 }
 
 function ConvertTo-OpPcStepTable {
@@ -178,6 +188,7 @@ function Show-OpPcView {
     $Controls.PcSteps.ItemsSource = (ConvertTo-OpPcStepTable -Plan $View.Plan).DefaultView
     $Controls.PcOfficeText.Text = $summary.Office
     $Controls.BtnInstallSelection.IsEnabled = $summary.CanInstall
+    $Controls.BtnAuto.IsEnabled = $summary.CanInstall
 }
 
 function Invoke-OpPcRefresh {
@@ -198,6 +209,7 @@ function Invoke-OpPcRefresh {
 
     $c = $Ui.Controls
     $c.BtnInstallSelection.IsEnabled = $false
+    $c.BtnAuto.IsEnabled = $false
     $c.PcSystemTitle.Text = 'Relevé du PC en cours…'
     $task = Start-OpBackgroundTask -ScriptBlock $script:OpPcLoadScript -Parameters @{ Root = $Ui.Root } -ModulePath $Ui.ModulePath -Confirm:$false
     [void](Register-OpBackgroundPump -Task $task -OnMessage {
@@ -209,7 +221,76 @@ function Invoke-OpPcRefresh {
                 $Ui.Controls.PcSystemTitle.Text = "Relevé du PC impossible : $(@($r.Error) + @($r.Errors) -join ' ')"
                 return
             }
+            # Relevé gardé pour le récapitulatif du mode automatique.
+            $Ui | Add-Member -NotePropertyName PcView -NotePropertyValue $r.Output[-1] -Force
             Show-OpPcView -Controls $Ui.Controls -View $r.Output[-1]
+        } -Context $Ui)
+}
+
+function Invoke-OpPcAuto {
+    <#
+    .SYNOPSIS
+        Affiche le récapitulatif du mode automatique, puis, s'il est validé, lance la session en arrière-plan.
+
+    .DESCRIPTION
+        Cahier des charges 8.6. Une seule validation (Show-OpAutoSummary), avec le forçage éventuel pour Windows 10
+        sans ESU ; ensuite Invoke-OpAutoSession sans confirmation. Boutons en conflit désactivés, étape en cours
+        affichée, compte à rebours avant redémarrage avec « Annuler le redémarrage ». Redémarrage annulé ou session
+        terminée : détection refaite.
+
+    .PARAMETER Ui
+        Fenêtre complétée de Root, ModulePath (Register-OpPcTab) et PcView (Invoke-OpPcRefresh).
+
+    .EXAMPLE
+        Invoke-OpPcAuto -Ui $ui
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Ui
+    )
+
+    if (-not $Ui.PSObject.Properties['PcView'] -or -not $Ui.PcView) { return }
+    $choice = Show-OpAutoSummary -View $Ui.PcView -Owner $Ui.Window
+    if (-not $choice) { return }
+    $c = $Ui.Controls
+    foreach ($button in 'BtnInstallSelection', 'BtnAuto', 'BtnRestart', 'BtnResume') { $c[$button].IsEnabled = $false }
+    $c.PcSteps.IsEnabled = $false
+    $c.PcProgress.IsIndeterminate = $true
+    $c.PcCurrentStep.Text = 'Session automatique en cours…'
+    $task = Start-OpBackgroundTask -ScriptBlock $script:OpPcAutoScript -Parameters @{ Root = $Ui.Root; ForceWindows = $choice.ForceWindows } -ModulePath $Ui.ModulePath -Confirm:$false
+    $Ui | Add-Member -NotePropertyName AutoTask -NotePropertyValue $task -Force
+    [void](Register-OpBackgroundPump -Task $task -OnMessage {
+            param($m, $Ui)
+            $c = $Ui.Controls
+            if ($m.PSObject.Properties['Kind'] -and $m.Kind -eq 'AutoStep') {
+                $c.PcCurrentStep.Text = "Étape $($m.Id) : en cours…"
+                if ($m.Done -and $m.State -eq 'Error') { $c.PcCurrentStep.Text = "Étape $($m.Id) : en erreur." }
+                elseif ($m.Done) { $c.PcCurrentStep.Text = "Étape $($m.Id) : terminée." }
+            } elseif ($m.PSObject.Properties['Kind'] -and $m.Kind -eq 'Countdown') {
+                $c.PcCurrentStep.Text = "Redémarrage dans $($m.Seconds) s"
+                if (-not $Ui.AutoTask.Cancellation.IsCancellationRequested) { $c.BtnCancelReboot.Visibility = 'Visible' }
+            } elseif ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $c.PcLastLog -Line $m.Line; Add-OpJournalEntry -Controls $c -Message $m }
+        } -OnCompleted {
+            param($r, $Ui)
+            $c = $Ui.Controls
+            $c.PcProgress.IsIndeterminate = $false
+            $c.BtnCancelReboot.Visibility = 'Collapsed'
+            $result = $null
+            if ($r.Output.Count -gt 0) { $result = $r.Output[-1] }
+            if ($r.Error) { $c.PcCurrentStep.Text = "Session automatique interrompue : $($r.Error)" }
+            elseif (-not $result) { $c.PcCurrentStep.Text = 'Session automatique non démarrée.' }
+            elseif ($result.Result -eq 'Restarting') {
+                $c.PcCurrentStep.Text = 'Redémarrage du PC : la session reprendra à l''ouverture de session.'
+                return
+            } elseif ($result.Result -eq 'Cancelled') { $c.PcCurrentStep.Text = 'Redémarrage annulé : état de la session conservé, à reprendre plus tard.' }
+            else {
+                $c.PcProgress.Value = 1
+                $c.PcCurrentStep.Text = 'Session automatique terminée.'
+                if ($result.ReportPath) { Add-OpLogLine -ListBox $c.PcLastLog -Line "Rapport : $($result.ReportPath)" }
+            }
+            foreach ($button in 'BtnRestart', 'BtnResume') { $c[$button].IsEnabled = $true }
+            $c.PcSteps.IsEnabled = $true
+            Invoke-OpPcRefresh -Ui $Ui
         } -Context $Ui)
 }
 
@@ -309,6 +390,15 @@ function Register-OpPcTab {
     $Ui | Add-Member -NotePropertyName ModulePath -NotePropertyValue $ModulePath -Force
     $Ui.Controls.BtnInstallSelection.Tag = $Ui
     $Ui.Controls.BtnInstallSelection.Add_Click({ Invoke-OpPcInstall -Ui $this.Tag })
+    $Ui.Controls.BtnAuto.Tag = $Ui
+    $Ui.Controls.BtnAuto.Add_Click({ Invoke-OpPcAuto -Ui $this.Tag })
+    $Ui.Controls.BtnCancelReboot.Tag = $Ui
+    $Ui.Controls.BtnCancelReboot.Add_Click({
+            $ui = $this.Tag
+            if ($ui.PSObject.Properties['AutoTask'] -and $ui.AutoTask) { Stop-OpBackgroundTask -Task $ui.AutoTask -Confirm:$false }
+            $this.Visibility = 'Collapsed'
+            $ui.Controls.PcCurrentStep.Text = 'Annulation du redémarrage demandée…'
+        })
     $Ui.Controls.BtnRestart.Add_Click({
             $answer = [System.Windows.MessageBox]::Show('Redémarrer le PC maintenant ? Enregistrer d''abord le travail en cours.', 'OffPatch', 'YesNo', 'Question')
             if ($answer -eq 'Yes') { Restart-OpPc -Confirm:$false }
