@@ -154,7 +154,8 @@ Describe 'Assistant « Préparer un support »' {
         BeforeAll {
             Mock Get-OpDepotSelection { [pscustomobject]@{ AvailableTargets = @('win11-x64', 'win10-x64'); Targets = @('win11-x64'); OfficeSources = @([pscustomobject]@{ Id = 'current'; Enabled = $true; Languages = @('fr-fr') }) } }
             Mock Get-OpVolumeInfo { Get-TestVolume -FileSystem 'FAT32' }
-            $drives = @([pscustomobject]@{ Name = 'F:\'; IsReady = $true; DriveType = 'Removable'; VolumeLabel = 'CLE'; DriveFormat = 'FAT32'; AvailableFreeSpace = [long]20GB; TotalSize = [long]29GB })
+            # Lecteur inconnu du PC qui exécute les tests (la CI n'a pas de F:) : les contrôles ne doivent pas en dépendre.
+            $drives = @([pscustomobject]@{ Name = 'Q:\'; IsReady = $true; DriveType = 'Removable'; VolumeLabel = 'CLE'; DriveFormat = 'FAT32'; AvailableFreeSpace = [long]20GB; TotalSize = [long]29GB })
             $script:d = Import-OpPrepareSupportWindow -Root $script:tool -Drives $drives
         }
         AfterAll { $script:d.Window.Close() }
@@ -163,7 +164,7 @@ Describe 'Assistant « Préparer un support »' {
             $c = $script:d.Controls
             @($c.SupportTargets.Children | ForEach-Object { "$($_.Content)=$($_.IsChecked)" }) | Should -Be @('win11-x64=True', 'win10-x64=False')
             $c.SupportSources.Children[0].Content | Should -Be 'current (fr-fr)'
-            $c.SupportDrive.SelectedItem.Root | Should -Be 'F:\'
+            $c.SupportDrive.SelectedItem.Root | Should -Be 'Q:\'
             $c.SupportBlocking.Visibility | Should -Be 'Visible'
             $c.SupportBlockingText.Text | Should -Match 'FAT32 refusé'
             $c.BtnSupportPrepare.IsEnabled | Should -BeFalse

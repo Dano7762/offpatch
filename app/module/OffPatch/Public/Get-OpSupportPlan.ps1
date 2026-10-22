@@ -109,7 +109,7 @@
                 $blocking.Add("Système de fichiers $($volume.FileSystem) refusé : NTFS ou exFAT requis (en FAT32, un fichier ne peut pas dépasser 4 Gio, et la cumulative Windows 11 x64 les dépasse).")
             }
             foreach ($relative in $files.Keys) {
-                $existing = Get-Item -LiteralPath (Join-Path $Destination $relative) -ErrorAction SilentlyContinue
+                $existing = Get-Item -LiteralPath ([System.IO.Path]::Combine($Destination, $relative)) -ErrorAction SilentlyContinue
                 if (-not $existing -or $existing.Length -ne [long]$files[$relative]) { $toCopy += [long]$files[$relative] }
             }
             if ($toCopy -gt [long]$volume.FreeBytes) {
