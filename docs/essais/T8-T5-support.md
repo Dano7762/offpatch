@@ -33,7 +33,7 @@ Le passage USB de VirtualBox fausse les lectures du dépôt : la clé reste bran
 3. dans la VM, PowerShell **en administrateur** (`\\VBoxSvr\cle` si `Y:` n'apparaît pas) :
 
    ```powershell
-   robocopy Y:\ C:\OffPatch /E
+   robocopy Y:\ C:\OffPatch /E /XD "System Volume Information" '$RECYCLE.BIN'
    Set-Location C:\OffPatch
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\app\OffPatch-Cli.ps1 -Action Plan | Tee-Object -FilePath C:\OffPatch\T5-support-plan.txt
    ```

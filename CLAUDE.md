@@ -104,7 +104,7 @@ Les fichiers se modifient avec l'outil d'édition natif, pas avec des scripts Py
 - Fonction factice de test : ne pas déclarer `[switch]$Confirm` à la main, la règle `PSUseSupportsShouldProcess` fait planter PSScriptAnalyzer (« Reference Position should begin before start Position ») ; mettre `[CmdletBinding(SupportsShouldProcess)]`.
 - Fichiers de `config/` réécrits par l'outil : ne modifier que les lignes concernées (`Set-OpDepotSelection`), jamais `ConvertTo-Json` (PowerShell 5.1 réindente tout et échappe `&`).
 - Scripts d'essai de `scratch/` avec accents : BOM UTF-8 aussi, sinon un motif comme `'Relevé*'` ne correspond plus.
-- Essais sur les VM VirtualBox de David : pas de dépôt lu par le passage USB (SHA-256 faux, différents à chaque lecture) ; dossier partagé puis `robocopy` vers `C:\OffPatch`, en excluant `depot\office` par son chemin complet (`/XD office` écarte aussi `config\office`).
+- Essais sur les VM VirtualBox de David : pas de dépôt lu par le passage USB (SHA-256 faux, différents à chaque lecture) ; dossier partagé puis `robocopy` vers `C:\OffPatch`, en excluant `depot\office` par son chemin complet (`/XD office` écarte aussi `config\office`). Copie depuis la racine d'une clé : `/XD "System Volume Information" '$RECYCLE.BIN'`.
 
 ## Git
 
