@@ -23,6 +23,13 @@ Describe 'Start-OpLog' {
         Test-Path -Path $log.ToolLogDirectory -PathType Container | Should -BeTrue
     }
 
+    It 'ouvre le journal même sous -WhatIf (essai à blanc), sans avertissement à l''écriture' {
+        $log = Start-OpLog -Kind Depot -Directory (Join-Path $TestDrive 'whatif') -Now $moment -WhatIf
+        Write-OpLog -Message 'essai' -Now $moment -WarningVariable warned 3>$null
+        @($warned).Count | Should -Be 0
+        Test-Path -Path $log.Path -PathType Leaf | Should -BeTrue
+    }
+
     It 'place par défaut le journal de session dans ProgramData\OffPatch\logs' {
         $saved = $env:ProgramData
         try {

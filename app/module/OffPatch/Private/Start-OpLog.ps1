@@ -32,10 +32,10 @@
     $path = Join-Path $Directory ($baseName + '.log')
     $toolLogs = Join-Path $Directory $baseName
 
-    if ($PSCmdlet.ShouldProcess($path, 'Création du journal')) {
-        New-Item -ItemType Directory -Force -Path $Directory -ErrorAction Stop | Out-Null
-        if ($Kind -eq 'Session') { New-Item -ItemType Directory -Force -Path $toolLogs -ErrorAction Stop | Out-Null }
-    }
+    # Journal ouvert même sous -WhatIf : un essai à blanc garde la trace de ce qu'il aurait fait (sinon Write-OpLog
+    # avertit « Journal inaccessible » à chaque ligne quand le dossier n'existe pas encore).
+    New-Item -ItemType Directory -Force -Path $Directory -WhatIf:$false -ErrorAction Stop | Out-Null
+    if ($Kind -eq 'Session') { New-Item -ItemType Directory -Force -Path $toolLogs -WhatIf:$false -ErrorAction Stop | Out-Null }
 
     $script:OpLog = [pscustomobject]@{
         Path             = $path
