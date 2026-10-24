@@ -1,6 +1,6 @@
 # OffPatch : cahier des charges
 
-Version 1.42 du 22 octobre 2026.
+Version 1.43 du 24 octobre 2026.
 
 ## 1. Contexte
 
@@ -170,7 +170,7 @@ Sur le PC client, l'outil écrit uniquement dans `C:\ProgramData\OffPatch\` : `s
     "rebootCountdownSeconds": 30,
     "staleDepotWarningDays": 35,
     "odtTimeoutMinutes": 30,
-    "createRestorePointBeforeSession": true
+    "createRestorePointBeforeSession": false
   },
   "logging": {
     "level": "INFO"
@@ -472,7 +472,7 @@ Assistant accessible depuis l'onglet Dépôt :
 | Espace libre sur C: | Sous `minFreeSpaceGB` : bloquant |
 | Portable sur batterie | Avertissement, confirmation demandée avant le mode auto |
 | Âge du dépôt | Au-delà de `staleDepotWarningDays` : avertissement |
-| Point de restauration (`createRestorePointBeforeSession`, actif par défaut) | Juste avant la première étape. Protection du système jugée active seulement si les deux indicateurs ci-dessous concordent (volume système sous `SPP\Clients` et réservation `Win32_ShadowStorage` pour ce volume). Inactive ou désaccord entre les deux : aucun appel à `Checkpoint-Computer`, avertissement : OffPatch n'active jamais la protection, et `Checkpoint-Computer` l'active de lui-même si on l'appelle (mesuré, voir ci-dessous). Active : `Checkpoint-Computer`, puis vérification par `Get-ComputerRestorePoint` qu'un point existe vraiment. Si Windows en a créé un dans les 24 heures, aucun nouveau point (avertissement de `Checkpoint-Computer`, pas d'erreur) : le rapport cite ce point existant (description, date). Après l'appel, les indicateurs sont relus : s'ils montrent une protection activée alors qu'elle ne l'était pas avant, le rapport l'indique explicitement (« protection du système activée par Checkpoint-Computer, à vérifier »). Jamais bloquant |
+| Point de restauration (`createRestorePointBeforeSession`, désactivé par défaut en v1, voir 13) | Juste avant la première étape. Protection du système jugée active seulement si les deux indicateurs ci-dessous concordent (volume système sous `SPP\Clients` et réservation `Win32_ShadowStorage` pour ce volume). Inactive ou désaccord entre les deux : aucun appel à `Checkpoint-Computer`, avertissement : OffPatch n'active jamais la protection, et `Checkpoint-Computer` l'active de lui-même si on l'appelle (mesuré, voir ci-dessous). Active : `Checkpoint-Computer`, puis vérification par `Get-ComputerRestorePoint` qu'un point existe vraiment. Si Windows en a créé un dans les 24 heures, aucun nouveau point (avertissement de `Checkpoint-Computer`, pas d'erreur) : le rapport cite ce point existant (description, date). Après l'appel, les indicateurs sont relus : s'ils montrent une protection activée alors qu'elle ne l'était pas avant, le rapport l'indique explicitement (« protection du système activée par Checkpoint-Computer, à vérifier »). Jamais bloquant |
 | PC connecté à un réseau | Avertissement : Windows Update peut travailler en parallèle. L'outil recommande d'activer le mode Avion pendant la session (il survit aux redémarrages) ; rappel dans l'écran récapitulatif du mode auto (8.6). OffPatch ne suspend pas Windows Update lui-même : aucune méthode documentée qui expire d'elle-même (R-15) |
 | Intégrité des fichiers nécessaires | Hash différent du manifeste : l'étape passe en erreur, les autres continuent |
 
@@ -690,16 +690,16 @@ Tests réels, selon deux moyens :
 - **Runners GitHub hébergés** (dépôt public `Dano7762/offpatch`, jetables), pour ce qu'ils couvrent : CI à chaque push (PSScriptAnalyzer et Pester sous Windows PowerShell 5.1, sans accès réseau), contrat en ligne avec le catalogue chaque mercredi (`catalog-contract.yml`), face Dépôt (recherche au catalogue, téléchargements, contrôles d'intégrité, `windows-2025`), Windows 11 ARM64 client sans redémarrage (`windows-11-arm`). Les workflows lourds se déclenchent à la main.
 - **Interventions réelles** pour le reste : tout ce qui demande un redémarrage, Windows 11 x64 client, Windows 10, un support physique. On commence toujours par l'action `Plan`, en lecture seule, avant toute installation.
 
-| Test | Situation de départ | Attendu | Où |
-|---|---|---|---|
-| T1 | Windows 11 26H2 x64 installé depuis une ISO, sans Office | Mode auto complet, Office `NotApplicable` « aucun Office Click-to-Run », rapport sans erreur | Intervention réelle (redémarrages, x64 client) |
-| T2 | Windows 11 24H2 x64 avec un Office Click-to-Run préinstallé ancien (Microsoft 365 Famille ou Office 2024, canal Current) | Enablement package appliqué, Office mis à jour depuis la source Current, licence inchangée | Intervention réelle (redémarrages, x64 client) |
-| T3 | Windows 11 26H2 x64 déjà à jour (par exemple la VM de T1 une fois toutes ses étapes faites) | Rien à installer, rapport cohérent | Intervention réelle (VM) ; l'action `Plan` a aussi tourné sur le runner `windows-11-arm` (25H2, non à jour) et sur un 25H2 x64 à jour, où l'enablement package 26H2 reste proposé tant que `includeEnablementPackage` est vrai |
-| T4 | Windows 10 22H2 x64 avec ESU actif | Cumulative ESU installée | Intervention réelle (Windows 10) |
-| T5 | Windows 10 22H2 x64 sans ESU | Avertissement, aucune étape Windows en mode auto | Intervention réelle (Windows 10) |
-| T6 | Windows 11 ARM64 avec un Office 64 bits Click-to-Run ancien | Mode manuel complet, Office mis à jour et fonctionnel | Runner `windows-11-arm` pour les étapes sans redémarrage, puis matériel réel |
-| T7 | Support débranché pendant un redémarrage | Fenêtre d'attente, reprise dès le rebranchement, même sur une autre lettre de lecteur | Intervention réelle (redémarrage, support physique) |
-| T8 | Préparation d'un support en FAT32 | Refus avec message explicite | Runner `windows-2025` avec un disque virtuel formaté en FAT32, puis support réel |
+| Test | Situation de départ | Attendu | Où | Résultat |
+|---|---|---|---|---|
+| T1 | Windows 11 26H2 x64 installé depuis une ISO, sans Office | Mode auto complet, Office `NotApplicable` « aucun Office Click-to-Run », rapport sans erreur | Intervention réelle (redémarrages, x64 client) | À valider après la v1, sur intervention réelle. Couvert en partie : mode auto complet sur VM 25H2 sans Office (partie Windows de T2) et T3 |
+| T2 | Windows 11 24H2 x64 avec un Office Click-to-Run préinstallé ancien (Microsoft 365 Famille ou Office 2024, canal Current) | Enablement package appliqué, Office mis à jour depuis la source Current, licence inchangée | Intervention réelle (redémarrages, x64 client) | Partie Windows conforme (VM 25H2 26200.8037 → 26H2 26300.9711, mode auto en console les 19 et 21 octobre 2026, depuis l'interface le 22 octobre 2026). Partie Office à valider après la v1 ; mise à jour d'un Office Current mesurée sur runner (`r08-office`, `office-update-scope`) |
+| T3 | Windows 11 26H2 x64 déjà à jour (par exemple la VM de T1 une fois toutes ses étapes faites) | Rien à installer, rapport cohérent | Intervention réelle (VM) ; l'action `Plan` a aussi tourné sur le runner `windows-11-arm` (25H2, non à jour) et sur un 25H2 x64 à jour, où l'enablement package 26H2 reste proposé tant que `includeEnablementPackage` est vrai | Conforme (VM 26H2 26300.9711, 21 et 22 octobre 2026) |
+| T4 | Windows 10 22H2 x64 avec ESU actif | Cumulative ESU installée | Intervention réelle (Windows 10) | À valider après la v1, sur un PC inscrit à l'ESU (R-04) |
+| T5 | Windows 10 22H2 x64 sans ESU | Avertissement, aucune étape Windows en mode auto | Intervention réelle (Windows 10) | Conforme (VM 19045.2965, 18 octobre 2026 ; depuis un support préparé, 24 octobre 2026) |
+| T6 | Windows 11 ARM64 avec un Office 64 bits Click-to-Run ancien | Mode manuel complet, Office mis à jour et fonctionnel | Runner `windows-11-arm` pour les étapes sans redémarrage, puis matériel réel | Étapes sans redémarrage conformes sur runner (`cli-steps-arm64`, `r08-office`) ; matériel réel à valider après la v1 |
+| T7 | Support débranché pendant un redémarrage | Fenêtre d'attente, reprise dès le rebranchement, même sur une autre lettre de lecteur | Intervention réelle (redémarrage, support physique) | Conforme (VM Windows 10, clé USB rebranchée sous une autre lettre, 19 octobre 2026) |
+| T8 | Préparation d'un support en FAT32 | Refus avec message explicite | Runner `windows-2025` avec un disque virtuel formaté en FAT32, puis support réel | Conforme (runner `t8-support`, FAT32 refusé, exFAT et NTFS préparés et vérifiés ; clé réelle, 24 octobre 2026) |
 
 Les résultats sont notés dans le journal de `TODO.md`.
 
@@ -720,8 +720,8 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 
 - Mise à jour du dépôt en un clic, avec le résumé des nouveautés.
 - Préparation d'un support filtré, sans perte des rapports déjà présents.
-- Tests T1 à T8 réussis.
-- Indicateurs de protection du système (8.2 : `SPP\Clients` et `Win32_ShadowStorage`) validés sur intervention réelle, sur un PC où la protection est active d'origine et sur un PC où elle est inactive ; à défaut, `createRestorePointBeforeSession` livré désactivé par défaut.
+- Tests T2 (partie Windows), T3, T5, T7 et T8 réussis. T1, T4, T6 et la partie Office de T2 sont validés après la v1, sur intervention réelle, dès qu'un PC adapté se présente ; la matrice de 12 donne l'état de chacun.
+- Indicateurs de protection du système (8.2 : `SPP\Clients` et `Win32_ShadowStorage`) validés sur intervention réelle, sur un PC où la protection est active d'origine et sur un PC où elle est inactive ; à défaut, `createRestorePointBeforeSession` livré désactivé par défaut. Seul le cas inactif a été vu (VM Windows 10 et Windows 11) : v1 livrée avec `false`.
 - Aucun gel de l'interface pendant les traitements longs.
 - Journal et rapport produits pour chaque session, y compris en cas d'échec.
 - PSScriptAnalyzer sans erreur, tests Pester au vert.
@@ -781,3 +781,4 @@ Matrice de traçabilité (bilan de phase 0) : une ligne par catégorie. Une case
 - 1.40 (22 octobre 2026) : logo de l'outil dans l'en-tête et comme icône de la fenêtre (`app/gui/OffPatch.png`, fond transparent), pied de fenêtre avec l'auteur, la licence MIT et le lien vers le dépôt GitHub du projet (5, 9). Demande et accord de David du 22 octobre 2026. Ligne de version en tête du document remise à jour (elle indiquait encore 1.34).
 - 1.41 (22 octobre 2026) : préparation d'un support (7.4), précisions de mise en œuvre sans changement de périmètre : `Lancer-OffPatch.cmd` et `LICENSE` copiés avec l'outil (le lanceur manquait à la liste), OffPatch à la racine du support, lecteur de l'outil refusé comme support, élément incomplet au dépôt écarté avec un avertissement, avertissement sous le double du dépôt retenu, espace demandé sans les fichiers déjà présents. Accord de David du 22 octobre 2026.
 - 1.42 (22 octobre 2026) : copie sur le support (7.4, étape 6) : manifeste filtré avec la date du dépôt d'origine, écrit seulement après des copies réussies ; dossiers du dépôt que le support ne doit plus porter supprimés (choix de David du 22 octobre 2026) ; lecteur portant des dossiers `app`, `config`, `tools` ou `depot` étrangers à OffPatch refusé (précision de sécurité, validée par David le 22 octobre 2026) ; annulation entre deux dossiers. Action CLI `Support`.
+- 1.43 (24 octobre 2026) : matrice des tests réels (12) complétée d'une colonne « Résultat » ; critère d'acceptation (13) : T2 (partie Windows), T3, T5, T7 et T8 réussis, T1, T4, T6 et la partie Office de T2 validés après la v1 sur intervention réelle (pas de PC adapté chez David) ; `createRestorePointBeforeSession` livré à `false` (6.1, 8.2), le cas « protection active d'origine » n'ayant pas été vu sur un PC réel, comme le prévoyait déjà 13. Décisions de David du 24 octobre 2026.

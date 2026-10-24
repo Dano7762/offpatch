@@ -19,7 +19,7 @@
     "rebootCountdownSeconds": 30,
     "staleDepotWarningDays": 35,
     "odtTimeoutMinutes": 30,
-    "createRestorePointBeforeSession": true
+    "createRestorePointBeforeSession": false
   },
   "logging": {
     "level": "INFO"

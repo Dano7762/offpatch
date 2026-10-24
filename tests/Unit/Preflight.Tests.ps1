@@ -135,7 +135,18 @@ Describe 'Test-OpPreflight' {
         (Get-Check (Get-TestInfo) 'DepotAge').Message | Should -BeLike '*illisible*JSON invalide*'
     }
 
+    It 'point de restauration : désactivé par défaut en v1 (cahier des charges 13), Ok sans lire la protection' {
+        $check = Get-Check (Get-TestInfo) 'RestorePoint'
+        $check.Result | Should -Be 'Ok'
+        $check.Message | Should -BeLike 'Désactivé dans settings.json*'
+    }
+
     It 'point de restauration : avertissement si la protection est inactive ou illisible, jamais bloquant' {
+        Mock Get-OpConfiguration {
+            $c = [pscustomobject]@{ Settings = (Get-Content -LiteralPath (Join-Path $root 'config\settings.json') -Raw -Encoding UTF8 | ConvertFrom-Json) }
+            $c.Settings.client.createRestorePointBeforeSession = $true
+            $c
+        }
         Mock Get-OpSystemProtection { [pscustomobject]@{ Active = $false; Spp = $true; Storage = $false } }
         $check = Get-Check (Get-TestInfo) 'RestorePoint'
         $check.Result | Should -Be 'Warning'
