@@ -1,0 +1,32 @@
+# T8 : préparation d'un support sur des disques virtuels FAT32, exFAT et NTFS (runner jetable, diskpart).
+# Dépôt synthétique de 8 Mo, rien n'est téléchargé. Attendu : FAT32 refusé avec message explicite, exFAT et NTFS
+# préparés et vérifiés. Déclenchement manuel uniquement.
+name: t8-support
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  t8:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Essai T8
+        run: ./tests/runner/Invoke-T8SupportTest.ps1 -OutputDirectory "$env:RUNNER_TEMP\t8-out"
+
+      - name: Sorties et journaux
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: t8-support
+          path: ${{ runner.temp }}/t8-out
+          retention-days: 30
+          if-no-files-found: warn
