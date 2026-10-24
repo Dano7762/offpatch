@@ -26,14 +26,14 @@ Capture d'écran du refus (étape 3) et du bilan (étape 6).
 
 ## 3. T5 depuis la clé préparée
 
-Le passage USB de VirtualBox fausse les lectures du dépôt : on copie la clé, sans rien y ajouter.
+Le passage USB de VirtualBox fausse les lectures du dépôt : la clé reste branchée sur l'hôte, sans être attribuée à la VM, et la VM la lit par un dossier partagé.
 
 1. VM Windows 10 revenue à l'instantané **« T5 vierge »**, sans réseau ;
-2. sur ton PC, copier tout le contenu de la clé dans le dossier partagé de la VM ;
-3. dans la VM, PowerShell **en administrateur** (remplacer `Z:\` par le dossier partagé) :
+2. VirtualBox, Configuration > Dossiers partagés : dossier pointant sur la racine de la clé sur l'hôte, nom `cle`, montage automatique sur `Y:` (lecture seule conseillée) ;
+3. dans la VM, PowerShell **en administrateur** (`\\VBoxSvr\cle` si `Y:` n'apparaît pas) :
 
    ```powershell
-   robocopy Z:\ C:\OffPatch /E
+   robocopy Y:\ C:\OffPatch /E
    Set-Location C:\OffPatch
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\app\OffPatch-Cli.ps1 -Action Plan | Tee-Object -FilePath C:\OffPatch\T5-support-plan.txt
    ```
