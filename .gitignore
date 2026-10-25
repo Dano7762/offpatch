@@ -33,3 +33,6 @@ Nouveau document texte.txt
 # Rapports et sorties d'essai déposés à la racine par David
 /*.html
 /T*-*.txt
+
+# Copies de travail temporaires de Claude Code
+.claude/worktrees/

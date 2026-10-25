@@ -4,7 +4,8 @@
 param()
 
 BeforeAll {
-    $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    Set-StrictMode -Version Latest
+    $root =Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     . (Join-Path $root 'app\module\OffPatch\Private\Invoke-OpHeadRequest.ps1')
     . (Join-Path $root 'app\module\OffPatch\Private\Resolve-OpDownloadUrl.ps1')
     $allowed = @((Get-Content -Path (Join-Path $root 'config\settings.json') -Raw -Encoding UTF8 | ConvertFrom-Json).allowedDomains)

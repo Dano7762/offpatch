@@ -3,7 +3,8 @@
 param()
 
 BeforeAll {
-    $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    Set-StrictMode -Version Latest
+    $root =Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     . (Join-Path $root 'app\module\OffPatch\Private\Invoke-OpWebRequest.ps1')
     function Get-SimulatedHttpError([int]$StatusCode, [string]$Content) {
         $exception = New-Object System.Exception "Erreur HTTP $StatusCode simulée"

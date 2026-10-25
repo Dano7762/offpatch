@@ -4,7 +4,8 @@
 param()
 
 BeforeAll {
-    $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    Set-StrictMode -Version Latest
+    $root =Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     . (Join-Path $root 'app\module\OffPatch\Private\ConvertFrom-OpCatalogSearchPage.ps1')
     . (Join-Path $root 'app\module\OffPatch\Private\ConvertFrom-OpCatalogDownloadDialog.ps1')
     . (Join-Path $root 'app\module\OffPatch\Private\Find-OpCatalogUpdate.ps1')

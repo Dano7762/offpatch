@@ -5,7 +5,8 @@
 param()
 
 BeforeAll {
-    $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    Set-StrictMode -Version Latest
+    $root =Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     . (Join-Path $root 'app\module\OffPatch\Private\Test-OpFileSignature.ps1')
     $microsoftRoot2010 = '3B1EFD3A66EA28B16697394703A72CA340A05BD5'
     $signedFile = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'

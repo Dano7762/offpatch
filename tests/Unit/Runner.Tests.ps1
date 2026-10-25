@@ -3,7 +3,8 @@
 param()
 
 BeforeAll {
-    $runner = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'tests\runner'
+    Set-StrictMode -Version Latest
+    $runner =Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'tests\runner'
 }
 
 Describe 'Invoke-R02CheckpointTest.ps1' {

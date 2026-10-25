@@ -4,7 +4,8 @@
 param()
 
 BeforeAll {
-    $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    Set-StrictMode -Version Latest
+    $root =Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     foreach ($name in 'Get-OpRoot', 'Unblock-OpToolFile') { . (Join-Path $root "app\module\OffPatch\Private\$name.ps1") }
     function Add-DownloadMark([string]$Path) {
         Set-Content -Path $Path -Stream 'Zone.Identifier' -Value "[ZoneTransfer]`r`nZoneId=3"

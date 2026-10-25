@@ -4,7 +4,8 @@
 param()
 
 BeforeAll {
-    $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    Set-StrictMode -Version Latest
+    $root =Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     . (Join-Path $root 'app\module\OffPatch\Private\Invoke-OpProcess.ps1')
     $cmd = Join-Path $env:SystemRoot 'System32\cmd.exe'
 }

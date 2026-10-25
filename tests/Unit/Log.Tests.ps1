@@ -3,7 +3,8 @@
 param()
 
 BeforeAll {
-    $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    Set-StrictMode -Version Latest
+    $root =Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     foreach ($name in 'Get-OpRoot', 'Get-OpPath', 'Start-OpLog', 'ConvertTo-OpMaskedText', 'Write-OpLog') {
         . (Join-Path $root "app\module\OffPatch\Private\$name.ps1")
     }
