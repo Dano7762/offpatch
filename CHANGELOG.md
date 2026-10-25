@@ -2,7 +2,7 @@
 
 Les dates sont celles de la publication sur GitHub. Le détail session par session est dans [docs/TODO.md](docs/TODO.md), la référence fonctionnelle dans le [cahier des charges](docs/CAHIER-DES-CHARGES.md).
 
-## 1.0.0 (à publier)
+## 1.0.0 (25 octobre 2026)
 
 Première version stable.
 
