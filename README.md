@@ -4,7 +4,7 @@
 
 Outil Windows portable qui prépare une fois par mois un dépôt de mises à jour Microsoft, puis les installe **sans connexion Internet** sur des PC traités un par un : en atelier, ou chez un client. Il prend la suite de WSUS Offline Update, qui n'est plus maintenu.
 
-> **État du projet : version bêta 0.6.0, finitions avant la 1.0.0.** Toutes les fonctions sont là : mise à jour du dépôt, préparation d'une clé, installation manuelle ou automatique avec reprise après redémarrage, rapport. Elles ont été validées sur des runners GitHub et sur des machines virtuelles Windows 10 et Windows 11. Trois cas restent à voir sur de vrais PC clients : un Windows 10 inscrit à l'ESU, un PC ARM64 avec Office, et la mise à jour d'un Office Click-to-Run installé (voir la matrice des tests dans le [cahier des charges](docs/CAHIER-DES-CHARGES.md), section 12).
+> **État du projet : version 1.0.0** (voir le [journal des versions](CHANGELOG.md)). Toutes les fonctions sont là : mise à jour du dépôt, préparation d'une clé, installation manuelle ou automatique avec reprise après redémarrage, rapport. Elles ont été validées sur des runners GitHub et sur des machines virtuelles Windows 10 et Windows 11. Trois cas restent à voir sur de vrais PC clients : un Windows 10 inscrit à l'ESU, un PC ARM64 avec Office, et la mise à jour d'un Office Click-to-Run installé (voir la matrice des tests dans le [cahier des charges](docs/CAHIER-DES-CHARGES.md), section 12).
 
 ## Ce que fait OffPatch
 
