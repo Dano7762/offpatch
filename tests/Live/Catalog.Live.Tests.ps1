@@ -29,8 +29,9 @@ BeforeAll {
 Describe 'Microsoft Update Catalog en ligne' -Tag 'Live' {
     It 'la recherche par KB et la fenêtre de téléchargement sont toujours reconnues' {
         try {
-            $entry = Find-OpCatalogUpdate -Query 'KB5043080' | Where-Object { $_.Title -match 'Windows 11 Version 24H2 for x64-based Systems \(KB5043080\)' } | Select-Object -First 1
-            $entry | Should -Not -BeNullOrEmpty
+            $found = @(Find-OpCatalogUpdate -Query 'KB5043080')
+            $entry = $found | Where-Object { $_.Title -match 'Windows 11 Version 24H2 for x64-based Systems \(KB5043080\)' } | Select-Object -First 1
+            $entry | Should -Not -BeNullOrEmpty -Because ('titres reçus ({0}) : {1}' -f $found.Count, (@($found | ForEach-Object { $_.Title }) -join ' | '))
             $files = @(Get-OpCatalogDownloadLink -UpdateId $entry.UpdateId)
             ($files | Where-Object { $_.FileName -match '^windows11\.0-kb5043080-x64_[0-9a-f]{40}\.msu$' }) | Should -Not -BeNullOrEmpty
         } catch {
