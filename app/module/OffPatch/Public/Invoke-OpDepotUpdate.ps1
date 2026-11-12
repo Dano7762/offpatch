@@ -161,8 +161,11 @@
     $toolVersion = $null
     if ($MyInvocation.MyCommand.Module) { $toolVersion = [string]$MyInvocation.MyCommand.Module.Version }
     $downloaded = @{}
-    # Avancement affiché dans la console de la CLI (Write-OpProgress) : un fichier partagé n'est compté qu'une fois.
-    $toFetch = @($items | ForEach-Object { $_.Files } | Where-Object { -not $_.Error -and -not $_.InDepot } | ForEach-Object { $_.Url } | Sort-Object -Unique)
+    # Avancement (Write-OpProgress) : un fichier partagé n'est compté qu'une fois ; avancement global en octets sur
+    # l'ensemble des fichiers à télécharger, fichier en cours dans script:OpProgressFile.
+    $sizes = @{}
+    foreach ($f in @($items | ForEach-Object { $_.Files } | Where-Object { -not $_.Error -and -not $_.InDepot })) { $sizes[$f.Url] = [double]$f.SizeBytes }
+    $script:OpProgressFile = @{ Index = 0; Count = $sizes.Count; Name = $null; Size = 0; Done = [double]0; Total = [double](($sizes.Values | Measure-Object -Sum).Sum) }
     $fileIndex = 0
     $new = New-Object System.Collections.Generic.List[object]
     foreach ($item in $items) {
@@ -180,15 +183,21 @@
                 try {
                     Assert-OpNotCancelled
                     $fileIndex++
-                    Write-OpProgress ('Fichier {0}/{1} : {2} ({3})' -f $fileIndex, $toFetch.Count, $f.FileName, (Format-OpSize $f.SizeBytes))
+                    $script:OpProgressFile.Index = $fileIndex
+                    $script:OpProgressFile.Name = $f.FileName
+                    $script:OpProgressFile.Size = $f.SizeBytes
+                    Write-OpProgress ('Fichier {0}/{1} : {2} ({3})' -f $fileIndex, $sizes.Count, $f.FileName, (Format-OpSize $f.SizeBytes))
                     $fileStart = Get-Date
                     $downloaded[$f.Url] = Save-OpDepotFile -Item $item -File $f -Configuration $configuration -Root $Root -Confirm:$false
+                    $script:OpProgressFile.Done += $sizes[$f.Url]
                     Write-OpProgress ('  terminé et contrôlé en {0:N0} s.' -f ((Get-Date) - $fileStart).TotalSeconds)
                 } catch [System.OperationCanceledException] {
+                    $script:OpProgressFile = $null
                     Write-OpLog -Level WARN -Message "Mise à jour du dépôt annulée à la demande : $($new.Count) nouveauté(s) déjà inscrite(s), pas de purge."
                     throw
                 } catch {
                     $downloaded[$f.Url] = $_.Exception.Message
+                    $script:OpProgressFile.Done += $sizes[$f.Url]
                     Write-OpProgress "  échec : $($_.Exception.Message)"
                 }
             }
@@ -216,9 +225,11 @@
         }
     }
 
+    $script:OpProgressFile = $null
+
     if ($odt -and -not $odt.Error -and -not $odt.UpToDate) {
         try {
-            Write-OpProgress "ODT $($odt.Version) : téléchargement et extraction."
+            Write-OpProgress "ODT $($odt.Version) : téléchargement et extraction." -Indeterminate
             Save-OpOdt -Plan $odt -Configuration $configuration -Root $Root -Confirm:$false | Out-Null
             $result.OdtUpdated = $true
         } catch {
@@ -236,11 +247,11 @@
                 Assert-OpNotCancelled
             }
             try {
-                Write-OpProgress "Source Office $($src.Id) ($($src.Channel)) : setup.exe /download en cours ; l'ODT n'indique pas sa progression (plusieurs Go, souvent 10 à 30 min)."
+                Write-OpProgress "Source Office $($src.Id) ($($src.Channel)) : setup.exe /download en cours ; l'ODT n'indique pas sa progression (plusieurs Go, souvent 10 à 30 min)." -Indeterminate
                 $saved = Save-OpOfficeSource -Source $src -SetupPath $odt.SetupPath -Root $Root -Confirm:$false
                 $version = $null
                 if ($saved.PSObject.Properties['Version']) { $version = $saved.Version }
-                Write-OpProgress "  terminé : version $version."
+                Write-OpProgress "  terminé : version $version." -Indeterminate
                 # Élément office-source : remplace celui de la version précédente de la même source (7.2).
                 $folder = @($configuration.OfficeSources.sources | Where-Object { $_.id -eq $src.Id })[0].folder
                 if (-not @($manifest.items | Where-Object { $_.id -eq "office-$($src.Id)-$($saved.Version)" })) {

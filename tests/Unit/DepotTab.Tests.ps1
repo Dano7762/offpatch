@@ -238,4 +238,19 @@ Describe 'Onglet Dépôt (fenêtre)' -Skip:$script:noSta {
         $c.BtnDepotUpdate.IsEnabled | Should -BeTrue
         $c.BtnDepotCancel.IsEnabled | Should -BeFalse
     }
+
+    It 'barre d''avancement : Value globale, indéterminée pour l''ODT, inchangée sans champ' {
+        $c = $script:ui.Controls
+        Show-OpDepotProgress -Controls $c -Message ([pscustomobject]@{ Kind = 'Progress'; Message = 'Fichier 1/2'; Value = 0.25; Indeterminate = $false })
+        $c.DepotProgress.Value | Should -Be 0.25
+        $c.DepotCurrent.Text | Should -Be 'Fichier 1/2'
+        Show-OpDepotProgress -Controls $c -Message ([pscustomobject]@{ Kind = 'Progress'; Message = 'ODT'; Value = $null; Indeterminate = $true })
+        $c.DepotProgress.IsIndeterminate | Should -BeTrue
+        Show-OpDepotProgress -Controls $c -Message ([pscustomobject]@{ Kind = 'Progress'; Message = 'Copie' })
+        $c.DepotProgress.IsIndeterminate | Should -BeTrue
+        $c.DepotCurrent.Text | Should -Be 'Copie'
+        Show-OpDepotProgress -Controls $c -Message ([pscustomobject]@{ Kind = 'Progress'; Message = 'Fichier 2/2'; Value = 0.75; Indeterminate = $false })
+        $c.DepotProgress.IsIndeterminate | Should -BeFalse
+        $c.DepotProgress.Value | Should -Be 0.75
+    }
 }

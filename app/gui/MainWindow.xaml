@@ -181,6 +181,7 @@
 
                     <!-- Avancement et dernières lignes du journal. -->
                     <StackPanel Grid.Row="4" Margin="0,10,0,0">
+                        <ProgressBar x:Name="DepotProgress" Height="14" Minimum="0" Maximum="1" Value="0" Margin="0,0,0,4" />
                         <TextBlock x:Name="DepotCurrent" TextTrimming="CharacterEllipsis" />
                         <ListBox x:Name="DepotLastLog" Height="130" Margin="0,6,0,0" FontFamily="Consolas" FontSize="12" />
                     </StackPanel>
