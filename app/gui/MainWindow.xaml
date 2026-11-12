@@ -50,10 +50,9 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" MinHeight="140" />
+                        <RowDefinition Height="3*" MinHeight="140" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="2*" MinHeight="150" />
                     </Grid.RowDefinitions>
 
                     <!-- Bandeau système. -->
@@ -102,24 +101,29 @@
                     </DataGrid>
 
                     <!-- Office (lecture seule). -->
-                    <TextBlock x:Name="PcOfficeText" Grid.Row="4" Margin="0,8,0,0" TextWrapping="Wrap" />
+                    <!-- Séparation déplaçable entre la grille et le bas de l'onglet. -->
+                    <GridSplitter Grid.Row="4" Height="6" Margin="0,4,0,0" HorizontalAlignment="Stretch" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" />
+
+                    <DockPanel Grid.Row="5">
+                    <TextBlock x:Name="PcOfficeText" DockPanel.Dock="Top" Margin="0,4,0,0" TextWrapping="Wrap" />
 
                     <!-- Boutons. -->
-                    <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,10,0,0">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,10,0,0">
                         <Button x:Name="BtnAuto" Content="Installation automatique" Padding="14,4" Margin="0,0,8,0" IsEnabled="False" />
                         <Button x:Name="BtnInstallSelection" Content="Installer la sélection" Padding="14,4" Margin="0,0,8,0" IsEnabled="False" />
                         <Button x:Name="BtnResume" Content="Reprendre la session interrompue" Padding="14,4" Visibility="Collapsed" ToolTipService.ShowOnDisabled="True" />
                     </StackPanel>
 
                     <!-- Avancement et dernières lignes du journal. -->
-                    <StackPanel Grid.Row="6" Margin="0,10,0,0">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,10,0,0">
                         <DockPanel>
                             <TextBlock x:Name="PcCurrentStep" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="0,0,8,0" />
                             <Button x:Name="BtnCancelReboot" DockPanel.Dock="Right" Content="Annuler le redémarrage" Padding="12,2" Margin="8,0,0,0" Visibility="Collapsed" />
                             <ProgressBar x:Name="PcProgress" Height="14" Minimum="0" Maximum="1" Value="0" />
                         </DockPanel>
-                        <ListBox x:Name="PcLastLog" Height="110" Margin="0,6,0,0" FontFamily="Consolas" FontSize="12" />
                     </StackPanel>
+                    <ListBox x:Name="PcLastLog" MinHeight="50" Margin="0,6,0,0" FontFamily="Consolas" FontSize="12" />
+                    </DockPanel>
                 </Grid>
             </TabItem>
             <TabItem x:Name="TabDepot" Header="Dépôt">
@@ -127,9 +131,9 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" MinHeight="140" />
+                        <RowDefinition Height="3*" MinHeight="140" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="2*" MinHeight="130" />
                     </Grid.RowDefinitions>
 
                     <!-- Résumé : date, taille totale, fraîcheur. -->
@@ -169,8 +173,12 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
+                    <!-- Séparation déplaçable entre la grille et le bas de l'onglet. -->
+                    <GridSplitter Grid.Row="3" Height="6" Margin="0,4,0,0" HorizontalAlignment="Stretch" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" />
+
+                    <DockPanel Grid.Row="4">
                     <!-- Boutons. -->
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,0">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,6,0,0">
                         <Button x:Name="BtnDepotCheck" Content="Vérifier les nouveautés" Padding="14,4" Margin="0,0,8,0" />
                         <Button x:Name="BtnDepotUpdate" Content="Mettre à jour le dépôt" Padding="14,4" Margin="0,0,8,0" />
                         <Button x:Name="BtnDepotPurge" Content="Purger" Padding="14,4" Margin="0,0,8,0" />
@@ -180,10 +188,11 @@
                     </StackPanel>
 
                     <!-- Avancement et dernières lignes du journal. -->
-                    <StackPanel Grid.Row="4" Margin="0,10,0,0">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,10,0,0">
                         <TextBlock x:Name="DepotCurrent" TextTrimming="CharacterEllipsis" />
-                        <ListBox x:Name="DepotLastLog" Height="130" Margin="0,6,0,0" FontFamily="Consolas" FontSize="12" />
                     </StackPanel>
+                    <ListBox x:Name="DepotLastLog" MinHeight="50" Margin="0,6,0,0" FontFamily="Consolas" FontSize="12" />
+                    </DockPanel>
                 </Grid>
             </TabItem>
             <TabItem x:Name="TabLog" Header="Journal">
