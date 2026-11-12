@@ -2,6 +2,17 @@
 
 Les dates sont celles de la publication sur GitHub. Le détail session par session est dans [docs/TODO.md](docs/TODO.md), la référence fonctionnelle dans le [cahier des charges](docs/CAHIER-DES-CHARGES.md).
 
+## 1.1.0 (12 novembre 2026)
+
+### Ajouté
+
+- Onglet Dépôt : barre de progression globale du téléchargement, calculée en octets sur l'ensemble des fichiers. Le texte garde le fichier en cours (« Fichier 2/8 : nom, reçu / taille (%) ; total % ») et se rafraîchit toutes les 2 s. Pour l'ODT et les sources Office, qui n'indiquent pas leur progression, la barre tourne sans pourcentage.
+- Onglets Dépôt et Ce PC : la zone des dernières lignes du journal se redimensionne en faisant glisser la séparation avec la liste du dessus.
+
+### Corrigé
+
+- Quand BITS croit le PC sans réseau alors qu'il a Internet (« Il n'existe actuellement aucune connexion réseau active »), chaque fichier échouait au bout de 5 min sans qu'un seul octet soit reçu. Après 60 s en erreur passagère sans aucun octet, BITS est maintenant jugé indisponible (avertissement au journal) et le téléchargement passe par HttpClient, avec les mêmes contrôles : domaines autorisés, https, aucune redirection suivie.
+
 ## 1.0.0 (25 octobre 2026)
 
 Première version stable.
