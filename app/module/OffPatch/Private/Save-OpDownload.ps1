@@ -7,7 +7,7 @@
         Étape 4 de la mise à jour du dépôt (cahier des charges 7.1, R-16). L'URL doit être l'URL finale, déjà résolue
         et contrôlée par Resolve-OpDownloadUrl : https seulement, aucune redirection suivie pendant le transfert.
         Engine Auto : BITS (Invoke-OpBitsDownload), puis HttpClient (Invoke-OpHttpDownload) si BITS est indisponible
-        (module absent, travail non créé ou bloqué en file d'attente) ; une autre erreur de BITS n'entraîne pas de repli.
+        (module absent, travail non créé, bloqué en file d'attente ou en erreur passagère sans aucun octet reçu) ; une autre erreur de BITS n'entraîne pas de repli.
         Un téléchargement interrompu reprend au lancement suivant : travail BITS conservé ou fichier « .part ».
         Fichier déjà présent à Destination (lancement précédent arrêté juste après le transfert) : gardé tel quel.
         Avec ExpectedSize, un fichier d'une autre taille est supprimé et une erreur est levée.

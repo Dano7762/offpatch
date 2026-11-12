@@ -202,6 +202,29 @@ Describe 'Invoke-OpBitsDownload (BITS simulé)' {
         Should -Invoke Remove-BitsTransfer -Times 1 -Exactly
     }
 
+    It 'déclare BITS indisponible quand le travail reste en erreur passagère sans aucun octet (réseau non vu par BITS)' {
+        Use-JobSequence @((Get-FakeJob 'Suspended'), (Get-FakeJob 'TransientError'))
+        $script:clock = [datetime]'2026-11-12 10:00:00'
+        Mock Get-Date { $script:clock = $script:clock.AddSeconds(5); $script:clock }
+        { Invoke-OpBitsDownload -Url $script:url -Destination $script:dest -QueuedSeconds 30 -StallSeconds 300 -PollMilliseconds 10 } |
+            Should -Throw -ExceptionType ([System.NotSupportedException]) -ExpectedMessage '*erreur passagère*HTTP 404 introuvable*RemoteFile*'
+        Should -Invoke Remove-BitsTransfer -Times 1 -Exactly
+    }
+
+    It 'passe au repli HttpClient dans Save-OpDownload quand le travail reste en erreur passagère sans aucun octet' {
+        Use-JobSequence @((Get-FakeJob 'Suspended'), (Get-FakeJob 'TransientError'))
+        $script:clock = [datetime]'2026-11-12 10:00:00'
+        Mock Get-Date { $script:clock = $script:clock.AddSeconds(5); $script:clock }
+        $dest = Join-Path $TestDrive 'repli\fichier.msu'
+        Mock Invoke-OpHttpDownload {
+            [System.IO.File]::WriteAllBytes($Destination, (New-Object byte[] 10))
+            [pscustomobject]@{ Path = $Destination; Engine = 'HttpClient'; Resumed = $false; SizeBytes = 10 }
+        }
+        (Save-OpDownload -Url $script:url -Destination $dest -ExpectedSize 10).Engine | Should -Be 'HttpClient'
+        Should -Invoke Invoke-OpHttpDownload -Times 1 -Exactly -ParameterFilter { $Url -eq $script:url }
+        Should -Invoke Write-OpLog -ParameterFilter { $Level -eq 'WARN' -and $Message -like '*erreur passagère*Repli sur HttpClient*' }
+    }
+
     It 'garde le travail pour une reprise ultérieure quand le transfert ne progresse plus' {
         Use-JobSequence @((Get-FakeJob 'Suspended'), (Get-FakeJob 'TransientError' 700))
         $script:clock = [datetime]'2026-10-11 10:00:00'

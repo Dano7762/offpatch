@@ -11,8 +11,11 @@
           - un travail du même nom vers la même URL et le même fichier, laissé par un lancement interrompu, est repris
             (Resume-BitsTransfer) au lieu d'être recréé : BITS garde les octets déjà reçus ;
           - travail resté en file d'attente sans aucun octet reçu pendant QueuedSeconds (BITS ne transfère que pour
-            un propriétaire en session interactive) : travail supprimé, erreur NotSupportedException « BITS
-            indisponible », pour que l'appelant passe au repli HttpClient ;
+            un propriétaire en session interactive), ou en erreur passagère (TransientError) sans aucun octet reçu
+            pendant QueuedSeconds (détection réseau de BITS en défaut, BG_E_NETWORK_DISCONNECTED alors que le PC a
+            Internet) : travail supprimé, erreur NotSupportedException « BITS indisponible » avec la description de
+            BITS, pour que l'appelant passe au repli HttpClient avant que BITS ne mette le travail en erreur
+            (RetryTimeout) ; si des octets ont déjà été reçus, ce cas ne s'applique pas ;
           - erreur définitive (HTTP 404, redirection refusée…) : travail supprimé, erreur avec la description de BITS ;
           - aucun progrès pendant StallSeconds : travail laissé en place pour une reprise au prochain lancement, erreur.
         Le fichier n'apparaît à sa place qu'après Complete-BitsTransfer.
@@ -98,9 +101,15 @@
             Remove-BitsTransfer -BitsJob $job -ErrorAction SilentlyContinue
             throw "Téléchargement BITS en échec, $Url : $detail"
         }
-        if ($state -eq 'Queued' -and $bytes -le 0 -and ((Get-Date) - $started).TotalSeconds -ge $QueuedSeconds) {
+        if (@('Queued', 'TransientError') -contains $state -and $bytes -le 0 -and ((Get-Date) - $started).TotalSeconds -ge $QueuedSeconds) {
+            # Sans aucun octet reçu, rien à reprendre : BITS est jugé indisponible et HttpClient prend le relais.
+            if ($state -eq 'Queued') {
+                $reason = "resté en file d'attente $QueuedSeconds s sans transfert (session non interactive ?)"
+            } else {
+                $reason = "en erreur passagère depuis $QueuedSeconds s sans aucun octet reçu : " + ("$($job.ErrorDescription)" -replace '\s+', ' ').Trim() + " (contexte $($job.ErrorContext))"
+            }
             Remove-BitsTransfer -BitsJob $job -ErrorAction SilentlyContinue
-            throw (New-Object System.NotSupportedException("BITS indisponible : travail resté en file d'attente $QueuedSeconds s sans transfert (session non interactive ?)."))
+            throw (New-Object System.NotSupportedException("BITS indisponible : travail $reason."))
         }
         try {
             Assert-OpNotCancelled
