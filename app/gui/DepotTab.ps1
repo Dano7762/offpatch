@@ -158,6 +158,39 @@ function Set-OpDepotBusy {
     $Controls.BtnDepotCancel.IsEnabled = $Busy -and $Cancellable
 }
 
+function Show-OpDepotProgress {
+    <#
+    .SYNOPSIS
+        Affiche un message d'avancement (Kind Progress, Write-OpProgress) dans la barre et la ligne de l'onglet Dépôt.
+
+    .DESCRIPTION
+        Indeterminate : barre indéterminée (ODT, sources Office). Value (0 à 1) : avancement global en octets. Sans
+        l'un ni l'autre, la barre reste comme elle est.
+
+    .PARAMETER Controls
+        Contrôles nommés de la fenêtre.
+
+    .PARAMETER Message
+        Message de la file : Message, et éventuellement Value et Indeterminate.
+
+    .EXAMPLE
+        Show-OpDepotProgress -Controls $ui.Controls -Message $m
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]$Controls,
+        [Parameter(Mandatory)][pscustomobject]$Message
+    )
+
+    $Controls.DepotCurrent.Text = $Message.Message
+    $bar = $Controls.DepotProgress
+    if ($Message.PSObject.Properties['Indeterminate'] -and $Message.Indeterminate) { $bar.IsIndeterminate = $true }
+    elseif ($Message.PSObject.Properties['Value'] -and $null -ne $Message.Value) {
+        $bar.IsIndeterminate = $false
+        $bar.Value = $Message.Value
+    }
+}
+
 function Invoke-OpDepotRefresh {
     <#
     .SYNOPSIS
@@ -211,20 +244,24 @@ function Invoke-OpDepotRun {
     )
 
     Set-OpDepotBusy -Controls $Ui.Controls -Busy $true -Cancellable $true -Confirm:$false
+    $Ui.Controls.DepotProgress.IsIndeterminate = $false
+    $Ui.Controls.DepotProgress.Value = 0
     $Ui.Controls.DepotCurrent.Text = 'Vérification des nouveautés…'
     if (-not $ListOnly) { $Ui.Controls.DepotCurrent.Text = 'Mise à jour du dépôt…' }
     $task = Start-OpBackgroundTask -ScriptBlock $script:OpDepotUpdateScript -Parameters @{ Root = $Ui.Root; ListOnly = [bool]$ListOnly } -ModulePath $Ui.ModulePath -Confirm:$false
     $Ui | Add-Member -NotePropertyName DepotTask -NotePropertyValue $task -Force
     [void](Register-OpBackgroundPump -Task $task -Context $Ui -OnMessage {
             param($m, $Ui)
-            if ($m.PSObject.Properties['Kind'] -and $m.Kind -eq 'Progress') { $Ui.Controls.DepotCurrent.Text = $m.Message }
+            if ($m.PSObject.Properties['Kind'] -and $m.Kind -eq 'Progress') { Show-OpDepotProgress -Controls $Ui.Controls -Message $m }
             elseif ($m.PSObject.Properties['Line']) { Add-OpLogLine -ListBox $Ui.Controls.DepotLastLog -Line $m.Line; Add-OpJournalEntry -Controls $Ui.Controls -Message $m }
         } -OnCompleted {
             param($r, $Ui)
             $c = $Ui.Controls
+            $c.DepotProgress.IsIndeterminate = $false
+            $c.DepotProgress.Value = 0
             if ($r.Cancelled) { $c.DepotCurrent.Text = 'Annulé : le téléchargement en cours reprendra au prochain lancement.' }
             elseif ($r.Error) { $c.DepotCurrent.Text = "Échec : $($r.Error)" }
-            else { $c.DepotCurrent.Text = 'Terminé : {0} erreur(s).' -f $r.Output[-1].ErrorCount }
+            else { $c.DepotCurrent.Text = 'Terminé : {0} erreur(s).' -f $r.Output[-1].ErrorCount; $c.DepotProgress.Value = 1 }
             Set-OpDepotBusy -Controls $c -Busy $false -Confirm:$false
             Invoke-OpDepotRefresh -Ui $Ui
         })
@@ -255,6 +292,7 @@ function Invoke-OpDepotPurgeRun {
     )
 
     Set-OpDepotBusy -Controls $Ui.Controls -Busy $true -Confirm:$false
+    $Ui.Controls.DepotProgress.Value = 0
     $Ui.Controls.DepotCurrent.Text = 'Purge du dépôt…'
     $task = Start-OpBackgroundTask -ScriptBlock $script:OpDepotPurgeScript -Parameters @{ Root = $Ui.Root; RemoveOrphans = [bool]$RemoveOrphans } -ModulePath $Ui.ModulePath -Confirm:$false
     [void](Register-OpBackgroundPump -Task $task -Context $Ui -OnMessage {

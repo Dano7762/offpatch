@@ -59,13 +59,13 @@
         if ($resumed) { $received = $existing }
         $total = $null
         if ($response.Content.Headers.ContentLength) { $total = $received + [long]$response.Content.Headers.ContentLength }
-        $lastReport = Get-Date
         while (($read = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
             $file.Write($buffer, 0, $read)
             $received += $read
             # Annulation : le fichier .part reste, la reprise (en-tête Range) repart de là.
             Assert-OpNotCancelled
-            if (((Get-Date) - $lastReport).TotalSeconds -ge 30) { Write-OpProgress '  HttpClient :' -Bytes $received -TotalBytes $total; $lastReport = Get-Date }
+            # Cadence (2 s pour l'interface, 30 s pour la console) tenue par Write-OpProgress -Throttle.
+            Write-OpProgress '  HttpClient :' -Bytes $received -TotalBytes $total -Throttle
         }
         $file.Close()
         $file = $null

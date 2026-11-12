@@ -258,6 +258,27 @@ Describe 'Invoke-OpDepotUpdate (téléchargement)' {
         $text | Should -Match 'Purge : rien à retirer'
     }
 
+    It 'avancement pour l''interface : fichier i/n et avancement global en octets jusqu''à 1, sans fichier en cours ensuite' {
+        $tool = Initialize-TestTool 'progress'
+        Mock Get-OpDepotPlan $script:plan
+        Mock Save-OpDepotFile { Write-OpProgress '  BITS :' -Bytes 5 -TotalBytes 10; Get-Entry $File.FileName }
+        $queue = New-Object 'System.Collections.Concurrent.ConcurrentQueue[object]'
+        $script:OpLog = [pscustomobject]@{ Path = (Join-Path $TestDrive 'p.log'); Level = 'INFO'; Queue = $queue; Console = $false }
+        try {
+            $null = Invoke-OpDepotUpdate -Root $tool
+        } finally { $script:OpLog = $null }
+        $m = $null
+        $list = @()
+        while ($queue.TryDequeue([ref]$m)) { $list += $m }
+        $bits = @($list | Where-Object { $_.Message -like '*; total *' })
+        $bits.Count | Should -Be 2
+        $bits[0].Message | Should -Match '^Fichier 1/2 : lcu\.msu, .*\(50 %\) ; total 25 %$'
+        $bits[0].Value | Should -Be 0.25
+        $bits[1].Value | Should -Be 0.75
+        $list[-1].Value | Should -Be 1
+        $script:OpProgressFile | Should -BeNullOrEmpty
+    }
+
     It 'reprend les entrées déjà au manifeste et ne compte pas comme nouveauté un élément déjà inscrit' {
         $tool = Initialize-TestTool 'd2'
         Mock Get-OpDepotPlan $script:plan
